@@ -1,4 +1,5 @@
 import { Upload, Wand2, Eye, Package } from "lucide-react";
+import Reveal from "@/components/ui/Reveal";
 
 const steps = [
   {
@@ -29,39 +30,43 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <section className="bg-white py-24">
+    <section className="bg-white py-24" id="how">
       <div className="mx-auto max-w-7xl px-6 text-center">
-        <h2 className="text-4xl font-bold text-gray-900">How it works</h2>
-        <p className="mt-4 text-lg text-gray-600">
-          From photos to a printed book in four simple steps
-        </p>
+        <Reveal>
+          <h2 className="text-4xl font-bold text-gray-900">How it works</h2>
+        </Reveal>
+
+        <Reveal delay={0.1}>
+          <p className="mt-4 text-lg text-gray-600">
+            From photos to a printed book in four simple steps
+          </p>
+        </Reveal>
 
         <div className="mt-16 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
-          {steps.map((step) => {
+          {steps.map((step, index) => {
             const Icon = step.icon;
             return (
-              <div
-                key={step.number}
-                className="relative rounded-2xl border border-gray-100 bg-white p-8 shadow-sm transition hover:shadow-md"
-              >
-                {/* Número de fondo */}
-                <span className="absolute top-4 right-6 text-6xl font-extrabold text-gray-300 opacity-50 select-none">
-                  {step.number}
-                </span>
+              <Reveal key={step.number} delay={0.2 + index * 0.15}>
+                <div className="relative rounded-2xl border border-gray-100 bg-white p-8 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                  {/* Número de fondo */}
+                  <span className="absolute top-4 right-6 text-6xl font-extrabold text-gray-300 opacity-50 select-none">
+                    {step.number}
+                  </span>
 
-                {/* Icono */}
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-500">
-                  <Icon size={24} />
+                  {/* Icono */}
+                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-500">
+                    <Icon size={24} />
+                  </div>
+
+                  {/* Texto */}
+                  <h3 className="mb-2 text-lg font-semibold text-gray-900">
+                    {step.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-gray-600">
+                    {step.description}
+                  </p>
                 </div>
-
-                {/* Texto */}
-                <h3 className="mb-2 text-lg font-semibold text-gray-900">
-                  {step.title}
-                </h3>
-                <p className="text-sm leading-relaxed text-gray-600">
-                  {step.description}
-                </p>
-              </div>
+              </Reveal>
             );
           })}
         </div>

@@ -1,53 +1,65 @@
+"use client";
+
+import Reveal from "@/components/ui/Reveal";
+
 export default function Footer() {
   return (
     <footer className="bg-black text-gray-400 pt-20 pb-10">
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
+      <div className="max-w-7xl mx-auto px-6">
 
-        {/* Brand */}
-        <div>
-          <h3 className="text-white text-xl font-semibold mb-4">Pixia</h3>
-          <p className="text-sm leading-relaxed">
-            Transformamos tus recuerdos en libros fotográficos
-            cinematográficos, creados con inteligencia artificial y calidad de impresión premium.
-          </p>
-        </div>
+        <Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+            
+            {/* Marca */}
+            <div>
+              <h3 className="text-white font-semibold text-lg mb-4">Pixia</h3>
+              <p className="text-sm leading-relaxed">
+                Turning your memories into cinematic stories, beautifully
+                designed and printed with AI.
+              </p>
+            </div>
 
-        {/* Product */}
-        <div>
-          <h4 className="text-white font-medium mb-3">Producto</h4>
-          <ul className="space-y-2 text-sm">
-            <li>Cómo funciona</li>
-            <li>Ejemplos</li>
-            <li>Precios</li>
-            <li>Preguntas frecuentes</li>
-          </ul>
-        </div>
+            {/* Producto */}
+            <div>
+              <h4 className="text-white font-semibold mb-3">Product</h4>
+              <ul className="space-y-2 text-sm">
+                <li>Create Album</li>
+                <li>How it Works</li>
+                <li>Pricing</li>
+                <li>Examples</li>
+              </ul>
+            </div>
 
-        {/* Company */}
-        <div>
-          <h4 className="text-white font-medium mb-3">Compañía</h4>
-          <ul className="space-y-2 text-sm">
-            <li>Sobre nosotros</li>
-            <li>Contacto</li>
-            <li>Privacidad</li>
-            <li>Términos</li>
-          </ul>
-        </div>
+            {/* Empresa */}
+            <div>
+              <h4 className="text-white font-semibold mb-3">Company</h4>
+              <ul className="space-y-2 text-sm">
+                <li>About</li>
+                <li>Careers</li>
+                <li>Contact</li>
+                <li>Press</li>
+              </ul>
+            </div>
 
-        {/* Social */}
-        <div>
-          <h4 className="text-white font-medium mb-3">Síguenos</h4>
-          <ul className="space-y-2 text-sm">
-            <li>Instagram</li>
-            <li>Facebook</li>
-            <li>TikTok</li>
-            <li>YouTube</li>
-          </ul>
-        </div>
-      </div>
+            {/* Legal */}
+            <div>
+              <h4 className="text-white font-semibold mb-3">Legal</h4>
+              <ul className="space-y-2 text-sm">
+                <li>Privacy Policy</li>
+                <li>Terms of Service</li>
+                <li>Cookies</li>
+              </ul>
+            </div>
+          </div>
+        </Reveal>
 
-      <div className="border-t border-white/10 mt-16 pt-6 text-center text-xs text-gray-500">
-        © {new Date().getFullYear()} Pixia. Hecho con amor para convertir recuerdos en historias eternas.
+        <Reveal delay={0.2}>
+          <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500">
+            <span>© {new Date().getFullYear()} Pixia. All rights reserved.</span>
+            <span>Made with ❤️ and AI</span>
+          </div>
+        </Reveal>
+
       </div>
     </footer>
   );
