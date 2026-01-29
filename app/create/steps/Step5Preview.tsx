@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import ContinueButton from "@/components/create/ContinueButton";
 import { useWizard } from "@/components/create/WizardProvider";
+import { useRouter } from "next/navigation";
 
 const emotionGradients: Record<string, string> = {
   happy: "from-yellow-400/40 via-orange-400/30 to-pink-400/40",
@@ -41,6 +41,7 @@ const emotionLabels: Record<string, string> = {
 
 export default function Step5Preview() {
   const { state } = useWizard();
+  const router = useRouter();
 
   return (
     <div className="w-full">
@@ -92,7 +93,15 @@ export default function Step5Preview() {
 
       {/* CTA */}
       <div className="flex flex-col items-center mt-12 gap-4">
-        <ContinueButton>Crear mi álbum</ContinueButton>
+        <motion.button
+          onClick={() => router.push("/create/loading")}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="px-10 py-4 rounded-full font-semibold text-lg bg-gradient-to-r from-pink-500 to-indigo-500 text-white shadow-[0_0_30px_rgba(236,72,153,0.5)]"
+        >
+          Crear mi álbum
+        </motion.button>
+
         <span className="text-white/40 text-sm">
           Esto tomará solo unos segundos.
         </span>
