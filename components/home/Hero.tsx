@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function Hero() {
   return (
@@ -24,9 +25,12 @@ export default function Hero() {
         </p>
 
         <div className="mt-10 flex justify-center gap-4">
-          <button className="px-8 py-3 rounded-full text-white font-semibold bg-gradient-to-r from-orange-400 to-pink-500 shadow-lg hover:scale-105 transition">
-            Create your album
-          </button>
+          <Link href="/create">
+            <button className="px-8 py-3 rounded-full text-white font-semibold bg-gradient-to-r from-orange-400 to-pink-500 shadow-lg hover:scale-105 transition">
+              Create your album
+            </button>
+          </Link>
+
           <button className="px-8 py-3 rounded-full border border-white/20 text-white hover:bg-white/10 transition">
             View demo
           </button>

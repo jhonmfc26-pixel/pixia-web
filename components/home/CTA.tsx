@@ -2,6 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import Reveal from "@/components/ui/Reveal";
+import Link from "next/link";
 
 export default function CTA() {
   return (
@@ -10,7 +11,6 @@ export default function CTA() {
       <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 via-transparent to-orange-400/10" />
 
       <div className="relative max-w-5xl mx-auto px-6 text-center">
-        
         <Reveal>
           <h2 className="text-3xl md:text-4xl font-semibold text-white mb-4">
             Tu historia merece ser recordada para siempre
@@ -33,16 +33,18 @@ export default function CTA() {
         </Reveal>
 
         <Reveal delay={0.35}>
-          <button
-            className="group inline-flex items-center gap-3 px-10 py-4 rounded-full text-white font-semibold text-lg
-            bg-gradient-to-r from-[#FF7A18] via-[#FF4D8D] to-[#FF2D95]
-            shadow-[0_0_40px_rgba(255,77,141,0.35)]
-            hover:shadow-[0_0_60px_rgba(255,77,141,0.55)]
-            transition-all duration-300 hover:scale-[1.04]"
-          >
-            Crear mi álbum ahora
-            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-          </button>
+          <Link href="/create">
+            <button
+              className="group inline-flex items-center gap-3 px-10 py-4 rounded-full text-white font-semibold text-lg
+              bg-gradient-to-r from-[#FF7A18] via-[#FF4D8D] to-[#FF2D95]
+              shadow-[0_0_40px_rgba(255,77,141,0.35)]
+              hover:shadow-[0_0_60px_rgba(255,77,141,0.55)]
+              transition-all duration-300 hover:scale-[1.04]"
+            >
+              Crear mi álbum ahora
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+            </button>
+          </Link>
         </Reveal>
 
         <Reveal delay={0.5}>
