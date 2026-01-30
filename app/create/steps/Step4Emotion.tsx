@@ -58,7 +58,7 @@ const emotions = [
 
 export default function Step4Emotion() {
   const { state, dispatch } = useWizard();
-  const [selected, setSelected] = useState<string | null>(state.emotion);
+  const [selected, setSelected] = useState<string | null>(state.emotion ?? null);
 
   const handleSelect = (id: string) => {
     setSelected(id);
