@@ -9,78 +9,25 @@ import Step3Style from "./steps/Step3Style";
 import Step4Emotion from "./steps/Step4Emotion";
 import Step5Preview from "./steps/Step5Preview";
 
-function WizardSteps() {
+export default function CreatePage() {
   const { state } = useWizard();
 
   return (
     <AnimatePresence mode="wait">
-      {state.step === 1 && (
-        <motion.div
-          key="step1"
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="w-full"
-        >
-          <Step1Story />
-        </motion.div>
-      )}
-
-      {state.step === 2 && (
-        <motion.div
-          key="step2"
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="w-full"
-        >
-          <Step2Upload />
-        </motion.div>
-      )}
-
-      {state.step === 3 && (
-        <motion.div
-          key="step3"
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="w-full"
-        >
-          <Step3Style />
-        </motion.div>
-      )}
-      {state.step === 4 && (
-        <motion.div
-          key="step4"
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="w-full"
-        >
-          <Step4Emotion />
-        </motion.div>
-      )}
-
-      {state.step === 5 && (
-        <motion.div
-          key="step5"
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="w-full"
-        >
-          <Step5Preview />
-        </motion.div>
-      )}
+      <motion.div
+        key={state.step}
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -24 }}
+        transition={{ duration: 0.4, ease: "easeInOut" }}
+        className="w-full"
+      >
+        {state.step === 1 && <Step1Story />}
+        {state.step === 2 && <Step2Upload />}
+        {state.step === 3 && <Step3Style />}
+        {state.step === 4 && <Step4Emotion />}
+        {state.step === 5 && <Step5Preview />}
+      </motion.div>
     </AnimatePresence>
   );
-}
-
-export default function CreatePage() {
-  return <WizardSteps />;
 }
