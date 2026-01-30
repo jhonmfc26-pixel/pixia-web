@@ -40,7 +40,7 @@ const styles = [
 
 export default function Step3Style() {
   const { state, dispatch } = useWizard();
-  const [selected, setSelected] = useState<string | null>(state.style);
+  const [selected, setSelected] = useState<string | null>(state.style ?? null);
 
   const handleSelect = (id: string) => {
     setSelected(id);
