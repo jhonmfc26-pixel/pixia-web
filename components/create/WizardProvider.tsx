@@ -1,6 +1,15 @@
 "use client";
 
-import { createContext, useContext, useReducer, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useEffect,
+} from "react";
+
+/* =======================
+   TYPES
+======================= */
 
 export type PhotoItem = {
   id: string;
@@ -24,12 +33,23 @@ type WizardAction =
   | { type: "SET_STYLE"; payload: string }
   | { type: "SET_EMOTION"; payload: string };
 
+/* =======================
+   INITIAL STATE
+======================= */
+
 const initialState: WizardState = {
   step: 1,
   photos: [],
 };
 
-function wizardReducer(state: WizardState, action: WizardAction): WizardState {
+/* =======================
+   REDUCER
+======================= */
+
+function wizardReducer(
+  state: WizardState,
+  action: WizardAction
+): WizardState {
   switch (action.type) {
     case "NEXT_STEP":
       return { ...state, step: Math.min(state.step + 1, 5) };
@@ -48,10 +68,18 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   }
 }
 
+/* =======================
+   CONTEXT
+======================= */
+
 const WizardContext = createContext<{
   state: WizardState;
   dispatch: React.Dispatch<WizardAction>;
 } | null>(null);
+
+/* =======================
+   PROVIDER
+======================= */
 
 export function WizardProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(wizardReducer, initialState);
@@ -68,11 +96,16 @@ export function WizardProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* =======================
+   HOOK
+======================= */
+
 export function useWizard() {
   const context = useContext(WizardContext);
+
   if (!context) {
     throw new Error("useWizard must be used within WizardProvider");
   }
+
   return context;
 }
-
