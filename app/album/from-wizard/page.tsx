@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useWizard } from "@/components/create/WizardProvider";
@@ -15,7 +17,7 @@ export default function AlbumFromWizardPage() {
     return <p className="p-8">No hay fotos para crear el álbum</p>;
   }
 
-  // ⏭ Redirigir al editor real (una vez montado)
+  // ⏭ Redirigir al editor real
   useEffect(() => {
     router.replace("/album/editor");
   }, [router]);
