@@ -1,11 +1,19 @@
-"use client";
+'use client';
 
-import AlbumOpenAnimation from "@/components/album/AlbumOpenAnimation";
+import { useAlbum } from '@/context/AlbumProvider';
 
 export default function AlbumEditorPage() {
+  const album = useAlbum();
+
   return (
-    <div className="min-h-screen bg-white flex justify-center items-center">
-      <AlbumOpenAnimation />
-    </div>
+    <main className="min-h-screen p-6">
+      <h1 className="text-xl font-semibold mb-4">
+        Album Editor
+      </h1>
+
+      <pre className="bg-neutral-100 p-4 rounded">
+        {JSON.stringify(album, null, 2)}
+      </pre>
+    </main>
   );
 }
