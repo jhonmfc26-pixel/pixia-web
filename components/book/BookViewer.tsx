@@ -107,47 +107,33 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
     if (spread.layout === 'full-bleed') {
       const photo = spread.photos[0] ?? null
 
-      // Left page — full photo
+      // Left page — left half of image
       pages.push(
-        <div key={`${spread.id}-left`} style={{ width: PAGE_W, height: PAGE_H, position: 'relative', background: '#111' }}>
+        <div key={`${spread.id}-left`} style={{ width: '100%', height: '100%', position: 'relative' }}>
           {photo && (
             <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
               <img
                 src={photo.src}
                 alt=""
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left center', display: 'block' }}
               />
             </div>
           )}
         </div>
       )
 
-      // Right page — breathing page
+      // Right page — right half of image
       pages.push(
-        <div
-          key={`${spread.id}-right`}
-          style={{
-            width: PAGE_W,
-            height: PAGE_H,
-            background: '#111',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 12,
-          }}
-        >
-          <div style={{ width: 24, height: 1, background: 'rgba(255,255,255,0.15)' }} />
-          <span style={{
-            fontSize: 9,
-            color: 'rgba(255,255,255,0.2)',
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            fontFamily: 'system-ui, sans-serif',
-          }}>
-            {spread.act}
-          </span>
-          <div style={{ width: 24, height: 1, background: 'rgba(255,255,255,0.15)' }} />
+        <div key={`${spread.id}-right`} style={{ width: '100%', height: '100%', position: 'relative' }}>
+          {photo && (
+            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
+              <img
+                src={photo.src}
+                alt=""
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }}
+              />
+            </div>
+          )}
         </div>
       )
 
