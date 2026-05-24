@@ -118,24 +118,24 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
     if (spread.layout === 'full-bleed') {
       const photo = spread.photos[0] ?? null
 
-      // Left page — 35% anchor keeps subject away from spine
+      // Left page — imagen al 200% de ancho, anclada a la izquierda
       pages.push(
         <div key={`${spread.id}-left`} style={{ background: '#111', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden' }}>
           {photo && (
-            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
-              <img src={photo.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '35% center', display: 'block' }} />
+            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer', overflow: 'hidden' }}>
+              <img src={photo.src} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '200%', height: '100%', objectFit: 'cover', objectPosition: 'left center', display: 'block' }} />
             </div>
           )}
           <span style={badge}>{spread.act}</span>
         </div>
       )
 
-      // Right page — 65% anchor, mirror of left
+      // Right page — misma imagen desplazada -100% para mostrar la mitad derecha
       pages.push(
         <div key={`${spread.id}-right`} style={{ background: '#111', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden' }}>
           {photo && (
-            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
-              <img src={photo.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '65% center', display: 'block' }} />
+            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer', overflow: 'hidden' }}>
+              <img src={photo.src} alt="" style={{ position: 'absolute', top: 0, left: '-100%', width: '200%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }} />
             </div>
           )}
         </div>
