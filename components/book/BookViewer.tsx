@@ -47,27 +47,68 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
   const pages: React.ReactNode[] = []
 
   // Front cover
+  const coverPhoto = book.content.spreads[0]?.photos[0]?.src ?? null
   pages.push(
     <div
       key="cover"
       style={{
-        background: '#0f0f0f',
         width: PAGE_W,
         height: PAGE_H,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#fff',
+        position: 'relative',
+        overflow: 'hidden',
+        background: '#1a1a1a',
         boxShadow: 'inset -6px 0 18px rgba(0,0,0,0.5)',
       }}
     >
-      <h1 style={{ fontSize: 26, fontFamily: 'Georgia, serif', textAlign: 'center', padding: '0 40px', lineHeight: 1.4 }}>
-        {book.identity.title}
-      </h1>
-      <p style={{ marginTop: 16, fontSize: 11, color: '#555', letterSpacing: 2, textTransform: 'uppercase' }}>
-        Pixia Editorial
-      </p>
+      {coverPhoto && (
+        <img
+          src={coverPhoto}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      )}
+      {/* Bottom gradient overlay */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 40%, transparent 70%)',
+      }} />
+      {/* Title block */}
+      <div style={{
+        position: 'absolute',
+        bottom: 36,
+        left: 0,
+        right: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 10,
+        padding: '0 32px',
+      }}>
+        <p style={{
+          margin: 0,
+          color: '#ffffff',
+          fontSize: 22,
+          fontWeight: 300,
+          letterSpacing: '0.08em',
+          textAlign: 'center',
+          fontFamily: 'Georgia, serif',
+          lineHeight: 1.35,
+        }}>
+          {book.identity.title}
+        </p>
+        <div style={{ width: 40, height: 1, background: 'rgba(255,255,255,0.3)' }} />
+        <p style={{
+          margin: 0,
+          color: 'rgba(255,255,255,0.6)',
+          fontSize: 11,
+          letterSpacing: '0.15em',
+          textTransform: 'uppercase',
+          fontFamily: 'system-ui, sans-serif',
+        }}>
+          {new Date(book.identity.createdAt).getFullYear()}
+        </p>
+      </div>
     </div>
   )
 
@@ -157,17 +198,35 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
     <div
       key="back-cover"
       style={{
-        background: '#0f0f0f',
+        background: '#111111',
         width: PAGE_W,
         height: PAGE_H,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 8,
         boxShadow: 'inset 6px 0 18px rgba(0,0,0,0.5)',
       }}
     >
-      <p style={{ color: '#333', fontSize: 11, fontFamily: 'Georgia, serif', letterSpacing: 2 }}>
-        PIXIA · {new Date().getFullYear()}
+      <p style={{
+        margin: 0,
+        color: 'rgba(255,255,255,0.15)',
+        fontSize: 13,
+        letterSpacing: '0.3em',
+        fontFamily: 'system-ui, sans-serif',
+        textTransform: 'uppercase',
+      }}>
+        PIXIA
+      </p>
+      <p style={{
+        margin: 0,
+        color: 'rgba(255,255,255,0.10)',
+        fontSize: 10,
+        letterSpacing: '0.1em',
+        fontFamily: 'system-ui, sans-serif',
+      }}>
+        Cada historia merece ser impresa
       </p>
     </div>
   )
