@@ -8,12 +8,46 @@ import { buildPixiaBook } from '../../../core/engine/buildPixiaBook'
 import { saveBookToLocal } from '../../../core/engine/localBookStorage'
 import { useWizard } from '../../../components/create/WizardProvider'
 
-async function fileToBase64(file: File): Promise<string> {
+async function fileToCompressedBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
+    const img = new window.Image()
+    const url = URL.createObjectURL(file)
+
+    img.onload = () => {
+      const MAX = 1200
+      let { width, height } = img
+
+      if (width > height && width > MAX) {
+        height = Math.round((height * MAX) / width)
+        width = MAX
+      } else if (height > width && height > MAX) {
+        width = Math.round((width * MAX) / height)
+        height = MAX
+      } else if (width > MAX) {
+        width = MAX
+        height = MAX
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return reject(new Error('Canvas not available'))
+
+      ctx.drawImage(img, 0, 0, width, height)
+      URL.revokeObjectURL(url)
+
+      const compressed = canvas.toDataURL('image/jpeg', 0.82)
+      resolve(compressed)
+    }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Error cargando imagen'))
+    }
+
+    img.src = url
   })
 }
 
@@ -32,8 +66,8 @@ export default function ResultPage() {
 
         const photos = await Promise.all(
           state.photos.map(async (p) => ({
-            id: p.id,
-            src: await fileToBase64(p.file),
+            id: crypto.randomUUID(),
+            src: await fileToCompressedBase64(p.file),
           }))
         )
         console.log('[Pixia] Fotos convertidas a base64', { count: photos.length })
