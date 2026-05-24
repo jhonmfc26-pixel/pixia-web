@@ -1,55 +1,68 @@
-"use client";
+'use client'
 
-import { motion, AnimatePresence } from "framer-motion";
-import { Check } from "lucide-react";
-import { useWizard } from "./WizardProvider";
+import { motion, AnimatePresence } from 'framer-motion'
+import { Check } from 'lucide-react'
+import { useWizard } from './WizardProvider'
 
 const steps = [
-  { id: 1, label: "Historia" },
-  { id: 2, label: "Fotos" },
-  { id: 3, label: "Estilo" },
-  { id: 4, label: "Emoción" },
-  { id: 5, label: "Preview" },
-];
+  { id: 1, label: 'Historia' },
+  { id: 2, label: 'Fotos' },
+  { id: 3, label: 'Estilo' },
+  { id: 4, label: 'Emoción' },
+  { id: 5, label: 'Preview' },
+]
 
 export function ProgressBar() {
-  const { state } = useWizard();
+  const { state } = useWizard()
 
   return (
-    <div className="flex justify-center">
-      <div className="flex items-center gap-6">
+    <div style={{ display: 'flex', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
         {steps.map((step, index) => {
-          const isActive = state.step === step.id;
-          const isCompleted = state.step > step.id;
+          const isActive = state.step === step.id
+          const isCompleted = state.step > step.id
 
           return (
-            <div key={step.id} className="flex items-center gap-3">
+            <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {/* Círculo */}
               <motion.div
                 layout
-                className={`relative w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold
-                  ${
-                    isActive
-                      ? "bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white"
-                      : isCompleted
-                      ? "bg-white text-black"
-                      : "bg-white/20 text-white/60"
-                  }`}
                 initial={false}
                 animate={
                   isActive
                     ? {
                         boxShadow: [
-                          "0 0 0px rgba(236,72,153,0)",
-                          "0 0 18px rgba(236,72,153,0.6)",
-                          "0 0 0px rgba(236,72,153,0)",
+                          '0 0 0px rgba(232,85,58,0)',
+                          '0 0 16px rgba(232,85,58,0.45)',
+                          '0 0 0px rgba(232,85,58,0)',
                         ],
                       }
                     : {}
                 }
-                transition={{ duration: 0.6 }}
+                transition={{ duration: 0.8, repeat: isActive ? Infinity : 0 }}
+                style={{
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  background: isActive
+                    ? 'var(--brand-coral)'
+                    : isCompleted
+                    ? 'var(--brand-coral)'
+                    : 'var(--bg-elevated)',
+                  color: isActive || isCompleted
+                    ? 'var(--text-primary)'
+                    : 'var(--text-tertiary)',
+                  border: isActive || isCompleted
+                    ? 'none'
+                    : '1px solid var(--border-medium)',
+                  flexShrink: 0,
+                }}
               >
-                {/* Check animado al completar */}
                 <AnimatePresence mode="wait">
                   {isCompleted ? (
                     <motion.span
@@ -57,9 +70,9 @@ export function ProgressBar() {
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0, opacity: 0 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                     >
-                      <Check className="w-4 h-4" />
+                      <Check size={12} />
                     </motion.span>
                   ) : (
                     <motion.span
@@ -75,22 +88,27 @@ export function ProgressBar() {
               </motion.div>
 
               {/* Label */}
-              <span
-                className={`text-xs ${
-                  isActive ? "text-white" : "text-white/40"
-                }`}
-              >
+              <span style={{
+                fontSize: '12px',
+                color: isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                fontWeight: isActive ? 500 : 400,
+                transition: 'color 0.2s',
+              }}>
                 {step.label}
               </span>
 
-              {/* Línea */}
+              {/* Línea conectora */}
               {index < steps.length - 1 && (
-                <div className="w-8 h-px bg-white/20" />
+                <div style={{
+                  width: '24px',
+                  height: '1px',
+                  background: 'var(--border-subtle)',
+                }} />
               )}
             </div>
-          );
+          )
         })}
       </div>
     </div>
-  );
+  )
 }

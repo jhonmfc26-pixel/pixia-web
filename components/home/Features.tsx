@@ -1,62 +1,100 @@
-import { Sparkles, Clock, Heart, Package } from "lucide-react";
-import Reveal from "@/components/ui/Reveal";
+import { Sparkles, Clock, Heart, Package } from 'lucide-react'
+import Reveal from '@/components/ui/Reveal'
 
 const features = [
   {
     icon: Sparkles,
-    title: "AI-Powered Design",
-    description:
-      "Our AI analyzes your photos, selects the best moments, and builds a beautiful layout automatically.",
+    title: 'Diseño editorial con IA',
+    description: 'La IA analiza tus fotos, selecciona los mejores momentos y construye una maquetación automáticamente.',
   },
   {
     icon: Clock,
-    title: "Ready in Minutes",
-    description:
-      "Upload your photos and receive a complete photo book design in under 5 minutes.",
+    title: 'Listo en minutos',
+    description: 'Sube tus fotos y recibe un libro completamente diseñado en menos de 5 minutos.',
   },
   {
     icon: Heart,
-    title: "Your Story, Your Way",
-    description:
-      "Edit, rearrange and personalize every page until your story feels perfect.",
+    title: 'Tu historia, a tu manera',
+    description: 'Edita, reorganiza y personaliza cada página hasta que tu historia se sienta perfecta.',
   },
   {
     icon: Package,
-    title: "Premium Quality",
-    description:
-      "Museum-quality printing on thick, luxurious paper, delivered to your door.",
+    title: 'Calidad premium',
+    description: 'Impresión de alta calidad en papel grueso y lujoso, entregado en tu puerta.',
   },
-];
+]
 
 export default function Features() {
   return (
-    <section className="py-24 bg-white" id="features">
-      <div className="max-w-7xl mx-auto px-6 text-center">
+    <section
+      id="features"
+      style={{
+        padding: '96px 24px',
+        background: 'var(--bg-surface)',
+        borderTop: '1px solid var(--border-subtle)',
+        borderBottom: '1px solid var(--border-subtle)',
+      }}
+    >
+      <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
         <Reveal>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight">
-            Creating memories has never been easier
+          <h2 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(28px, 4vw, 42px)',
+            fontWeight: 500,
+            color: 'var(--text-primary)',
+            letterSpacing: '-0.01em',
+            marginBottom: '12px',
+          }}>
+            Crear recuerdos nunca fue tan sencillo
           </h2>
         </Reveal>
 
         <Reveal delay={0.1}>
-          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-            Pixia doesn&apos;t just organize photos. Pixia creates your story.
+          <p style={{
+            fontSize: '16px',
+            color: 'var(--text-secondary)',
+            maxWidth: '480px',
+            margin: '0 auto 64px',
+            fontWeight: 300,
+            lineHeight: 1.7,
+          }}>
+            Pixia no solo organiza fotos. Pixia construye tu historia.
           </p>
         </Reveal>
 
-        <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '24px',
+        }}>
           {features.map((feature, index) => (
-            <Reveal key={index} delay={0.2 + index * 0.15}>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 p-8">
-                <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-orange-100 to-pink-100 mx-auto mb-6">
-                  <feature.icon className="w-6 h-6 text-orange-500" />
-                </div>
-
-                <h3 className="text-lg font-semibold text-gray-900 tracking-tight mb-2">
+            <Reveal key={index} delay={0.15 + index * 0.1}>
+              <div style={{
+                padding: '32px 28px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '12px',
+                textAlign: 'left',
+              }}>
+                <feature.icon
+                  size={20}
+                  style={{ color: 'var(--text-tertiary)', marginBottom: '20px' }}
+                />
+                <h3 style={{
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                  marginBottom: '8px',
+                  letterSpacing: '-0.01em',
+                }}>
                   {feature.title}
                 </h3>
-
-                <p className="text-gray-600 text-sm leading-relaxed">
+                <p style={{
+                  fontSize: '14px',
+                  color: 'var(--text-secondary)',
+                  lineHeight: 1.65,
+                  fontWeight: 300,
+                }}>
                   {feature.description}
                 </p>
               </div>
@@ -65,5 +103,5 @@ export default function Features() {
         </div>
       </div>
     </section>
-  );
+  )
 }

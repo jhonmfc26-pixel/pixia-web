@@ -1,66 +1,117 @@
-"use client";
-
-import Reveal from "@/components/ui/Reveal";
+'use client'
 
 export default function Footer() {
   return (
-    <footer className="bg-black text-gray-400 pt-20 pb-10">
-      <div className="max-w-7xl mx-auto px-6">
-
-        <Reveal>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
-            
-            {/* Marca */}
-            <div>
-              <h3 className="text-white font-semibold text-lg mb-4">Pixia</h3>
-              <p className="text-sm leading-relaxed">
-                Turning your memories into cinematic stories, beautifully
-                designed and printed with AI.
-              </p>
-            </div>
-
-            {/* Producto */}
-            <div>
-              <h4 className="text-white font-semibold mb-3">Product</h4>
-              <ul className="space-y-2 text-sm">
-                <li>Create Album</li>
-                <li>How it Works</li>
-                <li>Pricing</li>
-                <li>Examples</li>
-              </ul>
-            </div>
-
-            {/* Empresa */}
-            <div>
-              <h4 className="text-white font-semibold mb-3">Company</h4>
-              <ul className="space-y-2 text-sm">
-                <li>About</li>
-                <li>Careers</li>
-                <li>Contact</li>
-                <li>Press</li>
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <h4 className="text-white font-semibold mb-3">Legal</h4>
-              <ul className="space-y-2 text-sm">
-                <li>Privacy Policy</li>
-                <li>Terms of Service</li>
-                <li>Cookies</li>
-              </ul>
-            </div>
+    <footer style={{
+      background: 'var(--bg-base)',
+      borderTop: '1px solid var(--border-subtle)',
+      padding: '64px 24px 40px',
+    }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '40px',
+          marginBottom: '48px',
+        }}>
+          {/* Marca */}
+          <div>
+            <p style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '18px',
+              fontWeight: 500,
+              color: 'var(--text-primary)',
+              marginBottom: '10px',
+            }}>
+              Pixia
+            </p>
+            <p style={{
+              fontSize: '13px',
+              color: 'var(--text-tertiary)',
+              lineHeight: 1.65,
+              fontWeight: 300,
+              maxWidth: '220px',
+            }}>
+              Tus fotos, transformadas en libros con criterio editorial e IA.
+            </p>
           </div>
-        </Reveal>
 
-        <Reveal delay={0.2}>
-          <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500">
-            <span>© {new Date().getFullYear()} Pixia. All rights reserved.</span>
-            <span>Made with ❤️ and AI</span>
+          {/* Producto */}
+          <div>
+            <p style={{
+              fontSize: '12px',
+              color: 'var(--text-tertiary)',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              fontWeight: 500,
+              marginBottom: '16px',
+            }}>
+              Producto
+            </p>
+            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {['Crear álbum', 'Cómo funciona', 'Precios', 'Ejemplos'].map(item => (
+                <li key={item}>
+                  <a href="#" style={{
+                    fontSize: '13px',
+                    color: 'var(--text-tertiary)',
+                    textDecoration: 'none',
+                    transition: 'color 0.2s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                  >
+                    {item}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
-        </Reveal>
 
+          {/* Legal */}
+          <div>
+            <p style={{
+              fontSize: '12px',
+              color: 'var(--text-tertiary)',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              fontWeight: 500,
+              marginBottom: '16px',
+            }}>
+              Legal
+            </p>
+            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {['Privacidad', 'Términos de uso', 'Cookies'].map(item => (
+                <li key={item}>
+                  <a href="#" style={{
+                    fontSize: '13px',
+                    color: 'var(--text-tertiary)',
+                    textDecoration: 'none',
+                    transition: 'color 0.2s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                  >
+                    {item}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div style={{
+          borderTop: '1px solid var(--border-subtle)',
+          paddingTop: '24px',
+        }}>
+          <p style={{
+            fontSize: '12px',
+            color: 'var(--text-tertiary)',
+            letterSpacing: '0.02em',
+          }}>
+            © {new Date().getFullYear()} Pixia. Todos los derechos reservados.
+          </p>
+        </div>
       </div>
     </footer>
-  );
+  )
 }
