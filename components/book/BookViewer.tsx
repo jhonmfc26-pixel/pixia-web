@@ -2,15 +2,8 @@
 
 import HTMLFlipBook from 'react-pageflip'
 import { useRef, useState, useEffect } from 'react'
-import { PixiaBook, ActId } from '@/core/domain/PixiaBook'
+import { PixiaBook } from '@/core/domain/PixiaBook'
 import EditPanel from './EditPanel'
-
-const ACT_COLORS: Record<ActId, string> = {
-  inicio:     '#9ca3af',
-  desarrollo: '#f59e0b',
-  climax:     '#ec4899',
-  cierre:     '#a78bfa',
-}
 
 interface Props {
   book: PixiaBook
@@ -113,37 +106,36 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
   )
 
   // Content pages
-  book.content.spreads.forEach((spread) => {
-    const actColor = ACT_COLORS[spread.act]
-    const badgeStyle = (side: 'left' | 'right'): React.CSSProperties => ({
-      position: 'absolute', top: 12, [side]: 12,
-      background: actColor, color: '#fff', fontSize: 9,
-      padding: '3px 10px', borderRadius: 20, fontWeight: 700,
-      letterSpacing: 1.5, textTransform: 'uppercase',
-      boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-    })
+  const badge: React.CSSProperties = {
+    position: 'absolute', bottom: 12, left: 0, right: 0,
+    textAlign: 'center', pointerEvents: 'none',
+    color: 'rgba(255,255,255,0.2)', fontSize: 9,
+    letterSpacing: '0.15em', textTransform: 'uppercase',
+    fontFamily: 'system-ui, sans-serif',
+  }
 
+  book.content.spreads.forEach((spread) => {
     if (spread.layout === 'full-bleed') {
       const photo = spread.photos[0] ?? null
 
-      // Left page — left half of the photo
+      // Left page — 35% anchor keeps subject away from spine
       pages.push(
         <div key={`${spread.id}-left`} style={{ background: '#111', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden' }}>
           {photo && (
             <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
-              <img src={photo.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left center', display: 'block' }} />
+              <img src={photo.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '35% center', display: 'block' }} />
             </div>
           )}
-          <span style={badgeStyle('left')}>{spread.act}</span>
+          <span style={badge}>{spread.act}</span>
         </div>
       )
 
-      // Right page — right half of the same photo (visual continuity)
+      // Right page — 65% anchor, mirror of left
       pages.push(
         <div key={`${spread.id}-right`} style={{ background: '#111', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden' }}>
           {photo && (
             <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
-              <img src={photo.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }} />
+              <img src={photo.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '65% center', display: 'block' }} />
             </div>
           )}
         </div>
@@ -162,7 +154,7 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
               <div onClick={() => handleSelect(leftPhoto.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
                 <img src={leftPhoto.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
-              <span style={badgeStyle('left')}>{spread.act}</span>
+              <span style={badge}>{spread.act}</span>
             </>
           ) : (
             <Blank />
@@ -181,7 +173,7 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
               {spread.layout === 'editorial-right' && (
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '35%', background: 'linear-gradient(to top, rgba(0,0,0,0.4), transparent)', pointerEvents: 'none' }} />
               )}
-              <span style={badgeStyle('right')}>{spread.act}</span>
+              <span style={badge}>{spread.act}</span>
             </>
           ) : (
             <Blank />
