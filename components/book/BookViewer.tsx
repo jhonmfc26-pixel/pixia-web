@@ -48,7 +48,6 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
         width: PAGE_W,
         height: PAGE_H,
         position: 'relative',
-        overflow: 'hidden',
         background: '#1a1a1a',
         boxShadow: 'inset -6px 0 18px rgba(0,0,0,0.5)',
       }}
@@ -60,13 +59,11 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
       )}
-      {/* Bottom gradient overlay */}
       <div style={{
         position: 'absolute',
         inset: 0,
         background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 40%, transparent 70%)',
       }} />
-      {/* Title block */}
       <div style={{
         position: 'absolute',
         bottom: 36,
@@ -106,38 +103,51 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
   )
 
   // Content pages
-  const badge: React.CSSProperties = {
-    position: 'absolute', bottom: 12, left: 0, right: 0,
-    textAlign: 'center', pointerEvents: 'none',
-    color: 'rgba(255,255,255,0.2)', fontSize: 9,
-    letterSpacing: '0.15em', textTransform: 'uppercase',
-    fontFamily: 'system-ui, sans-serif',
-  }
-
   book.content.spreads.forEach((spread) => {
     if (spread.layout === 'full-bleed') {
       const photo = spread.photos[0] ?? null
 
-      // Left page — imagen al 200% de ancho, anclada a la izquierda
+      // Left page — full photo
       pages.push(
-        <div key={`${spread.id}-left`} style={{ background: '#111', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden' }}>
+        <div key={`${spread.id}-left`} style={{ width: PAGE_W, height: PAGE_H, position: 'relative', background: '#111' }}>
           {photo && (
-            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer', overflow: 'hidden' }}>
-              <img src={photo.src} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '200%', height: '100%', objectFit: 'cover', objectPosition: 'left center', display: 'block' }} />
+            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
+              <img
+                src={photo.src}
+                alt=""
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
             </div>
           )}
-          <span style={badge}>{spread.act}</span>
         </div>
       )
 
-      // Right page — misma imagen desplazada -100% para mostrar la mitad derecha
+      // Right page — breathing page
       pages.push(
-        <div key={`${spread.id}-right`} style={{ background: '#111', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden' }}>
-          {photo && (
-            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer', overflow: 'hidden' }}>
-              <img src={photo.src} alt="" style={{ position: 'absolute', top: 0, left: '-100%', width: '200%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }} />
-            </div>
-          )}
+        <div
+          key={`${spread.id}-right`}
+          style={{
+            width: PAGE_W,
+            height: PAGE_H,
+            background: '#111',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+          }}
+        >
+          <div style={{ width: 24, height: 1, background: 'rgba(255,255,255,0.15)' }} />
+          <span style={{
+            fontSize: 9,
+            color: 'rgba(255,255,255,0.2)',
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            fontFamily: 'system-ui, sans-serif',
+          }}>
+            {spread.act}
+          </span>
+          <div style={{ width: 24, height: 1, background: 'rgba(255,255,255,0.15)' }} />
         </div>
       )
 
@@ -148,14 +158,15 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
 
       // Left page
       pages.push(
-        <div key={`${spread.id}-left`} style={{ background: '#f8f7f5', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden', borderRight: '1px solid #e0ddd8' }}>
+        <div key={`${spread.id}-left`} style={{ width: PAGE_W, height: PAGE_H, position: 'relative', background: '#f8f7f5', borderRight: '1px solid #e0ddd8' }}>
           {leftPhoto ? (
-            <>
-              <div onClick={() => handleSelect(leftPhoto.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
-                <img src={leftPhoto.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              </div>
-              <span style={badge}>{spread.act}</span>
-            </>
+            <div onClick={() => handleSelect(leftPhoto.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
+              <img
+                src={leftPhoto.src}
+                alt=""
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            </div>
           ) : (
             <Blank />
           )}
@@ -164,16 +175,19 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
 
       // Right page
       pages.push(
-        <div key={`${spread.id}-right`} style={{ background: '#f8f7f5', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden', borderLeft: '1px solid #e0ddd8' }}>
+        <div key={`${spread.id}-right`} style={{ width: PAGE_W, height: PAGE_H, position: 'relative', background: '#f8f7f5', borderLeft: '1px solid #e0ddd8' }}>
           {rightPhoto ? (
             <>
               <div onClick={() => handleSelect(rightPhoto.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
-                <img src={rightPhoto.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <img
+                  src={rightPhoto.src}
+                  alt=""
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
               </div>
               {spread.layout === 'editorial-right' && (
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '35%', background: 'linear-gradient(to top, rgba(0,0,0,0.4), transparent)', pointerEvents: 'none' }} />
               )}
-              <span style={badge}>{spread.act}</span>
             </>
           ) : (
             <Blank />
@@ -183,7 +197,7 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
     }
   })
 
-  // Back cover — last photo as full-bleed with top gradient
+  // Back cover
   const lastSpread = book.content.spreads[book.content.spreads.length - 1]
   const backPhoto = lastSpread?.photos[lastSpread.photos.length - 1]?.src ?? null
   pages.push(
@@ -193,7 +207,6 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
         width: PAGE_W,
         height: PAGE_H,
         position: 'relative',
-        overflow: 'hidden',
         background: '#111',
         boxShadow: 'inset 6px 0 18px rgba(0,0,0,0.5)',
       }}
@@ -205,13 +218,11 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
       )}
-      {/* Top gradient overlay */}
       <div style={{
         position: 'absolute',
         inset: 0,
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 40%, transparent 70%)',
       }} />
-      {/* PIXIA mark at top */}
       <p style={{
         position: 'absolute',
         top: 28,
@@ -245,13 +256,11 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
         position: 'relative',
       }}
     >
-      {/* Controls */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
         <NavButton onClick={() => flipRef.current?.pageFlip().flipPrev()}>← Anterior</NavButton>
         <NavButton onClick={() => flipRef.current?.pageFlip().flipNext()}>Siguiente →</NavButton>
       </div>
 
-      {/* Book */}
       <HTMLFlipBook
         ref={flipRef}
         className=""
@@ -282,7 +291,6 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
         {pages}
       </HTMLFlipBook>
 
-      {/* Edit panel overlay */}
       {selectedPhoto && selectedSpread && (
         <EditPanel
           photoId={selectedPhoto}
