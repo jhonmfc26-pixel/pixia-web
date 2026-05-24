@@ -72,7 +72,7 @@ export default function ResultPage() {
         )
         console.log('[Pixia] Fotos convertidas a base64', { count: photos.length })
 
-        const book = buildPixiaBook({
+        const book = await buildPixiaBook({
           title: 'Mi historia Pixia',
           emotion: state.emotion ?? 'neutral',
           photos,

@@ -114,119 +114,126 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
 
   // Content pages
   book.content.spreads.forEach((spread) => {
-    const leftPhoto  = spread.photos[0] ?? null
-    const rightPhoto = spread.photos[1] ?? null
-    const actColor   = ACT_COLORS[spread.act]
+    const actColor = ACT_COLORS[spread.act]
+    const badgeStyle = (side: 'left' | 'right'): React.CSSProperties => ({
+      position: 'absolute', top: 12, [side]: 12,
+      background: actColor, color: '#fff', fontSize: 9,
+      padding: '3px 10px', borderRadius: 20, fontWeight: 700,
+      letterSpacing: 1.5, textTransform: 'uppercase',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+    })
 
-    // Left page
-    pages.push(
-      <div
-        key={`${spread.id}-left`}
-        style={{
-          background: '#f8f7f5',
-          width: PAGE_W,
-          height: PAGE_H,
-          position: 'relative',
-          overflow: 'hidden',
-          borderRight: '1px solid #e0ddd8',
-        }}
-      >
-        {leftPhoto ? (
-          <>
-            <div
-              onClick={() => handleSelect(leftPhoto.id)}
-              style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}
-            >
-              <img src={leftPhoto.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            </div>
-            <span style={{
-              position: 'absolute', top: 12, left: 12,
-              background: actColor, color: '#fff', fontSize: 9,
-              padding: '3px 10px', borderRadius: 20, fontWeight: 700,
-              letterSpacing: 1.5, textTransform: 'uppercase',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-            }}>
-              {spread.act}
-            </span>
-          </>
-        ) : (
-          <Blank />
-        )}
-      </div>
-    )
+    if (spread.layout === 'full-bleed') {
+      const photo = spread.photos[0] ?? null
 
-    // Right page
-    pages.push(
-      <div
-        key={`${spread.id}-right`}
-        style={{
-          background: '#f8f7f5',
-          width: PAGE_W,
-          height: PAGE_H,
-          position: 'relative',
-          overflow: 'hidden',
-          borderLeft: '1px solid #e0ddd8',
-        }}
-      >
-        {rightPhoto ? (
-          <>
-            <div
-              onClick={() => handleSelect(rightPhoto.id)}
-              style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}
-            >
-              <img src={rightPhoto.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      // Left page — left half of the photo
+      pages.push(
+        <div key={`${spread.id}-left`} style={{ background: '#111', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden' }}>
+          {photo && (
+            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
+              <img src={photo.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left center', display: 'block' }} />
             </div>
-            <span style={{
-              position: 'absolute', top: 12, right: 12,
-              background: actColor, color: '#fff', fontSize: 9,
-              padding: '3px 10px', borderRadius: 20, fontWeight: 700,
-              letterSpacing: 1.5, textTransform: 'uppercase',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-            }}>
-              {spread.act}
-            </span>
-          </>
-        ) : (
-          <Blank />
-        )}
-      </div>
-    )
+          )}
+          <span style={badgeStyle('left')}>{spread.act}</span>
+        </div>
+      )
+
+      // Right page — right half of the same photo (visual continuity)
+      pages.push(
+        <div key={`${spread.id}-right`} style={{ background: '#111', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden' }}>
+          {photo && (
+            <div onClick={() => handleSelect(photo.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
+              <img src={photo.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }} />
+            </div>
+          )}
+        </div>
+      )
+
+    } else {
+      // split-horizontal and editorial-right — two distinct photos
+      const leftPhoto  = spread.photos[0] ?? null
+      const rightPhoto = spread.photos[1] ?? null
+
+      // Left page
+      pages.push(
+        <div key={`${spread.id}-left`} style={{ background: '#f8f7f5', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden', borderRight: '1px solid #e0ddd8' }}>
+          {leftPhoto ? (
+            <>
+              <div onClick={() => handleSelect(leftPhoto.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
+                <img src={leftPhoto.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </div>
+              <span style={badgeStyle('left')}>{spread.act}</span>
+            </>
+          ) : (
+            <Blank />
+          )}
+        </div>
+      )
+
+      // Right page
+      pages.push(
+        <div key={`${spread.id}-right`} style={{ background: '#f8f7f5', width: PAGE_W, height: PAGE_H, position: 'relative', overflow: 'hidden', borderLeft: '1px solid #e0ddd8' }}>
+          {rightPhoto ? (
+            <>
+              <div onClick={() => handleSelect(rightPhoto.id)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
+                <img src={rightPhoto.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </div>
+              {spread.layout === 'editorial-right' && (
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '35%', background: 'linear-gradient(to top, rgba(0,0,0,0.4), transparent)', pointerEvents: 'none' }} />
+              )}
+              <span style={badgeStyle('right')}>{spread.act}</span>
+            </>
+          ) : (
+            <Blank />
+          )}
+        </div>
+      )
+    }
   })
 
-  // Back cover
+  // Back cover — last photo as full-bleed with top gradient
+  const lastSpread = book.content.spreads[book.content.spreads.length - 1]
+  const backPhoto = lastSpread?.photos[lastSpread.photos.length - 1]?.src ?? null
   pages.push(
     <div
       key="back-cover"
       style={{
-        background: '#111111',
         width: PAGE_W,
         height: PAGE_H,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
+        position: 'relative',
+        overflow: 'hidden',
+        background: '#111',
         boxShadow: 'inset 6px 0 18px rgba(0,0,0,0.5)',
       }}
     >
+      {backPhoto && (
+        <img
+          src={backPhoto}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      )}
+      {/* Top gradient overlay */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 40%, transparent 70%)',
+      }} />
+      {/* PIXIA mark at top */}
       <p style={{
+        position: 'absolute',
+        top: 28,
+        left: 0,
+        right: 0,
         margin: 0,
-        color: 'rgba(255,255,255,0.15)',
-        fontSize: 13,
-        letterSpacing: '0.3em',
-        fontFamily: 'system-ui, sans-serif',
+        textAlign: 'center',
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 11,
+        letterSpacing: '0.35em',
         textTransform: 'uppercase',
+        fontFamily: 'system-ui, sans-serif',
       }}>
         PIXIA
-      </p>
-      <p style={{
-        margin: 0,
-        color: 'rgba(255,255,255,0.10)',
-        fontSize: 10,
-        letterSpacing: '0.1em',
-        fontFamily: 'system-ui, sans-serif',
-      }}>
-        Cada historia merece ser impresa
       </p>
     </div>
   )
