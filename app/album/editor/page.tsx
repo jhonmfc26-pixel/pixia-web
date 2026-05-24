@@ -1,6 +1,6 @@
 'use client';
 
-import { useAlbum } from '@/context/AlbumProvider';
+import { useAlbum } from '@/components/album/AlbumProvider';
 
 export default function AlbumEditorPage() {
   const album = useAlbum();

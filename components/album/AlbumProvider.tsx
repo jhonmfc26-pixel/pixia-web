@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { Album } from "@/lib/album/types";
 import { buildAlbumFromPhotos } from "@/lib/album/buildAlbumFromPhotos";
-import { useWizard } from "@/components/create/WizardProvider";
 import { PhotoMeta } from "@/lib/photos/types";
 
 type AlbumContextType = {
@@ -15,37 +14,33 @@ type AlbumContextType = {
 
 const AlbumContext = createContext<AlbumContextType | null>(null);
 
-export function AlbumProvider({ children }: { children: React.ReactNode }) {
-  const { state } = useWizard();
+interface Props {
+  children: React.ReactNode;
+  photos: { id: string; src: string }[];
+}
+
+export function AlbumProvider({ children, photos }: Props) {
   const [album, setAlbum] = useState<Album | null>(null);
   const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
 
-  /* ------------------------------------------------------------------ */
-  /* BUILD ALBUM FROM WIZARD PHOTOS                                      */
-  /* ------------------------------------------------------------------ */
   useEffect(() => {
-    if (state.photos.length === 0) return;
+    if (photos.length === 0) return;
 
-    const photos: PhotoMeta[] = state.photos.map((p) => ({
+    const photoMetas: PhotoMeta[] = photos.map((p) => ({
       id: p.id,
-      src: URL.createObjectURL(p.file),
+      src: p.src,
       width: 2000,
       height: 3000,
       aspectRatio: 2 / 3,
       orientation: "vertical",
     }));
 
-    const builtAlbum = buildAlbumFromPhotos(photos);
+    const builtAlbum = buildAlbumFromPhotos(photoMetas);
 
-    /* -------------------------------------------------------------- */
-    /* 🧱 MARCAR CONTRAPORTADAS (MODELO, NO RENDER)                    */
-    /* -------------------------------------------------------------- */
     if (builtAlbum.spreads.length > 0) {
-      // Contraportada inicial
       builtAlbum.spreads[0].left.editable = false;
       builtAlbum.spreads[0].left.layout = null;
 
-      // Contraportada final
       const lastIndex = builtAlbum.spreads.length - 1;
       builtAlbum.spreads[lastIndex].right.editable = false;
       builtAlbum.spreads[lastIndex].right.layout = null;
@@ -53,16 +48,11 @@ export function AlbumProvider({ children }: { children: React.ReactNode }) {
 
     setAlbum(builtAlbum);
     setCurrentSpreadIndex(0);
-  }, [state.photos]);
+  }, [photos]);
 
-  /* ------------------------------------------------------------------ */
-  /* NAVIGATION                                                         */
-  /* ------------------------------------------------------------------ */
   const nextSpread = () => {
     if (!album) return;
-    setCurrentSpreadIndex((i) =>
-      Math.min(i + 1, album.spreads.length - 1)
-    );
+    setCurrentSpreadIndex((i) => Math.min(i + 1, album.spreads.length - 1));
   };
 
   const prevSpread = () => {
@@ -70,9 +60,7 @@ export function AlbumProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AlbumContext.Provider
-      value={{ album, currentSpreadIndex, nextSpread, prevSpread }}
-    >
+    <AlbumContext.Provider value={{ album, currentSpreadIndex, nextSpread, prevSpread }}>
       {children}
     </AlbumContext.Provider>
   );

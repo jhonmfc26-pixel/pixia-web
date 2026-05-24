@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { AlbumProvider } from '@/context/AlbumProvider';
+import { AlbumProvider } from '@/components/album/AlbumProvider';
 
 interface AlbumLayoutProps {
   children: ReactNode;
@@ -9,7 +9,7 @@ interface AlbumLayoutProps {
 
 export default function AlbumLayout({ children }: AlbumLayoutProps) {
   return (
-    <AlbumProvider>
+    <AlbumProvider photos={[]}>
       {children}
     </AlbumProvider>
   );

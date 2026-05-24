@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "preview": "npx wrangler pages dev .vercel/output/static",
+    "deploy": "pnpm pages:build && npx wrangler pages deploy .vercel/output/static"
   },
   "dependencies": {
     "framer-motion": "^12.29.2",
@@ -14,9 +17,12 @@
     "next": "16.1.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-dropzone": "^14.3.8"
+    "react-dropzone": "^14.3.8",
+    "react-pageflip": "^2.0.3",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.16",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
