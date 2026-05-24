@@ -20,6 +20,7 @@ async function fileToBase64(file: File): Promise<string> {
 export default function ResultPage() {
   const router = useRouter()
   const { state } = useWizard()
+  console.log('[Pixia] state.photos al cargar result:', state.photos.length)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
