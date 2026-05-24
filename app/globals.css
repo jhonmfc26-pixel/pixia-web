@@ -1,28 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
+
 @import "tailwindcss";
 
+@theme {
+  --color-brand-coral: #E8553A;
+  --color-brand-warm: #F2854A;
+  --color-brand-pink: #D94F6B;
+  --color-pixia-base: #0D0D0D;
+  --color-pixia-surface: #161616;
+  --color-pixia-elevated: #1E1E1E;
+  --color-pixia-hover: #242424;
+
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-base: #0D0D0D;
+  --bg-surface: #161616;
+  --bg-elevated: #1E1E1E;
+  --bg-hover: #242424;
+
+  --brand-coral: #E8553A;
+  --brand-warm: #F2854A;
+  --brand-pink: #D94F6B;
+
+  --text-primary: #F5F0EB;
+  --text-secondary: rgba(245, 240, 235, 0.55);
+  --text-tertiary: rgba(245, 240, 235, 0.3);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  padding-top: 80px;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 2px;
+}
+
+::selection {
+  background: rgba(232, 85, 58, 0.25);
+  color: var(--text-primary);
+}

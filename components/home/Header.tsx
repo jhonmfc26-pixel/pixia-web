@@ -1,66 +1,99 @@
-"use client";
+'use client'
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
 
 export default function Header() {
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    const onScroll = () => setScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
-    <header
-      className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        scrolled
-          ? "backdrop-blur-xl bg-black/60 shadow-lg py-3"
-          : "bg-transparent py-5"
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center gap-2">
-          <Image
-            src="/logo-pixia.png"
-            alt="Pixia Logo"
-            width={40}
-            height={40}
-            className="object-contain"
-          />
-          <span className="text-xl font-semibold tracking-tight bg-gradient-to-r from-orange-400 via-pink-400 to-fuchsia-500 bg-clip-text text-transparent">
-            Pixia
-          </span>
-        </div>
+    <header style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0,
+      zIndex: 100,
+      padding: '0 32px',
+      height: '64px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      transition: 'background 0.3s ease, border-color 0.3s ease',
+      background: scrolled ? 'rgba(13,13,13,0.85)' : 'transparent',
+      backdropFilter: scrolled ? 'blur(20px)' : 'none',
+      borderBottom: scrolled
+        ? '1px solid rgba(255,255,255,0.06)'
+        : '1px solid transparent',
+    }}>
+      {/* Logo */}
+      <Link href="/" style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        textDecoration: 'none'
+      }}>
+        <Image
+          src="/logo-pixia.png"
+          alt="Pixia"
+          width={28}
+          height={28}
+          style={{ objectFit: 'contain' }}
+        />
+        <span style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '20px',
+          fontWeight: 500,
+          color: 'var(--text-primary)',
+          letterSpacing: '0.02em',
+        }}>
+          Pixia
+        </span>
+      </Link>
 
-        {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-8 text-sm text-white/80">
-          <a href="#features" className="hover:text-white transition">
-            Producto
+      {/* Nav */}
+      <nav style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '32px'
+      }}>
+        {['Cómo funciona', 'Ejemplos', 'Precios'].map(item => (
+          <a key={item} href="#" style={{
+            fontSize: '14px',
+            color: 'var(--text-secondary)',
+            textDecoration: 'none',
+            transition: 'color 0.2s',
+            fontWeight: 400,
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+          >
+            {item}
           </a>
-          <a href="#how" className="hover:text-white transition">
-            Cómo funciona
-          </a>
-          <a href="#stories" className="hover:text-white transition">
-            Historias
-          </a>
-          <a href="#pricing" className="hover:text-white transition">
-            Precios
-          </a>
-        </nav>
+        ))}
+      </nav>
 
-        {/* CTA */}
-        <Link href="/create">
-          <button className="rounded-full px-5 py-2 text-sm font-medium bg-gradient-to-r from-orange-400 to-pink-500 text-white shadow-md hover:scale-105 transition">
-            Crear mi álbum
-          </button>
-        </Link>
-      </div>
+      {/* CTA */}
+      <Link href="/create" style={{
+        fontSize: '14px',
+        fontWeight: 500,
+        color: 'var(--text-primary)',
+        textDecoration: 'none',
+        padding: '9px 20px',
+        borderRadius: '8px',
+        background: 'var(--brand-coral)',
+        transition: 'opacity 0.2s',
+        letterSpacing: '0.01em',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+      >
+        Crear álbum
+      </Link>
     </header>
-  );
+  )
 }
