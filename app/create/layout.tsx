@@ -31,7 +31,7 @@ export default function CreateLayout({ children }: { children: React.ReactNode }
           <div style={{
             maxWidth: '960px',
             margin: '0 auto',
-            padding: '80px 48px 48px',
+            padding: '80px 48px 120px',
           }}>
             {children}
           </div>

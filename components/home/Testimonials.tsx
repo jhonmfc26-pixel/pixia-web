@@ -26,7 +26,7 @@ const testimonials = [
 export default function Testimonials() {
   return (
     <section
-      id="stories"
+      id="ejemplos"
       style={{
         padding: '96px 24px',
         background: 'var(--bg-base)',

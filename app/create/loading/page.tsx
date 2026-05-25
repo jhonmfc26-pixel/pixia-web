@@ -1,70 +1,76 @@
-"use client";
+'use client'
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 const steps = [
-  { text: "Seleccionando tus momentos clave…", target: 25 },
-  { text: "Organizando la narrativa visual…", target: 50 },
-  { text: "Aplicando el estilo cinematográfico…", target: 75 },
-  { text: "Tu historia está tomando forma…", target: 100 },
-];
+  { text: 'Seleccionando tus momentos clave…', target: 25 },
+  { text: 'Organizando la narrativa visual…', target: 50 },
+  { text: 'Aplicando el criterio editorial…', target: 75 },
+  { text: 'Tu historia está tomando forma…', target: 100 },
+]
 
 export default function CreateLoading() {
-  const router = useRouter();
-  const [index, setIndex] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const router = useRouter()
+  const [index, setIndex] = useState(0)
+  const [progress, setProgress] = useState(0)
 
-  // Avanza el texto
   useEffect(() => {
     const stepTimer = setInterval(() => {
-      setIndex((prev) => Math.min(prev + 1, steps.length - 1));
-    }, 1000);
+      setIndex((prev) => Math.min(prev + 1, steps.length - 1))
+    }, 1000)
+    return () => clearInterval(stepTimer)
+  }, [])
 
-    return () => clearInterval(stepTimer);
-  }, []);
-
-  // Avanza el porcentaje de forma suave
   useEffect(() => {
-    const target = steps[index].target;
-
+    const target = steps[index].target
     const progressTimer = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= target) return prev;
-        return prev + 1;
-      });
-    }, 30);
+        if (prev >= target) return prev
+        return prev + 1
+      })
+    }, 30)
+    return () => clearInterval(progressTimer)
+  }, [index])
 
-    return () => clearInterval(progressTimer);
-  }, [index]);
-
-  // Redirección final
   useEffect(() => {
     if (progress >= 100) {
       const timeout = setTimeout(() => {
-        router.push("/create/result");
-      }, 600);
-
-      return () => clearTimeout(timeout);
+        router.push('/create/result')
+      }, 600)
+      return () => clearTimeout(timeout)
     }
-  }, [progress, router]);
+  }, [progress, router])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black text-white">
-      <div className="text-center px-6 max-w-xl w-full">
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg-base)',
+    }}>
+      <div style={{ textAlign: 'center', padding: '0 24px', maxWidth: '480px', width: '100%' }}>
         {/* Título */}
         <motion.h1
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-3xl md:text-4xl font-semibold mb-6"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: '28px',
+            fontWeight: 400,
+            color: 'var(--text-primary)',
+            marginBottom: '24px',
+            letterSpacing: '-0.01em',
+          }}
         >
           Creando tu historia
         </motion.h1>
 
-        {/* Storytelling */}
-        <div className="relative h-10 mb-8 overflow-hidden">
+        {/* Texto de estado */}
+        <div style={{ position: 'relative', height: '40px', marginBottom: '32px', overflow: 'hidden' }}>
           <AnimatePresence mode="wait">
             <motion.p
               key={index}
@@ -72,7 +78,13 @@ export default function CreateLoading() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.4 }}
-              className="absolute inset-0 text-white/70"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                fontSize: '14px',
+                color: 'var(--text-secondary)',
+                fontWeight: 300,
+              }}
             >
               {steps[index].text}
             </motion.p>
@@ -80,23 +92,30 @@ export default function CreateLoading() {
         </div>
 
         {/* Barra de progreso */}
-        <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-4">
+        <div style={{
+          width: '100%',
+          height: '2px',
+          background: 'rgba(255,255,255,0.08)',
+          borderRadius: '1px',
+          overflow: 'hidden',
+          marginBottom: '12px',
+        }}>
           <motion.div
-            className="h-full bg-gradient-to-r from-pink-500 to-indigo-500"
+            style={{ height: '100%', background: 'var(--brand-coral)', borderRadius: '1px' }}
             animate={{ width: `${progress}%` }}
-            transition={{ ease: "easeOut", duration: 0.3 }}
+            transition={{ ease: 'easeOut', duration: 0.3 }}
           />
         </div>
 
         {/* Porcentaje */}
-        <p className="text-sm text-white/60">
-          {progress}% completado
-        </p>
-
-        <p className="text-xs text-white/40 mt-3">
-          Esto puede tomar unos segundos dependiendo de tu álbum
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--text-tertiary)',
+          letterSpacing: '0.03em',
+        }}>
+          {progress}%
         </p>
       </div>
     </div>
-  );
+  )
 }

@@ -1,127 +1,144 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import ContinueButton from "@/components/create/ContinueButton";
-import { useWizard } from "@/components/create/WizardProvider";
+import { useState } from 'react'
+import ContinueButton from '@/components/create/ContinueButton'
+import { useWizard } from '@/components/create/WizardProvider'
 
 const emotions = [
   {
-    id: "happy",
-    title: "Alegre",
-    desc: "Luminosa, ligera, llena de sonrisas",
-    gradient: "from-yellow-400 via-orange-400 to-pink-400",
-    glow: "shadow-[0_0_40px_rgba(251,191,36,0.6)]",
-    icon: "😊",
+    id: 'happy',
+    ordinal: '01',
+    title: 'Alegre',
+    desc: 'Luminosa, ligera, llena de sonrisas',
   },
   {
-    id: "romantic",
-    title: "Romántica",
-    desc: "Suave, amorosa, íntima",
-    gradient: "from-pink-400 via-rose-400 to-fuchsia-500",
-    glow: "shadow-[0_0_40px_rgba(244,114,182,0.6)]",
-    icon: "💖",
+    id: 'romantic',
+    ordinal: '02',
+    title: 'Romántica',
+    desc: 'Suave, amorosa, íntima',
   },
   {
-    id: "nostalgic",
-    title: "Nostálgica",
-    desc: "Recuerdos que tocan el corazón",
-    gradient: "from-indigo-500 via-blue-500 to-cyan-500",
-    glow: "shadow-[0_0_40px_rgba(99,102,241,0.6)]",
-    icon: "🥹",
+    id: 'nostalgic',
+    ordinal: '03',
+    title: 'Nostálgica',
+    desc: 'Recuerdos que tocan el corazón',
   },
   {
-    id: "epic",
-    title: "Épica",
-    desc: "Como el tráiler de una gran película",
-    gradient: "from-red-500 via-orange-500 to-yellow-500",
-    glow: "shadow-[0_0_40px_rgba(239,68,68,0.6)]",
-    icon: "🔥",
+    id: 'epic',
+    ordinal: '04',
+    title: 'Épica',
+    desc: 'Como el tráiler de una gran película',
   },
   {
-    id: "intimate",
-    title: "Íntima",
-    desc: "Cercana, real, profundamente humana",
-    gradient: "from-emerald-400 via-teal-500 to-cyan-600",
-    glow: "shadow-[0_0_40px_rgba(16,185,129,0.6)]",
-    icon: "🌿",
+    id: 'intimate',
+    ordinal: '05',
+    title: 'Íntima',
+    desc: 'Cercana, real, profundamente humana',
   },
   {
-    id: "inspiring",
-    title: "Inspiradora",
-    desc: "Motivadora, llena de esperanza",
-    gradient: "from-sky-400 via-violet-400 to-fuchsia-500",
-    glow: "shadow-[0_0_40px_rgba(139,92,246,0.6)]",
-    icon: "✨",
+    id: 'inspiring',
+    ordinal: '06',
+    title: 'Inspiradora',
+    desc: 'Motivadora, llena de esperanza',
   },
-];
+]
 
 export default function Step4Emotion() {
-  const { state, dispatch } = useWizard();
-  const [selected, setSelected] = useState<string | null>(state.emotion ?? null);
+  const { state, dispatch } = useWizard()
+  const [selected, setSelected] = useState<string | null>(state.emotion ?? null)
 
   const handleSelect = (id: string) => {
-    setSelected(id);
-    dispatch({ type: "SET_EMOTION", payload: id as any });
-  };
+    setSelected(id)
+    dispatch({ type: 'SET_EMOTION', payload: id as any })
+  }
 
   return (
-    <div className="w-full">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl md:text-5xl font-semibold text-white">
-          ¿Qué emoción quieres que se sienta tu historia?
+    <div style={{ width: '100%', paddingBottom: '72px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(28px, 4vw, 42px)',
+          fontWeight: 500,
+          color: 'var(--text-primary)',
+          letterSpacing: '-0.01em',
+          marginBottom: '10px',
+        }}>
+          ¿Qué emoción quieres transmitir?
         </h1>
-        <p className="text-white/60 mt-3 max-w-xl mx-auto">
-          Esto define el tono, la música y el ritmo de tu película.
+        <p style={{
+          fontSize: '16px',
+          color: 'var(--text-secondary)',
+          fontWeight: 300,
+          lineHeight: 1.6,
+        }}>
+          Esto define el tono narrativo de tu álbum.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '16px',
+        marginBottom: '48px',
+      }}>
         {emotions.map((emotion) => {
-          const isSelected = selected === emotion.id;
-
+          const isSelected = selected === emotion.id
           return (
-            <motion.div
+            <div
               key={emotion.id}
-              whileHover={{ scale: 1.05 }}
               onClick={() => handleSelect(emotion.id)}
-              className={`relative h-40 rounded-2xl cursor-pointer overflow-hidden transition-all
-                ${
-                  isSelected
-                    ? emotion.glow
-                    : "border border-white/10 hover:border-white/30"
-                }
-              `}
+              style={{
+                background: isSelected ? 'rgba(232, 85, 58, 0.06)' : 'var(--bg-surface)',
+                border: isSelected
+                  ? '1px solid var(--brand-coral)'
+                  : '1px solid var(--border-subtle)',
+                borderRadius: '12px',
+                padding: '28px 24px',
+                cursor: 'pointer',
+                boxShadow: isSelected ? '0 0 20px rgba(232, 85, 58, 0.15)' : 'none',
+                transition: 'border-color 0.2s, background 0.2s, box-shadow 0.2s',
+              }}
+              onMouseEnter={e => {
+                if (!isSelected) e.currentTarget.style.borderColor = 'var(--border-medium)'
+              }}
+              onMouseLeave={e => {
+                if (!isSelected) e.currentTarget.style.borderColor = 'var(--border-subtle)'
+              }}
             >
-              {/* Fondo gradiente */}
-              <div
-                className={`absolute inset-0 bg-gradient-to-br ${emotion.gradient} opacity-80`}
-              />
-
-              {/* Overlay oscuro */}
-              <div className="absolute inset-0 bg-black/40" />
-
-              {/* Contenido */}
-              <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
-                <span className="text-4xl mb-2">{emotion.icon}</span>
-                <h3 className="text-white text-lg font-semibold">
-                  {emotion.title}
-                </h3>
-                <p className="text-white/70 text-sm mt-1">{emotion.desc}</p>
-              </div>
-
-              {/* Glow al seleccionar */}
-              {isSelected && (
-                <div className="absolute inset-0 bg-white/10 blur-xl pointer-events-none" />
-              )}
-            </motion.div>
-          );
+              <span style={{
+                display: 'block',
+                fontSize: '11px',
+                color: 'var(--text-tertiary)',
+                letterSpacing: '0.15em',
+                fontWeight: 400,
+                marginBottom: '12px',
+              }}>
+                {emotion.ordinal}
+              </span>
+              <h3 style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '18px',
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+                marginBottom: '6px',
+                letterSpacing: '-0.01em',
+              }}>
+                {emotion.title}
+              </h3>
+              <p style={{
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+                fontWeight: 300,
+                lineHeight: 1.55,
+              }}>
+                {emotion.desc}
+              </p>
+            </div>
+          )
         })}
       </div>
 
-      <div className="flex justify-center">
-        <ContinueButton disabled={!selected} />
-      </div>
+      <ContinueButton disabled={!selected} />
     </div>
-  );
+  )
 }

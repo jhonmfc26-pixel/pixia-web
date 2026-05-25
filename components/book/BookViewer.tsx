@@ -39,24 +39,30 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
   /* ------------------------------------------------------------------ */
   const pages: React.ReactNode[] = []
 
-  // Front cover
+  // Front cover — two pages (full-bleed split)
   const coverPhoto = book.content.spreads[0]?.photos[0]?.src ?? null
+
+  // Cover left page
   pages.push(
-    <div
-      key="cover"
-      style={{
-        width: PAGE_W,
-        height: PAGE_H,
-        position: 'relative',
-        background: '#1a1a1a',
-        boxShadow: 'inset -6px 0 18px rgba(0,0,0,0.5)',
-      }}
-    >
+    <div key="cover-left" style={{ width: '100%', height: '100%', position: 'relative', background: '#0D0D0D' }}>
       {coverPhoto && (
         <img
           src={coverPhoto}
           alt=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left center', display: 'block' }}
+        />
+      )}
+    </div>
+  )
+
+  // Cover right page — photo + title overlay
+  pages.push(
+    <div key="cover-right" style={{ width: '100%', height: '100%', position: 'relative', background: '#0D0D0D' }}>
+      {coverPhoto && (
+        <img
+          src={coverPhoto}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }}
         />
       )}
       <div style={{
@@ -264,7 +270,7 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
         startZIndex={20}
         autoSize={false}
         maxShadowOpacity={0.6}
-        showCover
+        showCover={false}
         mobileScrollSupport={false}
         clickEventForward={false}
         useMouseEvents

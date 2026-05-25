@@ -61,8 +61,12 @@ export default function Header() {
         alignItems: 'center',
         gap: '32px'
       }}>
-        {['Cómo funciona', 'Ejemplos', 'Precios'].map(item => (
-          <a key={item} href="#" style={{
+        {[
+          { label: 'Cómo funciona', href: '#como-funciona' },
+          { label: 'Ejemplos', href: '#ejemplos' },
+          { label: 'Precios', href: '#precios' },
+        ].map(({ label, href }) => (
+          <a key={label} href={href} style={{
             fontSize: '14px',
             color: 'var(--text-secondary)',
             textDecoration: 'none',
@@ -72,7 +76,7 @@ export default function Header() {
           onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
           >
-            {item}
+            {label}
           </a>
         ))}
       </nav>
