@@ -39,70 +39,34 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
   /* ------------------------------------------------------------------ */
   const pages: React.ReactNode[] = []
 
-  // Front cover — two pages (full-bleed split)
+  // Front cover — single page (showCover treats it as hard cover)
   const coverPhoto = book.content.spreads[0]?.photos[0]?.src ?? null
-
-  // Cover left page
   pages.push(
-    <div key="cover-left" style={{ width: '100%', height: '100%', position: 'relative', background: '#0D0D0D' }}>
+    <div key="cover" style={{ width: '100%', height: '100%', position: 'relative', background: '#0D0D0D' }}>
       {coverPhoto && (
         <img
           src={coverPhoto}
           alt=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'left center', display: 'block' }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
       )}
-    </div>
-  )
-
-  // Cover right page — photo + title overlay
-  pages.push(
-    <div key="cover-right" style={{ width: '100%', height: '100%', position: 'relative', background: '#0D0D0D' }}>
-      {coverPhoto && (
-        <img
-          src={coverPhoto}
-          alt=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }}
-        />
-      )}
+      {/* Bottom title overlay */}
       <div style={{
         position: 'absolute',
-        inset: 0,
-        background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 40%, transparent 70%)',
-      }} />
-      <div style={{
-        position: 'absolute',
-        bottom: 36,
-        left: 0,
-        right: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 10,
-        padding: '0 32px',
+        bottom: 0, left: 0, right: 0,
+        padding: '32px 28px',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)',
       }}>
         <p style={{
           margin: 0,
+          fontFamily: 'var(--font-display)',
+          fontSize: 20,
+          fontWeight: 400,
           color: '#ffffff',
-          fontSize: 22,
-          fontWeight: 300,
-          letterSpacing: '0.08em',
-          textAlign: 'center',
-          fontFamily: 'Georgia, serif',
-          lineHeight: 1.35,
+          letterSpacing: '0.02em',
+          lineHeight: 1.3,
         }}>
           {book.identity.title}
-        </p>
-        <div style={{ width: 40, height: 1, background: 'rgba(255,255,255,0.3)' }} />
-        <p style={{
-          margin: 0,
-          color: 'rgba(255,255,255,0.6)',
-          fontSize: 11,
-          letterSpacing: '0.15em',
-          textTransform: 'uppercase',
-          fontFamily: 'system-ui, sans-serif',
-        }}>
-          {new Date(book.identity.createdAt).getFullYear()}
         </p>
       </div>
     </div>
@@ -189,47 +153,28 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
     }
   })
 
-  // Back cover
-  const lastSpread = book.content.spreads[book.content.spreads.length - 1]
-  const backPhoto = lastSpread?.photos[lastSpread.photos.length - 1]?.src ?? null
+  // Blank page if needed to keep total even for showCover
+  // Total = 1 (cover) + N_spreads×2 (interior) + 1 (back) = 2 + 2N → always even, no blank needed
+
+  // Back cover — single page, minimal
   pages.push(
-    <div
-      key="back-cover"
-      style={{
-        width: PAGE_W,
-        height: PAGE_H,
-        position: 'relative',
-        background: '#111',
-        boxShadow: 'inset 6px 0 18px rgba(0,0,0,0.5)',
-      }}
-    >
-      {backPhoto && (
-        <img
-          src={backPhoto}
-          alt=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
-      )}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 40%, transparent 70%)',
-      }} />
-      <p style={{
-        position: 'absolute',
-        top: 28,
-        left: 0,
-        right: 0,
-        margin: 0,
-        textAlign: 'center',
-        color: 'rgba(255,255,255,0.7)',
+    <div key="back-cover" style={{
+      width: '100%',
+      height: '100%',
+      background: '#111',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <span style={{
         fontSize: 11,
-        letterSpacing: '0.35em',
+        letterSpacing: '0.3em',
+        color: 'rgba(255,255,255,0.2)',
         textTransform: 'uppercase',
         fontFamily: 'system-ui, sans-serif',
       }}>
         PIXIA
-      </p>
+      </span>
     </div>
   )
 
@@ -270,7 +215,7 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
         startZIndex={20}
         autoSize={false}
         maxShadowOpacity={0.6}
-        showCover={false}
+        showCover
         mobileScrollSupport={false}
         clickEventForward={false}
         useMouseEvents
