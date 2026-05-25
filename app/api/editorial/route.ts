@@ -6,6 +6,10 @@ export async function POST(req: NextRequest) {
   try {
     const { photos, story, style, emotion } = await req.json()
 
+    console.log('[Editorial] Iniciando con', photos?.length, 'fotos')
+    console.log('[Editorial] API key existe:', !!process.env.ANTHROPIC_API_KEY)
+    console.log('[Editorial] API key prefix:', process.env.ANTHROPIC_API_KEY?.slice(0, 10))
+
     const imageContent = (photos as { id: string; src: string }[]).map((photo, index) => ([
       {
         type: 'image',
@@ -65,6 +69,25 @@ Reglas para photoIds:
 
 Usa TODOS los IDs de fotos proporcionados. Ninguna foto puede quedar sin asignar.`
 
+    const requestBody = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            ...imageContent,
+            { type: 'text', text: userPrompt }
+          ]
+        }
+      ]
+    }
+
+    const payloadSize = JSON.stringify(requestBody).length
+    console.log('[Editorial] Payload size bytes:', payloadSize)
+    console.log('[Editorial] Llamando a Claude con', imageContent.length, 'elementos de contenido')
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -72,29 +95,15 @@ Usa TODOS los IDs de fotos proporcionados. Ninguna foto puede quedar sin asignar
         'x-api-key': process.env.ANTHROPIC_API_KEY!,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              ...imageContent,
-              { type: 'text', text: userPrompt }
-            ]
-          }
-        ]
-      })
+      body: JSON.stringify(requestBody)
     })
 
+    console.log('[Editorial] Claude status:', response.status)
+
     if (!response.ok) {
-      const error = await response.text()
-      console.error('Claude API error:', error)
-      return NextResponse.json(
-        { error: 'Error calling Claude API', details: error },
-        { status: 500 }
-      )
+      const errorText = await response.text()
+      console.error('[Editorial] Claude error body:', errorText)
+      return NextResponse.json({ error: errorText }, { status: 500 })
     }
 
     const claudeResponse = await response.json()
@@ -105,19 +114,20 @@ Usa TODOS los IDs de fotos proporcionados. Ninguna foto puede quedar sin asignar
       const clean = content.replace(/```json\n?|\n?```/g, '').trim()
       editorial = JSON.parse(clean)
     } catch {
-      console.error('Error parsing Claude response:', content)
+      console.error('[Editorial] Error parsing Claude response:', content)
       return NextResponse.json(
-        { error: 'Error parsing editorial response' },
+        { error: 'Error parsing editorial response', raw: content },
         { status: 500 }
       )
     }
 
+    console.log('[Editorial] Spreads generados:', editorial?.spreads?.length)
     return NextResponse.json({ editorial })
 
   } catch (error) {
-    console.error('Editorial route error:', error)
+    console.error('[Editorial] Route error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: String(error) },
       { status: 500 }
     )
   }

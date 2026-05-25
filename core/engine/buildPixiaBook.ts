@@ -139,6 +139,31 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
   }
 }
 
+function compressForAI(src: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => {
+      const MAX = 512
+      let { width, height } = img
+      if (width > height && width > MAX) {
+        height = Math.round((height * MAX) / width)
+        width = MAX
+      } else if (height > MAX) {
+        width = Math.round((width * MAX) / height)
+        height = MAX
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', 0.6))
+    }
+    img.onerror = () => resolve(src) // fallback: send original if compress fails
+    img.src = src
+  })
+}
+
 export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook> {
   let editorial: {
     albumTitle?: string
@@ -147,11 +172,19 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
   }
 
   try {
+    // Compress photos to 512px / JPEG 0.6 for AI analysis only
+    const photosForAI = await Promise.all(
+      draft.photos.map(async (p) => ({
+        id: p.id,
+        src: await compressForAI(p.src),
+      }))
+    )
+
     const response = await fetch('/api/editorial', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        photos: draft.photos,
+        photos: photosForAI,
         story: draft.story || 'general',
         style: draft.style || 'cinematico',
         emotion: draft.emotion || 'emocional'
