@@ -18,6 +18,7 @@ export interface PixiaBook {
     spreads: {
       id: string; act: ActId; layout: string
       photos: { id: string; src: string }[]
+      caption?: string
     }[]
   }
   provenance: {

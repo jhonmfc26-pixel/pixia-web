@@ -92,7 +92,7 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
         </div>
       )
 
-      // Right page — right half of image
+      // Right page — right half of image + caption
       pages.push(
         <div key={`${spread.id}-right`} style={{ width: '100%', height: '100%', position: 'relative' }}>
           {photo && (
@@ -102,6 +102,21 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
                 alt=""
                 style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }}
               />
+            </div>
+          )}
+          {spread.caption && (
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              padding: '16px 20px',
+              background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%)',
+              pointerEvents: 'none',
+            }}>
+              <p style={{
+                margin: 0, fontSize: 11, fontStyle: 'italic', lineHeight: 1.5,
+                color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--font-display)',
+              }}>
+                {spread.caption}
+              </p>
             </div>
           )}
         </div>
@@ -143,6 +158,21 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
               </div>
               {spread.layout === 'editorial-right' && (
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '35%', background: 'linear-gradient(to top, rgba(0,0,0,0.4), transparent)', pointerEvents: 'none' }} />
+              )}
+              {spread.caption && (
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  padding: '16px 20px',
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%)',
+                  pointerEvents: 'none',
+                }}>
+                  <p style={{
+                    margin: 0, fontSize: 11, fontStyle: 'italic', lineHeight: 1.5,
+                    color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--font-display)',
+                  }}>
+                    {spread.caption}
+                  </p>
+                </div>
               )}
             </>
           ) : (

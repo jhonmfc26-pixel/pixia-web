@@ -4,7 +4,7 @@ export const runtime = 'edge'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { buildPixiaBook } from '../../../core/engine/buildPixiaBook'
+import { buildPixiaBookWithAI } from '../../../core/engine/buildPixiaBook'
 import { saveBookToLocal } from '../../../core/engine/localBookStorage'
 import { useWizard } from '../../../components/create/WizardProvider'
 
@@ -62,7 +62,7 @@ export default function ResultPage() {
 
     async function build() {
       try {
-        console.log('[Pixia] Iniciando generación', { photoCount: state.photos.length })
+        console.log('[Pixia] Iniciando generación con AI', { photoCount: state.photos.length })
 
         const photos = await Promise.all(
           state.photos.map(async (p) => ({
@@ -72,17 +72,17 @@ export default function ResultPage() {
         )
         console.log('[Pixia] Fotos convertidas a base64', { count: photos.length })
 
-        const book = await buildPixiaBook({
-          title: 'Mi historia Pixia',
-          emotion: state.emotion ?? 'neutral',
+        const book = await buildPixiaBookWithAI({
           photos,
+          story: state.storyType ?? 'general',
+          style: state.style ?? 'cinematico',
+          emotion: state.emotion ?? 'emocional',
         })
-        console.log('[Pixia] PixiaBook creado', { bookId: book.identity.bookId, spreads: book.content.spreads.length })
+        console.log('[Pixia] PixiaBook creado', { bookId: book.identity.bookId, spreads: book.content.spreads.length, version: book.identity.version })
 
         saveBookToLocal(book)
         console.log('[Pixia] Libro guardado en localStorage')
 
-        console.log('[Pixia] Navegando a', `/book/${book.identity.bookId}`)
         router.push(`/book/${book.identity.bookId}`)
       } catch (err) {
         console.error('[Pixia] ERROR en generación:', err)
@@ -91,7 +91,7 @@ export default function ResultPage() {
     }
 
     build()
-  }, [state.photos, state.emotion, router])
+  }, [state.photos, state.storyType, state.style, state.emotion, router])
 
   return (
     <p>

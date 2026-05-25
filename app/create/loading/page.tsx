@@ -4,44 +4,60 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const steps = [
-  { text: 'Seleccionando tus momentos clave…', target: 25 },
-  { text: 'Organizando la narrativa visual…', target: 50 },
-  { text: 'Aplicando el criterio editorial…', target: 75 },
-  { text: 'Tu historia está tomando forma…', target: 100 },
+const messages = [
+  { title: 'Analizando tus fotos', sub: 'La IA está viendo cada momento...' },
+  { title: 'Detectando emociones', sub: 'Identificando los momentos clave...' },
+  { title: 'Construyendo la narrativa', sub: 'Ordenando tu historia en 4 actos...' },
+  { title: 'Diseñando cada página', sub: 'Eligiendo el mejor layout para cada foto...' },
+  { title: 'Escribiendo los captions', sub: 'Dando voz a tus recuerdos...' },
+  { title: 'Casi listo', sub: 'Finalizando tu álbum editorial...' },
 ]
 
 export default function CreateLoading() {
   const router = useRouter()
-  const [index, setIndex] = useState(0)
+  const [msgIndex, setMsgIndex] = useState(0)
   const [progress, setProgress] = useState(0)
+  const [done, setDone] = useState(false)
 
+  // Rotar mensajes cada 3s en loop
   useEffect(() => {
-    const stepTimer = setInterval(() => {
-      setIndex((prev) => Math.min(prev + 1, steps.length - 1))
-    }, 1000)
-    return () => clearInterval(stepTimer)
+    const interval = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % messages.length)
+    }, 3000)
+    return () => clearInterval(interval)
   }, [])
 
+  // Avanzar progreso suavemente hasta ~95% mientras espera
   useEffect(() => {
-    const target = steps[index].target
-    const progressTimer = setInterval(() => {
+    const interval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= target) return prev
-        return prev + 1
+        if (prev >= 95) return prev
+        // desaceleración: avanza menos cuanto más cerca del tope
+        const step = Math.max(0.3, (95 - prev) * 0.04)
+        return Math.min(95, prev + step)
       })
-    }, 30)
-    return () => clearInterval(progressTimer)
-  }, [index])
+    }, 200)
+    return () => clearInterval(interval)
+  }, [])
 
+  // Navegación al terminar (disparada desde result/page.tsx vía router)
+  // Este componente solo es la pantalla de espera visual — result/page.tsx
+  // hace la llamada real y luego navega a /book/[id]
   useEffect(() => {
-    if (progress >= 100) {
-      const timeout = setTimeout(() => {
-        router.push('/create/result')
-      }, 600)
-      return () => clearTimeout(timeout)
+    if (done) {
+      setProgress(100)
+      const t = setTimeout(() => router.push('/create/result'), 400)
+      return () => clearTimeout(t)
     }
-  }, [progress, router])
+  }, [done, router])
+
+  // Timeout de seguridad: redirige a result después de 30s
+  useEffect(() => {
+    const t = setTimeout(() => setDone(true), 30000)
+    return () => clearTimeout(t)
+  }, [])
+
+  const msg = messages[msgIndex]
 
   return (
     <div style={{
@@ -52,32 +68,39 @@ export default function CreateLoading() {
       background: 'var(--bg-base)',
     }}>
       <div style={{ textAlign: 'center', padding: '0 24px', maxWidth: '480px', width: '100%' }}>
-        {/* Título */}
-        <motion.h1
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '28px',
-            fontWeight: 400,
-            color: 'var(--text-primary)',
-            marginBottom: '24px',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          Creando tu historia
-        </motion.h1>
-
-        {/* Texto de estado */}
-        <div style={{ position: 'relative', height: '40px', marginBottom: '32px', overflow: 'hidden' }}>
+        {/* Título rotante */}
+        <div style={{ position: 'relative', height: '44px', marginBottom: '12px', overflow: 'hidden' }}>
           <AnimatePresence mode="wait">
-            <motion.p
-              key={index}
+            <motion.h1
+              key={msgIndex}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.4 }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                fontFamily: 'var(--font-display)',
+                fontSize: '28px',
+                fontWeight: 400,
+                color: 'var(--text-primary)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {msg.title}
+            </motion.h1>
+          </AnimatePresence>
+        </div>
+
+        {/* Subtítulo rotante */}
+        <div style={{ position: 'relative', height: '28px', marginBottom: '40px', overflow: 'hidden' }}>
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={msgIndex}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.4, delay: 0.05 }}
               style={{
                 position: 'absolute',
                 inset: 0,
@@ -86,7 +109,7 @@ export default function CreateLoading() {
                 fontWeight: 300,
               }}
             >
-              {steps[index].text}
+              {msg.sub}
             </motion.p>
           </AnimatePresence>
         </div>
@@ -103,7 +126,7 @@ export default function CreateLoading() {
           <motion.div
             style={{ height: '100%', background: 'var(--brand-coral)', borderRadius: '1px' }}
             animate={{ width: `${progress}%` }}
-            transition={{ ease: 'easeOut', duration: 0.3 }}
+            transition={{ ease: 'easeOut', duration: 0.5 }}
           />
         </div>
 
@@ -113,7 +136,7 @@ export default function CreateLoading() {
           color: 'var(--text-tertiary)',
           letterSpacing: '0.03em',
         }}>
-          {progress}%
+          {Math.round(progress)}%
         </p>
       </div>
     </div>
