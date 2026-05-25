@@ -139,107 +139,119 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
   }
 }
 
-function compressForAI(src: string): Promise<string> {
+function describePhoto(src: string, index: number): Promise<string> {
   return new Promise((resolve) => {
     const img = new window.Image()
     img.onload = () => {
-      const MAX = 512
-      let { width, height } = img
-      if (width > height && width > MAX) {
-        height = Math.round((height * MAX) / width)
-        width = MAX
-      } else if (height > MAX) {
-        width = Math.round((width * MAX) / height)
-        height = MAX
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, width, height)
-      resolve(canvas.toDataURL('image/jpeg', 0.6))
+      const ratio = img.width / img.height
+      const orientation =
+        ratio > 1.2 ? 'horizontal (landscape)' :
+        ratio < 0.85 ? 'vertical (portrait)' :
+        'cuadrada'
+      const size = img.width > 2000 ? 'alta resolución' : 'resolución estándar'
+      resolve(`Foto ${index + 1}: orientación ${orientation}, ${size}, dimensiones ${img.width}x${img.height}px`)
     }
-    img.onerror = () => resolve(src) // fallback: send original if compress fails
+    img.onerror = () => resolve(`Foto ${index + 1}: orientación desconocida`)
     img.src = src
   })
 }
 
 export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook> {
-  let editorial: {
-    albumTitle?: string
-    globalNarrative?: string
-    spreads: { id?: string; act: string; layout: string; photoIds: string[]; caption?: string }[]
-  }
-
   try {
-    // Compress photos to 512px / JPEG 0.6 for AI analysis only
-    const photosForAI = await Promise.all(
-      draft.photos.map(async (p) => ({
-        id: p.id,
-        src: await compressForAI(p.src),
-      }))
+    const photoDescriptions = await Promise.all(
+      draft.photos.map((p, i) => describePhoto(p.src, i))
     )
 
     const response = await fetch('/api/editorial', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        photos: photosForAI,
-        story: draft.story || 'general',
+        photoDescriptions,
+        story: draft.story || 'boda',
         style: draft.style || 'cinematico',
-        emotion: draft.emotion || 'emocional'
-      })
+        emotion: draft.emotion || 'romantica',
+      }),
     })
 
     if (!response.ok) {
-      console.warn('AI editorial failed, falling back to mechanical build')
+      const errText = await response.text()
+      console.error('[Pixia] Editorial API error:', errText)
       return buildPixiaBook(draft)
     }
 
-    const data = await response.json()
-    editorial = data.editorial
+    const { editorial } = await response.json()
+
+    if (!editorial?.spreads) {
+      console.error('[Pixia] Editorial sin spreads:', editorial)
+      return buildPixiaBook(draft)
+    }
+
+    type AISSpread = {
+      id?: string
+      act: string
+      layout: string
+      photoIndices: number[]
+      caption?: string
+    }
+
+    const spreads = (editorial.spreads as AISSpread[])
+      .map((s, index) => {
+        const photos = (s.photoIndices ?? [])
+          .map((i) => draft.photos[i])
+          .filter((p): p is { id: string; src: string } => p !== undefined)
+          .map((p) => ({ id: p.id, src: p.src }))
+
+        if (photos.length === 0) return null
+
+        return {
+          id: s.id ?? `spread-${index}`,
+          act: s.act as ActId,
+          layout: s.layout ?? 'full-bleed',
+          photos,
+          caption: s.caption ?? '',
+        }
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+
+    return {
+      identity: {
+        bookId: `pb-${Date.now()}`,
+        title: editorial.albumTitle || 'Mi historia Pixia',
+        createdAt: new Date().toISOString(),
+        version: '2.0-ai',
+      },
+      editorial: {
+        intent: '',
+        tone: emotionToTone(draft.emotion),
+        summary: editorial.albumTitle || '',
+        decisions: [],
+      },
+      narrative: {
+        acts: [
+          { id: 'inicio', purpose: 'El comienzo', spreadIds: spreads.filter((s) => s.act === 'inicio').map((s) => s.id) },
+          { id: 'desarrollo', purpose: 'El desarrollo', spreadIds: spreads.filter((s) => s.act === 'desarrollo').map((s) => s.id) },
+          { id: 'climax', purpose: 'El clímax', spreadIds: spreads.filter((s) => s.act === 'climax').map((s) => s.id) },
+          { id: 'cierre', purpose: 'El cierre', spreadIds: spreads.filter((s) => s.act === 'cierre').map((s) => s.id) },
+        ],
+      },
+      physical: {
+        format: 'square',
+        size: '30x30cm',
+        orientation: 'landscape',
+        paper: 'premium-glossy',
+        cover: 'hard-cover',
+        totalSpreads: spreads.length,
+      },
+      content: { spreads },
+      provenance: {
+        source: 'pixia-ai-editorial-v2',
+        photoCount: draft.photos.length,
+        signalsUsed: ['orientation', 'dimensions', 'emotion', 'style'],
+        engineVersion: '2.0',
+      },
+    }
   } catch {
-    console.warn('AI editorial error, falling back to mechanical build')
+    console.warn('[Pixia] AI editorial error, falling back to mechanical build')
     return buildPixiaBook(draft)
-  }
-
-  const photoMap = new Map(draft.photos.map((p) => [p.id, p]))
-
-  const spreads = editorial.spreads
-    .map((s, index) => ({
-      id: s.id ?? `spread-${index}`,
-      act: s.act as ActId,
-      layout: s.layout,
-      photos: (s.photoIds ?? [])
-        .map((id) => photoMap.get(id))
-        .filter((p): p is { id: string; src: string } => p !== undefined),
-      caption: s.caption,
-    }))
-    .filter((s) => s.photos.length > 0)
-
-  return {
-    identity: {
-      bookId: `pb-${Date.now()}`,
-      title: editorial.albumTitle || 'Mi historia Pixia',
-      createdAt: new Date().toISOString(),
-      version: '2.0-ai',
-    },
-    editorial: {
-      intent: editorial.globalNarrative || '',
-      tone: emotionToTone(draft.emotion),
-      summary: editorial.globalNarrative || '',
-      decisions: [],
-    },
-    narrative: {
-      acts: [
-        { id: 'inicio', purpose: 'El comienzo de la historia', spreadIds: spreads.filter((s) => s.act === 'inicio').map((s) => s.id) },
-        { id: 'desarrollo', purpose: 'El desarrollo de los momentos', spreadIds: spreads.filter((s) => s.act === 'desarrollo').map((s) => s.id) },
-        { id: 'climax', purpose: 'Los momentos más emotivos', spreadIds: spreads.filter((s) => s.act === 'climax').map((s) => s.id) },
-        { id: 'cierre', purpose: 'El cierre de la historia', spreadIds: spreads.filter((s) => s.act === 'cierre').map((s) => s.id) },
-      ],
-    },
-    physical: { format: 'PB-01', size: 'A4', orientation: 'vertical', paper: 'premium-matte', cover: 'hard', totalSpreads: spreads.length },
-    content: { spreads },
-    provenance: { source: 'pixia-ai-editorial-v2', photoCount: draft.photos.length, signalsUsed: ['vision', 'emotion', 'style', 'story'], engineVersion: '2.0' },
   }
 }
