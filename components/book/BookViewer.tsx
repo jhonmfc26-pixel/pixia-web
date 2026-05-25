@@ -153,28 +153,51 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
     }
   })
 
-  // Blank page if needed to keep total even for showCover
-  // Total = 1 (cover) + N_spreads×2 (interior) + 1 (back) = 2 + 2N → always even, no blank needed
+  // Parity check: with showCover=true total children must be even.
+  // pages.length before back cover = 1 (cover) + 2*N (interior).
+  // If that count is even, adding back cover makes it odd → insert blank first.
+  if (pages.length % 2 === 0) {
+    pages.push(
+      <div key="blank" style={{ background: '#f7f4ef', width: '100%', height: '100%' }} />
+    )
+  }
 
-  // Back cover — single page, minimal
+  // Back cover — last photo full-bleed, top overlay, centered PIXIA
+  const lastSpread = book.content.spreads[book.content.spreads.length - 1]
+  const backPhoto = lastSpread?.photos[lastSpread.photos.length - 1]?.src ?? null
   pages.push(
-    <div key="back-cover" style={{
-      width: '100%',
-      height: '100%',
-      background: '#111',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
-      <span style={{
-        fontSize: 11,
-        letterSpacing: '0.3em',
-        color: 'rgba(255,255,255,0.2)',
-        textTransform: 'uppercase',
-        fontFamily: 'system-ui, sans-serif',
+    <div key="back-cover" style={{ width: '100%', height: '100%', position: 'relative', background: '#111' }}>
+      {backPhoto && (
+        <img
+          src={backPhoto}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      )}
+      {/* Top gradient overlay */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 50%)',
+      }} />
+      {/* PIXIA centered */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}>
-        PIXIA
-      </span>
+        <span style={{
+          fontSize: 11,
+          letterSpacing: '0.3em',
+          color: 'rgba(255,255,255,0.45)',
+          textTransform: 'uppercase',
+          fontFamily: 'system-ui, sans-serif',
+        }}>
+          PIXIA
+        </span>
+      </div>
     </div>
   )
 
