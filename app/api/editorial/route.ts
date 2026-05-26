@@ -85,7 +85,9 @@ Reglas de layout:
 - momentos muy especiales solos → "full-bleed"
 
 Usa photoIndices (números 0-based) para referenciar fotos.
-Usa TODAS las fotos. Ninguna puede quedar sin asignar.`
+Usa TODAS las fotos. Ninguna puede quedar sin asignar.
+
+REGLA ABSOLUTA: Haz una lista mental de todos los photoIndices que usas. Antes de finalizar el JSON, verifica que ningún número aparezca dos veces en toda la respuesta. Si una foto ya fue usada en un spread anterior, NO la uses de nuevo. Es preferible tener menos spreads que repetir fotos.`
         }]
       })
     })

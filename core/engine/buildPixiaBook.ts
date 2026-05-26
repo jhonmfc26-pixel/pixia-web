@@ -223,6 +223,8 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
       })
       .filter((s): s is NonNullable<typeof s> => s !== null)
 
+    console.log('[Pixia] Fotos únicas usadas:', usedIndices.size, 'de', draft.photos.length, 'disponibles')
+
     return {
       identity: {
         bookId: `pb-${Date.now()}`,
