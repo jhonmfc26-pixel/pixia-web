@@ -10,6 +10,21 @@ export async function POST(req: NextRequest) {
     console.log('[Editorial] API key existe:', !!process.env.ANTHROPIC_API_KEY)
     console.log('[Editorial] API key prefix:', process.env.ANTHROPIC_API_KEY?.slice(0, 10))
 
+    const descriptions = photoDescriptions as string[]
+    const total = descriptions.length
+
+    const enrichedDescriptions = descriptions.map((d, i) => {
+      const position = total <= 1 ? 0 : i / (total - 1)
+      const moment = position < 0.2
+        ? 'inicio del evento (preparación, llegada)'
+        : position < 0.6
+          ? 'durante el evento (celebración, momentos grupales)'
+          : position < 0.9
+            ? 'clímax del evento (momentos más especiales)'
+            : 'final del evento (despedida, celebración final)'
+      return `Foto ${i + 1}: ${d} - Posición en el evento: ${moment}`
+    })
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -28,8 +43,18 @@ Evento: ${story}
 Estilo: ${style}
 Emoción: ${emotion}
 
-Fotos disponibles (${photoDescriptions.length} fotos):
-${(photoDescriptions as string[]).map((d, i) => `Foto ${i + 1}: ${d}`).join('\n')}
+Fotos disponibles (${total} fotos):
+${enrichedDescriptions.join('\n')}
+
+El orden de las fotos es cronológico — las primeras fotos ocurrieron antes en el tiempo que las últimas.
+Respeta este orden temporal al asignar los actos.
+Las fotos de preparación siempre van en INICIO.
+Las fotos del momento principal van en CLÍMAX.
+Las fotos de celebración final van en CIERRE.
+
+CRÍTICO: Cada foto solo puede aparecer UNA VEZ en todo el álbum. Nunca repitas un photoIndex.
+
+IMPORTANTE: Todos los captions deben estar en español. El albumTitle también en español.
 
 Construye el álbum editorial dividiendo en 4 actos narrativos.
 Responde SOLO con JSON válido, sin markdown:

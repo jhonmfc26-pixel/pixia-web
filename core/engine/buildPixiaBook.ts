@@ -194,9 +194,19 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
       caption?: string
     }
 
+    const usedIndices = new Set<number>()
+
     const spreads = (editorial.spreads as AISSpread[])
       .map((s, index) => {
-        const photos = (s.photoIndices ?? [])
+        const uniqueIndices = (s.photoIndices ?? []).filter((i) => {
+          if (usedIndices.has(i)) return false
+          usedIndices.add(i)
+          return true
+        })
+
+        if (uniqueIndices.length === 0) return null
+
+        const photos = uniqueIndices
           .map((i) => draft.photos[i])
           .filter((p): p is { id: string; src: string } => p !== undefined)
           .map((p) => ({ id: p.id, src: p.src }))
