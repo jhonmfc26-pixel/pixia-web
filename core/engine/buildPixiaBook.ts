@@ -213,10 +213,16 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
 
         if (photos.length === 0) return null
 
+        const layout = (() => {
+          if (s.layout === 'split-horizontal' && photos.length < 2) return 'full-bleed'
+          if (s.layout === 'editorial-right' && photos.length < 2) return 'full-bleed'
+          return s.layout ?? 'full-bleed'
+        })()
+
         return {
           id: s.id ?? `spread-${index}`,
           act: s.act as ActId,
-          layout: s.layout ?? 'full-bleed',
+          layout,
           photos,
           caption: s.caption ?? '',
         }

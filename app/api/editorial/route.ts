@@ -107,6 +107,25 @@ REGLA ABSOLUTA: Haz una lista mental de todos los photoIndices que usas. Antes d
       const clean = text.replace(/```json\n?|\n?```/g, '').trim()
       const editorial = JSON.parse(clean)
       console.log('[Editorial] Spreads generados:', editorial?.spreads?.length)
+
+      // Deduplicar — cada photoIndex solo una vez
+      const usedIndices = new Set<number>()
+      const deduplicatedSpreads = (editorial.spreads ?? [])
+        .map((spread: { photoIndices?: number[] } & Record<string, unknown>) => {
+          const uniqueIndices = (spread.photoIndices ?? [])
+            .filter((idx: number) => {
+              if (usedIndices.has(idx)) return false
+              usedIndices.add(idx)
+              return true
+            })
+          return { ...spread, photoIndices: uniqueIndices }
+        })
+        .filter((spread: { photoIndices: number[] }) => spread.photoIndices.length > 0)
+
+      editorial.spreads = deduplicatedSpreads
+      console.log('[Editorial] Índices únicos usados:', [...usedIndices])
+      console.log('[Editorial] Spreads tras deduplicar:', deduplicatedSpreads.length)
+
       return NextResponse.json({ editorial })
     } catch {
       console.error('[Editorial] Parse error, raw:', text)

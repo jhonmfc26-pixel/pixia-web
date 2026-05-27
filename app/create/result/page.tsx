@@ -2,7 +2,7 @@
 
 export const runtime = 'edge'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { buildPixiaBookWithAI } from '../../../core/engine/buildPixiaBook'
 import { saveBookToLocal } from '../../../core/engine/localBookStorage'
@@ -14,17 +14,14 @@ async function fileToCompressedBase64(file: File): Promise<string> {
     const url = URL.createObjectURL(file)
 
     img.onload = () => {
-      const MAX = 1200
+      const MAX = 800
       let { width, height } = img
 
       if (width > height && width > MAX) {
         height = Math.round((height * MAX) / width)
         width = MAX
-      } else if (height > width && height > MAX) {
+      } else if (height > MAX) {
         width = Math.round((width * MAX) / height)
-        height = MAX
-      } else if (width > MAX) {
-        width = MAX
         height = MAX
       }
 
@@ -32,20 +29,14 @@ async function fileToCompressedBase64(file: File): Promise<string> {
       canvas.width = width
       canvas.height = height
 
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return reject(new Error('Canvas not available'))
-
+      const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, 0, 0, width, height)
       URL.revokeObjectURL(url)
 
-      const compressed = canvas.toDataURL('image/jpeg', 0.82)
-      resolve(compressed)
+      resolve(canvas.toDataURL('image/jpeg', 0.70))
     }
 
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('Error cargando imagen'))
-    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Error cargando imagen')) }
 
     img.src = url
   })
@@ -56,16 +47,23 @@ export default function ResultPage() {
   const { state } = useWizard()
   console.log('[Pixia] state.photos al cargar result:', state.photos.length)
   const [error, setError] = useState<string | null>(null)
+  const hasGenerated = useRef(false)
 
   useEffect(() => {
+    if (hasGenerated.current) return
     if (state.photos.length === 0) return
+    hasGenerated.current = true
 
     async function build() {
       try {
         console.log('[Pixia] Iniciando generación con AI', { photoCount: state.photos.length })
 
+        if (state.photos.length > 20) {
+          console.warn('[Pixia] Fotos limitadas a 20 por localStorage')
+        }
+        const maxPhotos = state.photos.slice(0, 20)
         const photos = await Promise.all(
-          state.photos.map(async (p) => ({
+          maxPhotos.map(async (p) => ({
             id: crypto.randomUUID(),
             src: await fileToCompressedBase64(p.file),
           }))
@@ -94,13 +92,13 @@ export default function ResultPage() {
   }, [state.photos, state.storyType, state.style, state.emotion, router])
 
   return (
-    <p>
+    <div>
       Generando tu libro...
       {error && (
-        <p style={{ color: 'red', fontSize: 12, marginTop: 16, maxWidth: 300, textAlign: 'center' }}>
+        <div style={{ color: 'red', fontSize: 12, marginTop: 16, maxWidth: 300, textAlign: 'center' }}>
           {error}
-        </p>
+        </div>
       )}
-    </p>
+    </div>
   )
 }

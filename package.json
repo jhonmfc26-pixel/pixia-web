@@ -12,6 +12,7 @@
     "deploy": "pnpm pages:build && npx wrangler pages deploy .vercel/output/static"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
     "framer-motion": "^12.29.2",
     "lucide-react": "^0.563.0",
     "next": "16.1.4",
@@ -19,6 +20,7 @@
     "react-dom": "19.2.3",
     "react-dropzone": "^14.3.8",
     "react-pageflip": "^2.0.3",
+    "uuid": "^14.0.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
@@ -27,6 +29,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.4",
     "tailwindcss": "^4",
