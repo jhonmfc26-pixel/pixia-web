@@ -12,28 +12,52 @@ import {
 import ContinueButton from "@/components/create/ContinueButton";
 import { X, Star, Move } from "lucide-react";
 import { useWizard, PhotoItem } from "@/components/create/WizardProvider";
+import { usePhotoAnalysis } from "@/core/modules/scoring/usePhotoAnalysis";
 
 export default function Step2Upload() {
   const { state, dispatch } = useWizard();
   const photos = state.photos;
+  const { progress, analyzePhotos } = usePhotoAnalysis();
 
   const count = useMotionValue(0);
   const rounded = useTransform(count, (latest) => Math.round(latest));
 
   const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
+    async (acceptedFiles: File[]) => {
+      console.log('[Step2] onDrop recibió', acceptedFiles.length, 'archivos')
+
       const newPhotos: PhotoItem[] = acceptedFiles.map((file) => ({
         id: crypto.randomUUID(),
         file,
         priority: false,
       }));
 
+      // Mostrar thumbnails inmediatamente — no esperar análisis
       dispatch({
         type: "SET_PHOTOS",
         payload: [...photos, ...newPhotos].slice(0, 30),
       });
+
+      console.log('[Step2] Iniciando análisis...')
+      const analyzed = await analyzePhotos(acceptedFiles);
+      console.log('[Step2] Análisis completado:', analyzed.length, 'fotos')
+
+      if (analyzed.length > 0) {
+        localStorage.setItem(
+          'pixia_photo_analysis',
+          JSON.stringify(analyzed.map((p, index) => ({
+            id: p.id,
+            orientation: p.orientation,
+            score: p.score,
+            takenAt: p.exif.takenAt?.toISOString() || null,
+            gps: p.exif.gps || null,
+            originalIndex: index,
+          })))
+        );
+        console.log('[Step2] Análisis guardado en localStorage')
+      }
     },
-    [dispatch, photos]
+    [dispatch, photos, analyzePhotos]
   );
 
   const removePhoto = (id: string) => {
@@ -110,6 +134,40 @@ export default function Step2Upload() {
           )}
         </div>
       </motion.div>
+
+      {progress.isAnalyzing && (
+        <div style={{
+          padding: '12px 16px', marginTop: '16px',
+          background: 'rgba(255,255,255,0.04)',
+          borderRadius: '8px',
+          display: 'flex', flexDirection: 'column', gap: '8px',
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between',
+            fontSize: '12px', color: 'rgba(255,255,255,0.5)',
+          }}>
+            <span>Analizando fotos...</span>
+            <span>{progress.completed} / {progress.total}</span>
+          </div>
+          <div style={{
+            height: '2px', background: 'rgba(255,255,255,0.08)',
+            borderRadius: '1px', overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%', background: '#E8553A',
+              width: `${(progress.completed / progress.total) * 100}%`,
+              transition: 'width 0.3s ease', borderRadius: '1px',
+            }} />
+          </div>
+          {progress.insights.length > 0 && (
+            <span style={{
+              fontSize: '11px', color: 'rgba(232,85,58,0.8)', fontStyle: 'italic',
+            }}>
+              {progress.insights[progress.insights.length - 1]}
+            </span>
+          )}
+        </div>
+      )}
 
       {photos.length > 0 && (
         <Reorder.Group

@@ -61,12 +61,45 @@ export default function ResultPage() {
         if (state.photos.length > 20) {
           console.warn('[Pixia] Fotos limitadas a 20 por localStorage')
         }
-        const maxPhotos = state.photos.slice(0, 20)
+
+        // Leer análisis EXIF/score del wizard
+        const analysisRaw = localStorage.getItem('pixia_photo_analysis')
+        const analysis: any[] = analysisRaw ? JSON.parse(analysisRaw) : []
+        console.log('[Result] analysis del localStorage:', analysis.length, 'fotos')
+        console.log('[Result] primera foto takenAt:', analysis[0]?.takenAt)
+
+        // Ordenar el análisis por takenAt
+        const sortedAnalysis = [...analysis].sort((a, b) => {
+          if (!a.takenAt && !b.takenAt) return 0
+          if (!a.takenAt) return 1
+          if (!b.takenAt) return -1
+          return new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime()
+        })
+
+        // Reordenar state.photos según el orden cronológico del análisis
+        const filesToProcess = sortedAnalysis.length === state.photos.length
+          ? sortedAnalysis.map((a: any) => state.photos[a.originalIndex])
+          : state.photos.slice(0, 20)
+
+        console.log('[Result] Orden de archivos:',
+          sortedAnalysis.map((a: any) => `${a.originalIndex}→${a.takenAt || 'sin-fecha'}`)
+        )
+
         const photos = await Promise.all(
-          maxPhotos.map(async (p) => ({
-            id: crypto.randomUUID(),
-            src: await fileToCompressedBase64(p.file),
-          }))
+          filesToProcess.slice(0, 20).map(async (p: any, index: number) => {
+            const meta = sortedAnalysis[index]
+            return {
+              id: crypto.randomUUID(),
+              src: await fileToCompressedBase64(p.file),
+              takenAt: meta?.takenAt || null,
+              orientation: meta?.orientation || 'landscape',
+              score: meta?.score || null,
+            }
+          })
+        )
+
+        console.log('[Result] orden después de sort:',
+          photos.map((p: any) => p.takenAt || 'sin-fecha')
         )
         console.log('[Pixia] Fotos convertidas a base64', { count: photos.length })
 

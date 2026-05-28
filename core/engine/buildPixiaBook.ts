@@ -2,7 +2,13 @@ import { ActId, NarrativeTone, PixiaBook } from '../domain/PixiaBook'
 
 export interface AlbumDraft {
   title?: string
-  photos: { id: string; src: string }[]
+  photos: {
+    id: string
+    src: string
+    orientation?: string
+    score?: { finalScore: number; recommendation: string }
+    takenAt?: string | null
+  }[]
   style?: string
   emotion?: string
   story?: string
@@ -159,7 +165,20 @@ function describePhoto(src: string, index: number): Promise<string> {
 export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook> {
   try {
     const photoDescriptions = await Promise.all(
-      draft.photos.map((p, i) => describePhoto(p.src, i))
+      draft.photos.map((p, i) => {
+        if (p.orientation) {
+          const rec = p.score?.recommendation ?? 'supporting'
+          const time = p.takenAt
+            ? new Date(p.takenAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+            : null
+          const timeCtx = time ? ` — tomada a las ${time}` : ''
+          const scoreCtx = rec === 'hero'
+            ? ' — FOTO PROTAGONISTA (alta calidad)'
+            : rec === 'discard' ? ' — foto de calidad baja' : ''
+          return `Foto ${i + 1}: orientación ${p.orientation}${timeCtx}${scoreCtx}`
+        }
+        return describePhoto(p.src, i)
+      })
     )
 
     const response = await fetch('/api/editorial', {
