@@ -10,18 +10,42 @@ import { PHOTOS_PER_LAYOUT } from './types'
  * @param layoutConfig layout elegido por el usuario para cada página
  * @param extraPages   número de páginas extra agregadas con costo
  */
+function autoLayout(
+  current: { photo: PhotoAsset; act: ActId },
+  next?: { photo: PhotoAsset; act: ActId },
+): PageLayout {
+  const orientation = current.photo.orientation || 'landscape'
+  console.log('[PageEngine] autoLayout:', orientation, next?.photo.orientation || 'no-next')
+
+  // Dos portrait juntas → side-2 (lado a lado)
+  if (next && orientation === 'portrait' && next.photo.orientation === 'portrait') {
+    return 'side-2'
+  }
+  // Dos landscape juntas → stack-2 (apiladas)
+  if (next && orientation === 'landscape' && next.photo.orientation === 'landscape') {
+    return 'stack-2'
+  }
+  // Landscape sola o square → single
+  if (orientation === 'landscape' || orientation === 'square') return 'single'
+  // Portrait sola → portrait (con aire)
+  return 'portrait'
+}
+
 export function buildPages(
   photos: { photo: PhotoAsset; act: ActId }[],
   layoutConfig: LayoutConfig = new Map(),
-  extraPages: number = 0,
 ): AlbumPages {
   const pages: Page[] = []
   let photoIndex = 0
   let pageIndex  = 0
 
+  console.log('[PageEngine] Fotos con orientación:',
+    photos.map(p => p.photo.orientation || 'sin-orientacion').join(', ')
+  )
+
   while (photoIndex < photos.length) {
-    // Layout para esta página (default 'single')
-    const layout = layoutConfig.get(pageIndex) || 'single'
+    const layout = layoutConfig.get(pageIndex) ||
+      autoLayout(photos[photoIndex], photos[photoIndex + 1])
     const needed = PHOTOS_PER_LAYOUT[layout]
 
     // Caso especial: cross-page (foto cruza 2 páginas)

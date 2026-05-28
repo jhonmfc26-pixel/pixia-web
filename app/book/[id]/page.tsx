@@ -31,8 +31,8 @@ function normalizeBook(raw: any): AlbumBlueprint {
       r2Key: '',
       width: 0,
       height: 0,
-      orientation: 'landscape' as const,
-      originalName: p.id,
+      orientation: (p.orientation ?? 'landscape') as 'landscape' | 'portrait' | 'square',
+      originalName: p.originalName ?? p.id,
       score: {
         sharpness: 0, exposure: 0, composition: 0, faces: 0,
         resolution: 0, uniqueness: 100, emotionalWeight: 50,

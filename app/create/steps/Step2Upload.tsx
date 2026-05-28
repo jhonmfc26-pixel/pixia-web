@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   motion,
@@ -13,11 +13,16 @@ import ContinueButton from "@/components/create/ContinueButton";
 import { X, Star, Move } from "lucide-react";
 import { useWizard, PhotoItem } from "@/components/create/WizardProvider";
 import { usePhotoAnalysis } from "@/core/modules/scoring/usePhotoAnalysis";
+import { useUpload } from "@/core/modules/upload/useUpload";
+import { useSession } from "@/core/modules/session/useSession";
 
 export default function Step2Upload() {
   const { state, dispatch } = useWizard();
   const photos = state.photos;
   const { progress, analyzePhotos } = usePhotoAnalysis();
+  const { sessionId } = useSession();
+  const { uploadProgress, uploadPhotos } = useUpload(sessionId || '');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const count = useMotionValue(0);
   const rounded = useTransform(count, (latest) => Math.round(latest));
@@ -25,39 +30,56 @@ export default function Step2Upload() {
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       console.log('[Step2] onDrop recibió', acceptedFiles.length, 'archivos')
+      setIsProcessing(true)
 
-      const newPhotos: PhotoItem[] = acceptedFiles.map((file) => ({
-        id: crypto.randomUUID(),
-        file,
-        priority: false,
-      }));
+      try {
+        const newPhotos: PhotoItem[] = acceptedFiles.map((file) => ({
+          id: crypto.randomUUID(),
+          file,
+          priority: false,
+        }));
 
-      // Mostrar thumbnails inmediatamente — no esperar análisis
-      dispatch({
-        type: "SET_PHOTOS",
-        payload: [...photos, ...newPhotos].slice(0, 30),
-      });
+        // Mostrar thumbnails inmediatamente — no esperar análisis
+        dispatch({
+          type: "SET_PHOTOS",
+          payload: [...photos, ...newPhotos].slice(0, 30),
+        });
 
-      console.log('[Step2] Iniciando análisis...')
-      const analyzed = await analyzePhotos(acceptedFiles);
-      console.log('[Step2] Análisis completado:', analyzed.length, 'fotos')
+        console.log('[Step2] Iniciando análisis...')
+        const analyzed = await analyzePhotos(acceptedFiles);
+        console.log('[Step2] Análisis completado:', analyzed.length, 'fotos')
 
-      if (analyzed.length > 0) {
-        localStorage.setItem(
-          'pixia_photo_analysis',
-          JSON.stringify(analyzed.map((p, index) => ({
-            id: p.id,
-            orientation: p.orientation,
-            score: p.score,
-            takenAt: p.exif.takenAt?.toISOString() || null,
-            gps: p.exif.gps || null,
-            originalIndex: index,
-          })))
-        );
-        console.log('[Step2] Análisis guardado en localStorage')
+        if (analyzed.length > 0) {
+          localStorage.setItem(
+            'pixia_photo_analysis',
+            JSON.stringify(analyzed.map((p, index) => ({
+              id: p.id,
+              orientation: p.orientation,
+              score: p.score,
+              takenAt: p.exif.takenAt?.toISOString() || null,
+              gps: p.exif.gps || null,
+              originalIndex: index,
+            })))
+          );
+          console.log('[Step2] Análisis guardado en localStorage')
+
+          if (sessionId) {
+            const filesToUpload = analyzed.map(p => ({
+              file: p.file,
+              photoId: p.id,
+            }));
+            const uploaded = await uploadPhotos(filesToUpload);
+            if (uploaded.length > 0) {
+              localStorage.setItem('pixia_r2_photos', JSON.stringify(uploaded));
+              console.log('[Step2] Fotos subidas a R2:', uploaded.length);
+            }
+          }
+        }
+      } finally {
+        setIsProcessing(false)
       }
     },
-    [dispatch, photos, analyzePhotos]
+    [dispatch, photos, analyzePhotos, sessionId, uploadPhotos]
   );
 
   const removePhoto = (id: string) => {
@@ -169,6 +191,33 @@ export default function Step2Upload() {
         </div>
       )}
 
+      {uploadProgress.isUploading && (
+        <div style={{
+          padding: '12px 16px', marginTop: '8px',
+          background: 'rgba(255,255,255,0.04)',
+          borderRadius: '8px',
+          display: 'flex', flexDirection: 'column', gap: '8px',
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between',
+            fontSize: '12px', color: 'rgba(255,255,255,0.5)',
+          }}>
+            <span>Guardando en la nube...</span>
+            <span>{uploadProgress.completed} / {uploadProgress.total}</span>
+          </div>
+          <div style={{
+            height: '2px', background: 'rgba(255,255,255,0.08)',
+            borderRadius: '1px', overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%', background: '#E8553A',
+              width: `${(uploadProgress.completed / uploadProgress.total) * 100}%`,
+              transition: 'width 0.3s ease', borderRadius: '1px',
+            }} />
+          </div>
+        </div>
+      )}
+
       {photos.length > 0 && (
         <Reorder.Group
           axis="x"
@@ -233,7 +282,7 @@ export default function Step2Upload() {
         </Reorder.Group>
       )}
 
-      <ContinueButton disabled={!unlocked} />
+      <ContinueButton disabled={isProcessing || !unlocked} />
     </div>
   );
 }

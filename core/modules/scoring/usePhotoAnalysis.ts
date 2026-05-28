@@ -36,42 +36,50 @@ export function usePhotoAnalysis() {
     console.log('[Scoring] Iniciando análisis de', files.length, 'fotos')
     setProgress({ total: files.length, completed: 0, isAnalyzing: true, insights: [] })
 
-    const results: AnalyzedPhoto[] = []
+    const BATCH_SIZE = 5
+    const results: AnalyzedPhoto[] = new Array(files.length)
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      const batch = files.slice(i, Math.min(i + BATCH_SIZE, files.length))
 
-      const exif = await readExif(file)
-      const src = await compressFile(file, 1200, 0.82)
-      const dims = await getImageDimensions(src)
+      await Promise.all(
+        batch.map(async (file, batchIdx) => {
+          const globalIdx = i + batchIdx
 
-      const ratio = dims.width / dims.height
-      const orientation: 'landscape' | 'portrait' | 'square' =
-        ratio > 1.15 ? 'landscape' :
-        ratio < 0.87 ? 'portrait' : 'square'
+          const exif = await readExif(file)
+          const src = await compressFile(file, 800, 0.75)
+          const dims = await getImageDimensions(src)
 
-      const score = await scorePhoto(src)
+          const ratio = dims.width / dims.height
+          const orientation: 'landscape' | 'portrait' | 'square' =
+            ratio > 1.15 ? 'landscape' :
+            ratio < 0.87 ? 'portrait' : 'square'
 
-      results.push({
-        id: crypto.randomUUID(),
-        file,
-        src,
-        width: dims.width,
-        height: dims.height,
-        orientation,
-        exif,
-        score,
-      })
+          const score = await scorePhoto(src)
 
-      const insight = generateInsight(results, i + 1, files.length)
+          results[globalIdx] = {
+            id: crypto.randomUUID(),
+            file,
+            src,
+            width: dims.width,
+            height: dims.height,
+            orientation,
+            exif,
+            score,
+          }
+        })
+      )
+
+      const completed = Math.min(i + BATCH_SIZE, files.length)
+      const insight = generateInsight(results.filter(Boolean) as AnalyzedPhoto[], completed, files.length)
       setProgress(prev => ({
         ...prev,
-        completed: i + 1,
+        completed,
         insights: insight ? [...prev.insights, insight] : prev.insights,
       }))
     }
 
-    const sorted = sortByExif(results)
+    const sorted = sortByExif(results.filter(Boolean) as AnalyzedPhoto[])
     setAnalyzedPhotos(sorted)
     setProgress(prev => ({ ...prev, isAnalyzing: false }))
 

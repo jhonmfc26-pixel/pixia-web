@@ -12,6 +12,8 @@
     "deploy": "pnpm pages:build && npx wrangler pages deploy .vercel/output/static"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1055.0",
+    "@aws-sdk/s3-request-presigner": "^3.1055.0",
     "@supabase/supabase-js": "^2.106.2",
     "framer-motion": "^12.29.2",
     "lucide-react": "^0.563.0",

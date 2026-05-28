@@ -40,10 +40,12 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
   const bookRef = useRef<any>(null)
 
   // Construir páginas con el motor
-  const albumPages = useMemo(
-    () => buildPages(photoPool, layoutConfig),
-    [photoPool, layoutConfig]
-  )
+  const albumPages = useMemo(() => {
+    console.log('[Viewer] photoPool orientaciones:',
+      photoPool.map(p => `${p.photo.id?.slice(0, 8)}: ${p.photo.orientation || 'undefined'}`)
+    )
+    return buildPages(photoPool, layoutConfig)
+  }, [photoPool, layoutConfig])
 
   // Dimensiones responsive
   useEffect(() => {

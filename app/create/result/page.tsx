@@ -58,10 +58,6 @@ export default function ResultPage() {
       try {
         console.log('[Pixia] Iniciando generación con AI', { photoCount: state.photos.length })
 
-        if (state.photos.length > 20) {
-          console.warn('[Pixia] Fotos limitadas a 20 por localStorage')
-        }
-
         // Leer análisis EXIF/score del wizard
         const analysisRaw = localStorage.getItem('pixia_photo_analysis')
         const analysis: any[] = analysisRaw ? JSON.parse(analysisRaw) : []
@@ -76,28 +72,47 @@ export default function ResultPage() {
           return new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime()
         })
 
+        // Leer URLs de R2 si ya fueron subidas
+        const r2Raw = localStorage.getItem('pixia_r2_photos')
+        const r2Photos: any[] = r2Raw ? JSON.parse(r2Raw) : []
+        const r2Map = new Map(r2Photos.map((p: any) => [p.photoId, p.url]))
+        console.log('[Result] Fotos en R2:', r2Photos.length)
+
         // Reordenar state.photos según el orden cronológico del análisis
         const filesToProcess = sortedAnalysis.length === state.photos.length
           ? sortedAnalysis.map((a: any) => state.photos[a.originalIndex])
-          : state.photos.slice(0, 20)
+          : state.photos.slice(0, 40)
 
         console.log('[Result] Orden de archivos:',
           sortedAnalysis.map((a: any) => `${a.originalIndex}→${a.takenAt || 'sin-fecha'}`)
         )
 
+        console.log('[Result] IDs únicos en análisis:',
+          new Set(analysis.map((a: any) => a.id)).size, 'de', analysis.length
+        )
+
         const photos = await Promise.all(
-          filesToProcess.slice(0, 20).map(async (p: any, index: number) => {
+          filesToProcess.slice(0, 40).map(async (p: any, index: number) => {
             const meta = sortedAnalysis[index]
+            const r2Url = meta?.id ? r2Map.get(meta.id) : null
+            const src = r2Url || await fileToCompressedBase64(p.file)
             return {
-              id: crypto.randomUUID(),
-              src: await fileToCompressedBase64(p.file),
+              id: meta?.id || `photo-${index}`,
+              src,
+              url: src,
+              thumbnailUrl: r2Url || '',
+              r2Key: '',
+              width: 0,
+              height: 0,
               takenAt: meta?.takenAt || null,
-              orientation: meta?.orientation || 'landscape',
+              orientation: (meta?.orientation || 'landscape') as 'landscape' | 'portrait' | 'square',
               score: meta?.score || null,
+              originalName: p.file?.name || `photo-${index}`,
             }
           })
         )
 
+        console.log('[Result] Fotos con R2 URL:', photos.filter((p: any) => p.url?.startsWith('http')).length)
         console.log('[Result] orden después de sort:',
           photos.map((p: any) => p.takenAt || 'sin-fecha')
         )

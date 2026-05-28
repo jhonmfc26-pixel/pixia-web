@@ -5,9 +5,15 @@ export interface AlbumDraft {
   photos: {
     id: string
     src: string
+    url?: string
+    thumbnailUrl?: string
+    r2Key?: string
+    width?: number
+    height?: number
     orientation?: string
     score?: { finalScore: number; recommendation: string }
     takenAt?: string | null
+    originalName?: string
   }[]
   style?: string
   emotion?: string
@@ -227,8 +233,8 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
 
         const photos = uniqueIndices
           .map((i) => draft.photos[i])
-          .filter((p): p is { id: string; src: string } => p !== undefined)
-          .map((p) => ({ id: p.id, src: p.src }))
+          .filter((p) => p !== undefined)
+          .map((p) => ({ id: p!.id, src: p!.src, orientation: p!.orientation }))
 
         if (photos.length === 0) return null
 
