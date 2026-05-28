@@ -7,12 +7,31 @@ import { useParams, useRouter } from 'next/navigation'
 import { getBookFromLocal } from '../../../core/engine/localBookStorage'
 import PixiaViewer from '../../../core/modules/viewer/PixiaViewer'
 import type { AlbumBlueprint } from '../../../core/contracts/AlbumBlueprint'
+import { getDefaultTemplate } from '../../../core/modules/cover/coverTemplates'
 
 // Normalize old PixiaBook format → AlbumBlueprint
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeBook(raw: any): AlbumBlueprint {
-  // Already new format
-  if (raw.spreads && raw.cover && raw.occasion) return raw as AlbumBlueprint
+  // Already new AlbumBlueprint format — still patch cover to ensure new fields exist
+  if (raw.spreads && raw.cover && raw.occasion) {
+    const occasion = raw.occasion || 'boda'
+    const defaultTemplate = getDefaultTemplate(occasion)
+    const cover = raw.cover
+    const normalized: AlbumBlueprint = {
+      ...raw,
+      cover: {
+        photoId: cover.photoId || '',
+        templateId: cover.templateId || defaultTemplate.id,
+        title: cover.title || raw.narrative?.title || 'Mi álbum',
+        subtitle: cover.subtitle || '',
+        date: cover.date || '',
+        textPosition: cover.textPosition || defaultTemplate.defaultPosition,
+        textAlign: cover.textAlign || defaultTemplate.defaultAlign,
+        textColor: cover.textColor || 'auto',
+      },
+    }
+    return normalized
+  }
 
   // Old PixiaBook format: content.spreads with photos[].src (not url)
   const oldSpreads = raw.content?.spreads ?? []
@@ -41,10 +60,12 @@ function normalizeBook(raw: any): AlbumBlueprint {
     })),
   }))
 
+  const occasion = raw.occasion || 'boda'
+  const defaultTemplate = getDefaultTemplate(occasion)
   const title = raw.identity?.title ?? 'Mi álbum'
   const coverPhotoId = spreads[0]?.photos[0]?.id ?? ''
 
-  return {
+  const result: AlbumBlueprint = {
     id: raw.identity?.bookId ?? `book-${Date.now()}`,
     sessionId: raw.identity?.bookId ?? '',
     createdAt: new Date(raw.identity?.createdAt ?? Date.now()),
@@ -52,9 +73,20 @@ function normalizeBook(raw: any): AlbumBlueprint {
     version: 1,
     format: '30x30',
     style: 'con-margen',
-    occasion: 'boda',
+    occasion,
     pageCount: spreads.length * 2,
-    cover: { photoId: coverPhotoId, title, style: 'classic' },
+    cover: {
+      photoId: raw.cover?.photoId || coverPhotoId,
+      templateId: raw.cover?.templateId || defaultTemplate.id,
+      title: raw.narrative?.title || raw.cover?.title || title,
+      subtitle: raw.cover?.subtitle && raw.cover.subtitle !== (raw.narrative?.title || raw.identity?.title)
+        ? raw.cover.subtitle
+        : '',
+      date: raw.cover?.date || '',
+      textPosition: raw.cover?.textPosition || defaultTemplate.defaultPosition,
+      textAlign: raw.cover?.textAlign || defaultTemplate.defaultAlign,
+      textColor: raw.cover?.textColor || 'auto',
+    },
     spreads,
     narrative: {
       title,
@@ -64,6 +96,8 @@ function normalizeBook(raw: any): AlbumBlueprint {
     status: 'preview',
     aiGenerated: raw.provenance?.source?.includes('ai') ?? false,
   }
+
+  return result
 }
 
 function mapOldLayout(layout: string): AlbumBlueprint['spreads'][number]['layout'] {

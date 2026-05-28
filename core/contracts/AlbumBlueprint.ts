@@ -80,10 +80,13 @@ export interface Spread {
 
 export interface CoverConfig {
   photoId: string
-  title: string           // "J & N"
-  subtitle?: string       // "Una historia de amor"
-  date?: string           // "Julio 2024"
-  style: CoverStyle
+  templateId: string
+  title: string
+  subtitle?: string
+  date?: string
+  textPosition: 'top' | 'center' | 'bottom'
+  textAlign: 'left' | 'center' | 'right'
+  textColor: 'auto' | 'light' | 'dark'
 }
 
 export interface AlbumBlueprint {

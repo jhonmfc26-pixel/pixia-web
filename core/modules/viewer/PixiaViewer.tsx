@@ -109,7 +109,14 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
     <div key="cover" style={{ width: '100%', height: '100%' }}>
       <CoverPage
         photo={coverPhoto}
-        cover={book.cover || { photoId: '', title: book.narrative?.title || 'Mi álbum', style: 'classic' as const }}
+        cover={book.cover || {
+          photoId: '',
+          title: book.narrative?.title || 'Mi álbum',
+          templateId: 'wedding-classic',
+          textPosition: 'bottom',
+          textAlign: 'center',
+          textColor: 'auto',
+        }}
         style={albumStyle}
       />
     </div>,
