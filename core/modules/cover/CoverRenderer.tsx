@@ -6,9 +6,11 @@ interface CoverRendererProps {
   config: CoverConfig
   photoUrl?: string
   scale?: number
+  format?: '20x20' | '30x30' | 'a4'
 }
 
-export default function CoverRenderer({ config, photoUrl, scale = 1 }: CoverRendererProps) {
+export default function CoverRenderer({ config, photoUrl, scale = 1, format = '30x30' }: CoverRendererProps) {
+  const aspectRatio = format === 'a4' ? '3 / 4' : '1 / 1'
   const template = getTemplateById(config.templateId)
   if (!template) return null
 
@@ -44,7 +46,7 @@ export default function CoverRenderer({ config, photoUrl, scale = 1 }: CoverRend
   return (
     <div style={{
       width: '100%',
-      height: '100%',
+      aspectRatio,
       position: 'relative',
       overflow: 'hidden',
       background: '#1a1a1a',

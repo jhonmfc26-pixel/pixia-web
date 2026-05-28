@@ -9,6 +9,8 @@ import CoverPage from './pages/CoverPage'
 import BackCoverPage from './pages/BackCoverPage'
 import BlankPage from './pages/BlankPage'
 import EditorPanel from '@/core/modules/editor/EditorPanel'
+import CoverEditor from '@/core/modules/cover/CoverEditor'
+import { useCover } from '@/core/modules/cover/useCover'
 
 interface PixiaViewerProps {
   book: AlbumBlueprint
@@ -28,7 +30,24 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
     return map
   }, [photoPool])
 
-  // Estado del editor
+  // Estado del editor de portada
+  const { config: coverConfig, setConfig: setCoverConfig } = useCover(book.cover)
+  const [coverEditorOpen, setCoverEditorOpen] = useState(false)
+
+  // Fotos candidatas para la portada — top 15 por score, todas las orientaciones
+  const coverCandidates = useMemo(() => {
+    const all = photoPool.map(p => p.photo)
+    const sorted = [...all].sort((a, b) =>
+      (b.score?.finalScore || 0) - (a.score?.finalScore || 0)
+    )
+    const candidates = sorted.slice(0, 15)
+    console.log('[Cover] candidatas:',
+      candidates.map(p => `${p.orientation}: ${p.score?.finalScore || 0}`)
+    )
+    return candidates
+  }, [photoPool])
+
+  // Estado del editor de páginas
   const [layoutConfig, setLayoutConfig] = useState<LayoutConfig>(new Map())
   const [editMode, setEditMode] = useState(false)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
@@ -41,9 +60,6 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
 
   // Construir páginas con el motor
   const albumPages = useMemo(() => {
-    console.log('[Viewer] photoPool orientaciones:',
-      photoPool.map(p => `${p.photo.id?.slice(0, 8)}: ${p.photo.orientation || 'undefined'}`)
-    )
     return buildPages(photoPool, layoutConfig)
   }, [photoPool, layoutConfig])
 
@@ -65,9 +81,9 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
   }, [])
 
   // Total de páginas (portada + páginas + paridad + contraportada)
-  const innerPages  = albumPages.pages.length
-  const needsBlank  = innerPages % 2 !== 0
-  const totalPages  = 1 + innerPages + (needsBlank ? 1 : 0) + 1
+  const innerPages = albumPages.pages.length
+  const needsBlank = innerPages % 2 !== 0
+  const totalPages = 1 + innerPages + (needsBlank ? 1 : 0) + 1
 
   // Key estable para forzar remontaje cuando cambia la estructura del libro
   const flipbookKey = useMemo(() => {
@@ -96,28 +112,22 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
   const selectedPage      = albumPages.pages.find(p => p.id === selectedPageId)
   const selectedPageIndex = albumPages.pages.findIndex(p => p.id === selectedPageId)
 
-  // Layouts disponibles según fotos restantes
+  // Layouts disponibles
   const availableLayouts: PageLayout[] = useMemo(() => {
     return ['single', 'stack-2', 'side-2', 'grid-3', 'grid-4', 'portrait', 'cross-left']
   }, [])
 
-  // Portada
-  const coverPhoto = photoPool[0]?.photo
+  // Foto de portada activa (editable)
+  const coverPhoto = photosById.get(coverConfig.photoId) || photoPool[0]?.photo
 
   // Hijos del flipbook — array limpio sin nulls
   const flipChildren = [
     <div key="cover" style={{ width: '100%', height: '100%' }}>
       <CoverPage
         photo={coverPhoto}
-        cover={book.cover || {
-          photoId: '',
-          title: book.narrative?.title || 'Mi álbum',
-          templateId: 'wedding-classic',
-          textPosition: 'bottom',
-          textAlign: 'center',
-          textColor: 'auto',
-        }}
+        cover={coverConfig}
         style={albumStyle}
+        format={book.format || '30x30'}
       />
     </div>,
 
@@ -171,7 +181,7 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
         </button>
 
         <span style={{ fontFamily: 'Playfair Display, serif', fontSize: '16px', color: 'white' }}>
-          {book.narrative?.title || book.cover?.title || 'Mi álbum'}
+          {coverConfig.title || book.narrative?.title || 'Mi álbum'}
         </span>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -217,7 +227,7 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
           transition: 'opacity 0.2s ease',
         }}>
 
-          {/* Overlay de captura en modo edición (centro 80% — bordes permiten swipe) */}
+          {/* Overlay de captura en modo edición */}
           {editMode && (
             <div
               style={{
@@ -227,6 +237,13 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
               }}
               onClick={(e) => {
                 e.stopPropagation()
+
+                // Portada → abrir editor de portada
+                if (currentPage === 0) {
+                  setCoverEditorOpen(true)
+                  return
+                }
+
                 const rect = e.currentTarget.getBoundingClientRect()
                 const x = e.clientX - rect.left
                 const isLeft = x < rect.width / 2
@@ -315,7 +332,7 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
         </>
       )}
 
-      {/* Panel editor */}
+      {/* Panel editor de páginas */}
       {selectedPageId && (
         <EditorPanel
           availableLayouts={availableLayouts}
@@ -324,6 +341,20 @@ export default function PixiaViewer({ book }: PixiaViewerProps) {
           totalPages={albumPages.pages.length}
           onChangeLayout={handleChangeLayout}
           onClose={() => setSelectedPageId(null)}
+        />
+      )}
+
+      {/* Editor de portada */}
+      {coverEditorOpen && (
+        <CoverEditor
+          config={coverConfig}
+          occasion={book.occasion || 'boda'}
+          format={book.format || '30x30'}
+          heroPhotos={coverCandidates}
+          photoUrl={photosById.get(coverConfig.photoId)?.url || photoPool[0]?.photo.url}
+          photosById={photosById}
+          onUpdate={setCoverConfig}
+          onClose={() => setCoverEditorOpen(false)}
         />
       )}
 
