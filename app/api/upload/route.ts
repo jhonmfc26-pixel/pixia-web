@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY!
 
     const buffer = await file.arrayBuffer()
-    const key = `users/${sessionId}/compressed/${photoId}.jpg`
+    const key = `users/${sessionId}/original/${photoId}.jpg`
     const contentType = file.type || 'image/jpeg'
 
     const r2Res = await signedR2Put(endpoint, bucket, key, buffer, contentType, accessKeyId, secretAccessKey)

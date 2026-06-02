@@ -2,17 +2,19 @@
 
 export const runtime = 'edge'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getBookFromLocal } from '../../../core/engine/localBookStorage'
 import PixiaViewer from '../../../core/modules/viewer/PixiaViewer'
 import type { AlbumBlueprint } from '../../../core/contracts/AlbumBlueprint'
 import { getDefaultTemplate } from '../../../core/modules/cover/coverTemplates'
+import { extractPhotoPool, buildPages } from '../../../core/modules/album/pageEngine'
+import type { LayoutConfig, PhotoPlacement } from '../../../core/modules/album/types'
 
 // Normalize old PixiaBook format → AlbumBlueprint
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeBook(raw: any): AlbumBlueprint {
-  // Already new AlbumBlueprint format — still patch cover to ensure new fields exist
+  // Already new AlbumBlueprint format — patch cover + hydrate Maps
   if (raw.spreads && raw.cover && raw.occasion) {
     const occasion = raw.occasion || 'boda'
     const defaultTemplate = getDefaultTemplate(occasion)
@@ -29,13 +31,19 @@ function normalizeBook(raw: any): AlbumBlueprint {
         textAlign: cover.textAlign || defaultTemplate.defaultAlign,
         textColor: cover.textColor || 'auto',
       },
-    }
+      // Hidratar Maps desde entries serializadas por el editor
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      layoutConfig: Array.isArray(raw.layoutConfig) ? new Map(raw.layoutConfig as any) : new Map(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      placements: Array.isArray(raw.placements) ? new Map(raw.placements as any) : new Map(),
+    } as AlbumBlueprint
     return normalized
   }
 
   // Old PixiaBook format: content.spreads with photos[].src (not url)
   const oldSpreads = raw.content?.spreads ?? []
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const spreads = oldSpreads.map((s: any, i: number) => ({
     id: s.id ?? `spread-${i}`,
     act: s.act ?? 'inicio',
@@ -43,6 +51,7 @@ function normalizeBook(raw: any): AlbumBlueprint {
     isLocked: false,
     pageNumber: i * 2 + 1,
     caption: s.caption,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     photos: (s.photos ?? []).map((p: any) => ({
       id: p.id,
       url: p.src ?? p.url ?? '',
@@ -65,7 +74,7 @@ function normalizeBook(raw: any): AlbumBlueprint {
   const title = raw.identity?.title ?? 'Mi álbum'
   const coverPhotoId = spreads[0]?.photos[0]?.id ?? ''
 
-  const result: AlbumBlueprint = {
+  const result = {
     id: raw.identity?.bookId ?? `book-${Date.now()}`,
     sessionId: raw.identity?.bookId ?? '',
     createdAt: new Date(raw.identity?.createdAt ?? Date.now()),
@@ -95,7 +104,11 @@ function normalizeBook(raw: any): AlbumBlueprint {
     },
     status: 'preview',
     aiGenerated: raw.provenance?.source?.includes('ai') ?? false,
-  }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    layoutConfig: Array.isArray(raw.layoutConfig) ? new Map(raw.layoutConfig as any) : new Map(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    placements: Array.isArray(raw.placements) ? new Map(raw.placements as any) : new Map(),
+  } as AlbumBlueprint
 
   return result
 }
@@ -112,24 +125,70 @@ function mapOldLayout(layout: string): AlbumBlueprint['spreads'][number]['layout
 export default function BookPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pageParam = parseInt(searchParams.get('page') || '0', 10)
   const [book, setBook] = useState<AlbumBlueprint | null>(null)
+  const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
     const loaded = getBookFromLocal(params.id as string)
-
     if (!loaded) {
-      router.replace('/')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNotFound(true)
       return
     }
+    const normalized = normalizeBook(loaded)
+    setBook(normalized)
+  }, [params.id])
 
-    setBook(normalizeBook(loaded))
-  }, [params.id, router])
+  useEffect(() => {
+    if (notFound) router.replace('/')
+  }, [notFound, router])
+
+  const photoPool = useMemo(() => book ? extractPhotoPool(book.spreads) : [], [book])
+
+  const photosById = useMemo(() => {
+    const map = new Map()
+    photoPool.forEach(item => map.set(item.photo.id, item.photo))
+    return map
+  }, [photoPool])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bookAny = book as any
+  const layoutConfig: LayoutConfig = useMemo(() =>
+    bookAny?.layoutConfig instanceof Map ? bookAny.layoutConfig : new Map(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [book]
+  )
+  const placements: Map<string, PhotoPlacement> = useMemo(() =>
+    bookAny?.placements instanceof Map ? bookAny.placements : new Map(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [book]
+  )
+
+  const albumPages = useMemo(() => buildPages(photoPool, layoutConfig), [photoPool, layoutConfig])
+
+  const coverPhoto = useMemo(
+    () => book ? (photosById.get(book.cover.photoId) ?? photoPool[0]?.photo) : undefined,
+    [book, photosById, photoPool]
+  )
 
   if (!book) return <p style={{ color: 'white', padding: 32 }}>Cargando...</p>
 
   return (
     <main>
-      <PixiaViewer book={book} />
+      <PixiaViewer
+        pages={albumPages.pages}
+        photosById={photosById}
+        placements={placements}
+        coverPhoto={coverPhoto}
+        cover={book.cover}
+        style={book.style || 'con-margen'}
+        format={book.format || '30x30'}
+        title={book.cover.title || book.narrative?.title || 'Mi álbum'}
+        startPage={Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 0}
+        onEdit={(currentPage) => router.push(`/book/${book.id}/edit?page=${currentPage}`)}
+      />
     </main>
   )
 }

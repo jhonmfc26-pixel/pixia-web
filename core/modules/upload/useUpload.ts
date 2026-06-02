@@ -33,14 +33,14 @@ export function useUpload(sessionId: string) {
     const results: UploadedPhoto[] = []
     const failed: string[] = []
 
-    const BATCH_SIZE = 3
+    const BATCH_SIZE = 2
     for (let i = 0; i < files.length; i += BATCH_SIZE) {
       const batch = files.slice(i, i + BATCH_SIZE)
 
       const batchResults = await Promise.allSettled(
-        batch.map(async ({ file, photoId, compressedBlob }) => {
+        batch.map(async ({ file, photoId }) => {
           const formData = new FormData()
-          formData.append('file', compressedBlob || file)
+          formData.append('file', file)
           formData.append('sessionId', sessionId)
           formData.append('photoId', photoId)
 
@@ -49,7 +49,10 @@ export function useUpload(sessionId: string) {
             body: formData,
           })
 
-          if (!res.ok) throw new Error(`Upload failed for ${photoId}`)
+          if (!res.ok) {
+            const errText = await res.text().catch(() => 'unknown')
+            throw new Error(`HTTP ${res.status}: ${errText}`)
+          }
 
           const data = await res.json()
           return {
@@ -64,9 +67,12 @@ export function useUpload(sessionId: string) {
       batchResults.forEach((result, idx) => {
         if (result.status === 'fulfilled') {
           results.push(result.value)
+          console.log('[Upload] OK:', batch[idx].photoId, 'size:', batch[idx].file.size)
         } else {
           failed.push(batch[idx].photoId)
-          console.error('[Upload] Failed:', batch[idx].photoId, result.reason)
+          console.error('[Upload] FAIL:', batch[idx].photoId,
+            'size:', batch[idx].file.size,
+            'error:', result.reason)
         }
       })
 

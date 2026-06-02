@@ -11,14 +11,13 @@ interface EditorPanelProps {
 }
 
 const LAYOUT_LABELS: Record<PageLayout, string> = {
-  'single':      '1 foto',
-  'stack-2':     '2 apiladas',
-  'side-2':      '2 lado a lado',
-  'grid-3':      '3 fotos',
-  'grid-4':      '4 fotos',
-  'portrait':    'Vertical con aire',
-  'cross-left':  'Cruza 2 páginas',
-  'cross-right': 'Cruza 2 páginas',
+  'single':       '1 foto',
+  'stack-2':      '2 apiladas',
+  'side-2':       '2 lado a lado',
+  'grid-3':       '3 fotos',
+  'grid-4':       '4 fotos',
+  'portrait':     'Vertical con aire',
+  'hero-spread':  'Doble página',
 }
 
 const LAYOUT_PREVIEWS: Record<PageLayout, React.ReactElement> = {
@@ -59,15 +58,10 @@ const LAYOUT_PREVIEWS: Record<PageLayout, React.ReactElement> = {
       <rect x="14" y="5" width="16" height="22" fill="rgba(255,255,255,0.18)" rx="2"/>
     </svg>
   ),
-  'cross-left': (
+  'hero-spread': (
     <svg width="44" height="32" viewBox="0 0 44 32">
       <rect x="2" y="2" width="40" height="28" fill="rgba(255,255,255,0.28)" rx="2"/>
-      <line x1="22" y1="2" x2="22" y2="30" stroke="rgba(0,0,0,0.3)" strokeWidth="1"/>
-    </svg>
-  ),
-  'cross-right': (
-    <svg width="44" height="32" viewBox="0 0 44 32">
-      <rect x="2" y="2" width="40" height="28" fill="rgba(255,255,255,0.28)" rx="2"/>
+      <line x1="22" y1="2" x2="22" y2="30" stroke="rgba(0,0,0,0.3)" strokeWidth="1" strokeDasharray="3 2"/>
     </svg>
   ),
 }
