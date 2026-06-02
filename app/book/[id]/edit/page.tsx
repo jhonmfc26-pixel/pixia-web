@@ -85,6 +85,7 @@ export default function EditPage() {
         format,
         layoutConfig,
         placements,
+        manualPhotoOrder: Array.isArray(b.manualPhotoOrder) ? b.manualPhotoOrder : undefined,
       } as AlbumBlueprint)
     } catch (e) {
       console.error('[Edit] Error:', e)
@@ -108,6 +109,7 @@ export default function EditPage() {
     layoutConfig: LayoutConfig
     placements: Map<string, PhotoPlacement>
     cover?: CoverConfig
+    manualPhotoOrder?: string[]
   }) => {
     const raw = localStorage.getItem('pixia_books')
     if (!raw) return
@@ -118,6 +120,7 @@ export default function EditPage() {
         layoutConfig: Array.from(changes.layoutConfig.entries()),
         placements: Array.from(changes.placements.entries()),
         ...(changes.cover ? { cover: changes.cover } : {}),
+        ...(changes.manualPhotoOrder ? { manualPhotoOrder: changes.manualPhotoOrder } : {}),
       }
       localStorage.setItem('pixia_books', JSON.stringify(books))
     } catch (e) {

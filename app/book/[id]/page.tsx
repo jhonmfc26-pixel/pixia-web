@@ -36,6 +36,7 @@ function normalizeBook(raw: any): AlbumBlueprint {
       layoutConfig: Array.isArray(raw.layoutConfig) ? new Map(raw.layoutConfig as any) : new Map(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       placements: Array.isArray(raw.placements) ? new Map(raw.placements as any) : new Map(),
+      manualPhotoOrder: Array.isArray(raw.manualPhotoOrder) ? raw.manualPhotoOrder : undefined,
     } as AlbumBlueprint
     return normalized
   }
@@ -108,6 +109,7 @@ function normalizeBook(raw: any): AlbumBlueprint {
     layoutConfig: Array.isArray(raw.layoutConfig) ? new Map(raw.layoutConfig as any) : new Map(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     placements: Array.isArray(raw.placements) ? new Map(raw.placements as any) : new Map(),
+    manualPhotoOrder: Array.isArray(raw.manualPhotoOrder) ? raw.manualPhotoOrder : undefined,
   } as AlbumBlueprint
 
   return result
@@ -145,7 +147,12 @@ export default function BookPage() {
     if (notFound) router.replace('/')
   }, [notFound, router])
 
-  const photoPool = useMemo(() => book ? extractPhotoPool(book.spreads) : [], [book])
+  const photoPool = useMemo(() => {
+    if (!book) return []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const manualOrder = (book as any).manualPhotoOrder as string[] | undefined
+    return extractPhotoPool(book.spreads, manualOrder)
+  }, [book])
 
   const photosById = useMemo(() => {
     const map = new Map()

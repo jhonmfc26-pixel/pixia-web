@@ -9,6 +9,7 @@ import EditorPhotoFrame from './EditorPhotoFrame'
 import EditorPanel from './EditorPanel'
 import CoverEditor from '@/core/modules/cover/CoverEditor'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
+import PhotoReplaceModal from './PhotoReplaceModal'
 
 interface EditorViewProps {
   book: AlbumBlueprint
@@ -16,6 +17,7 @@ interface EditorViewProps {
     layoutConfig: LayoutConfig
     placements: Map<string, PhotoPlacement>
     cover?: CoverConfig
+    manualPhotoOrder?: string[]
   }) => void
 }
 
@@ -28,13 +30,14 @@ interface EditorSpreadPageProps {
   onEndAdjust: () => void
   onUpdatePlacement: (photoId: string, placement: PhotoPlacement) => void
   onOpenLayoutPanel: (pageId: string) => void
+  onReplacePhoto: (photoId: string) => void
   albumStyle: AlbumStyle
 }
 
 function EditorSpreadPage({
   page, photosById, placements,
   adjustingPhotoId, onStartAdjust, onEndAdjust,
-  onUpdatePlacement, onOpenLayoutPanel,
+  onUpdatePlacement, onOpenLayoutPanel, onReplacePhoto,
 }: EditorSpreadPageProps) {
   const photoIds = page.photoIds
 
@@ -50,7 +53,7 @@ function EditorSpreadPage({
         onStartAdjust={() => onStartAdjust(id)}
         onEndAdjust={onEndAdjust}
         onUpdatePlacement={(p) => onUpdatePlacement(id, p)}
-        onOpenLayoutPanel={() => onOpenLayoutPanel(page.id)}
+        onReplace={() => onReplacePhoto(id)}
       />
     )
   }
@@ -140,6 +143,20 @@ function EditorSpreadPage({
           )
         })}
       </div>
+
+      {/* Botón Diseño a nivel de página (uno solo, fuera del grid) */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onOpenLayoutPanel(page.id) }}
+        style={{
+          position: 'absolute', bottom: 12, right: 12,
+          background: 'rgba(0,0,0,0.7)', color: 'white',
+          border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 6, padding: '6px 12px',
+          fontSize: 12, cursor: 'pointer', zIndex: 10,
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.9)'}
+        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.7)'}
+      >◫ Diseño</button>
     </div>
   )
 }
@@ -164,7 +181,15 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
   const fromPage = parseInt(searchParams.get('page') || '0', 10)
   const initialSpread = fromPage > 0 ? Math.floor((fromPage - 1) / 2) : 0
 
-  const photoPool = useMemo(() => extractPhotoPool(book.spreads), [book.spreads])
+  const [manualPhotoOrder, setManualPhotoOrder] = useState<string[] | undefined>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (book as any).manualPhotoOrder
+  )
+
+  const photoPool = useMemo(
+    () => extractPhotoPool(book.spreads, manualPhotoOrder),
+    [book.spreads, manualPhotoOrder]
+  )
   const photosById = useMemo(() => {
     const map = new Map<string, PhotoAsset>()
     photoPool.forEach(item => map.set(item.photo.id, item.photo))
@@ -199,6 +224,7 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
   const [adjustingPhotoId, setAdjustingPhotoId] = useState<string | null>(null)
   const [layoutPanelOpen, setLayoutPanelOpen] = useState<string | null>(null)
   const [coverEditorOpen, setCoverEditorOpen] = useState(false)
+  const [replacePhotoOpen, setReplacePhotoOpen] = useState<string | null>(null)
 
   const albumPages = useMemo(
     () => buildPages(photoPool, layoutConfig),
@@ -244,8 +270,34 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
     setLayoutPanelOpen(null)
   }
 
+  const currentOrder = useMemo(
+    () => photoPool.map(item => item.photo.id),
+    [photoPool]
+  )
+
+  const replaceCandidates = useMemo((): PhotoAsset[] => {
+    if (!replacePhotoOpen) return []
+    const currentPage = albumPages.pages.find(p => p.photoIds.includes(replacePhotoOpen))
+    const photosInPage = new Set(currentPage?.photoIds ?? [])
+    const candidates = photoPool
+      .map(item => item.photo)
+      .filter(p => !photosInPage.has(p.id))
+    candidates.sort((a, b) => (b.score?.finalScore ?? 0) - (a.score?.finalScore ?? 0))
+    return candidates.slice(0, 3)
+  }, [replacePhotoOpen, photoPool, albumPages])
+
+  const handleReplacePhoto = (oldPhotoId: string, newPhotoId: string) => {
+    const newOrder = [...currentOrder]
+    const oldIdx = newOrder.indexOf(oldPhotoId)
+    const newIdx = newOrder.indexOf(newPhotoId)
+    if (oldIdx < 0 || newIdx < 0) return
+    ;[newOrder[oldIdx], newOrder[newIdx]] = [newOrder[newIdx], newOrder[oldIdx]]
+    setManualPhotoOrder(newOrder)
+    setReplacePhotoOpen(null)
+  }
+
   const handleDone = () => {
-    onSave({ layoutConfig, placements, cover })
+    onSave({ layoutConfig, placements, cover, manualPhotoOrder })
     const targetPage = currentSpread * 2 + 1
     window.location.href = `/book/${book.id}?page=${targetPage}`
   }
@@ -330,6 +382,7 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
                   onEndAdjust={() => setAdjustingPhotoId(null)}
                   onUpdatePlacement={handleUpdatePlacement}
                   onOpenLayoutPanel={(id) => setLayoutPanelOpen(id)}
+                  onReplacePhoto={(photoId) => setReplacePhotoOpen(photoId)}
                   albumStyle={book.style || 'con-margen'}
                 />
               )}
@@ -350,6 +403,7 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
                   onEndAdjust={() => setAdjustingPhotoId(null)}
                   onUpdatePlacement={handleUpdatePlacement}
                   onOpenLayoutPanel={(id) => setLayoutPanelOpen(id)}
+                  onReplacePhoto={(photoId) => setReplacePhotoOpen(photoId)}
                   albumStyle={book.style || 'con-margen'}
                 />
               )}
@@ -418,6 +472,19 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
           onClose={() => setCoverEditorOpen(false)}
         />
       )}
+
+      {replacePhotoOpen && (() => {
+        const currentPhoto = photosById.get(replacePhotoOpen)
+        if (!currentPhoto) return null
+        return (
+          <PhotoReplaceModal
+            currentPhoto={currentPhoto}
+            candidates={replaceCandidates}
+            onPick={(newPhoto) => handleReplacePhoto(replacePhotoOpen, newPhoto.id)}
+            onClose={() => setReplacePhotoOpen(null)}
+          />
+        )
+      })()}
     </div>
   )
 }

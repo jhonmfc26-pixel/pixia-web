@@ -163,7 +163,7 @@ export function changePageLayout(
  * los spreads del AlbumBlueprint (formato viejo de la IA).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function extractPhotoPool(spreads: any): { photo: PhotoAsset; act: ActId }[] {
+export function extractPhotoPool(spreads: any, manualOrder?: string[]): { photo: PhotoAsset; act: ActId }[] {
   if (!Array.isArray(spreads)) {
     console.warn('[Pool] spreads no es array:', typeof spreads)
     return []
@@ -179,5 +179,19 @@ export function extractPhotoPool(spreads: any): { photo: PhotoAsset; act: ActId 
       pool.push({ photo, act: spread.act || 'desarrollo' })
     }
   }
+
+  if (manualOrder && manualOrder.length > 0) {
+    const byId = new Map(pool.map(item => [item.photo.id, item]))
+    const reordered: typeof pool = []
+    for (const id of manualOrder) {
+      const item = byId.get(id)
+      if (item) { reordered.push(item); byId.delete(id) }
+    }
+    for (const item of pool) {
+      if (byId.has(item.photo.id)) reordered.push(item)
+    }
+    return reordered
+  }
+
   return pool
 }

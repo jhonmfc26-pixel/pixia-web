@@ -10,12 +10,12 @@ interface EditorPhotoFrameProps {
   onStartAdjust: () => void
   onEndAdjust: () => void
   onUpdatePlacement: (placement: PhotoPlacement) => void
-  onOpenLayoutPanel: () => void
+  onReplace?: () => void
 }
 
 export default function EditorPhotoFrame({
   photo, placement, isAdjusting,
-  onStartAdjust, onEndAdjust, onUpdatePlacement, onOpenLayoutPanel,
+  onStartAdjust, onEndAdjust, onUpdatePlacement, onReplace,
 }: EditorPhotoFrameProps) {
   const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
@@ -106,19 +106,21 @@ export default function EditorPhotoFrame({
           >
             ✋ Ajustar
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onOpenLayoutPanel() }}
-            style={{
-              position: 'absolute', bottom: '10px', right: '10px',
-              background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '6px', padding: '6px 10px',
-              color: 'rgba(255,255,255,0.9)', fontSize: '10px',
-              cursor: 'pointer', zIndex: 30,
-            }}
-          >
-            ◫ Diseño
-          </button>
+          {onReplace && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onReplace() }}
+              style={{
+                position: 'absolute', bottom: '10px', left: '10px',
+                background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: '6px', padding: '6px 10px',
+                color: 'rgba(255,255,255,0.9)', fontSize: '10px',
+                cursor: 'pointer', zIndex: 30,
+              }}
+            >
+              ↔ Cambiar
+            </button>
+          )}
         </>
       )}
 
