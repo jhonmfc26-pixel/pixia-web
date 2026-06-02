@@ -8,6 +8,7 @@ import { buildPages, extractPhotoPool } from '@/core/modules/album/pageEngine'
 import EditorPhotoFrame from './EditorPhotoFrame'
 import EditorPanel from './EditorPanel'
 import CoverEditor from '@/core/modules/cover/CoverEditor'
+import { getLayoutById } from '@/core/modules/album/layouts/helpers'
 
 interface EditorViewProps {
   book: AlbumBlueprint
@@ -54,26 +55,7 @@ function EditorSpreadPage({
     )
   }
 
-  // single — 1 foto a página completa
-  if (page.layout === 'single') {
-    return (
-      <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-        {frameFor(photoIds[0])}
-      </div>
-    )
-  }
-
-  // portrait — 1 foto con padding 15% (igual que LayoutRenderer)
-  if (page.layout === 'portrait') {
-    return (
-      <div style={{ width: '100%', height: '100%', padding: '15%', boxSizing: 'border-box', position: 'relative' }}>
-        {frameFor(photoIds[0])}
-      </div>
-    )
-  }
-
-  // hero-spread — foto cruza dos páginas, cada lado muestra su mitad
-  // No-interactivo: el pan/zoom no aplica porque las dos mitades deben estar sincronizadas
+  // CASO ESPECIAL: hero-spread (foto cruza 2 páginas, no es layout genérico)
   if (page.layout === 'hero-spread') {
     const photo = photosById.get(photoIds[0])
     const spreadHalf = page.spreadHalf
@@ -104,84 +86,77 @@ function EditorSpreadPage({
         <button
           onClick={(e) => { e.stopPropagation(); onOpenLayoutPanel(page.id) }}
           style={{
-            position: 'absolute',
-            bottom: 12, right: 12,
-            background: 'rgba(0,0,0,0.7)',
-            color: 'white',
+            position: 'absolute', bottom: 12, right: 12,
+            background: 'rgba(0,0,0,0.7)', color: 'white',
             border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 6,
-            padding: '6px 12px',
-            fontSize: 12,
-            cursor: 'pointer',
-            zIndex: 10,
+            borderRadius: 6, padding: '6px 12px',
+            fontSize: 12, cursor: 'pointer', zIndex: 10,
           }}
         >◫ Diseño</button>
       </div>
     )
   }
 
-  if (page.layout === 'side-2') {
-    return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', gap: '2px' }}>
-        {photoIds.slice(0, 2).map(id => (
-          <div key={id} style={{ flex: 1, position: 'relative', minWidth: 0 }}>
-            {frameFor(id)}
-          </div>
-        ))}
-      </div>
-    )
+  // CASO GENÉRICO: cualquier layout del registry con grid
+  const schema = getLayoutById(page.layout)
+  if (!schema) {
+    console.warn('[EditorSpreadPage] Layout no encontrado en registry:', page.layout)
+    return null
   }
 
-  if (page.layout === 'stack-2') {
-    return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        {photoIds.slice(0, 2).map(id => (
-          <div key={id} style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-            {frameFor(id)}
-          </div>
-        ))}
-      </div>
-    )
-  }
+  const innerPadding = schema.innerPadding ?? '0px'
 
-  if (page.layout === 'grid-3') {
-    return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', gap: '2px' }}>
-        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          {frameFor(photoIds[0])}
-        </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-          {photoIds.slice(1, 3).map(id => (
-            <div key={id} style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-              {frameFor(id)}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  if (page.layout === 'grid-4') {
-    return (
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      padding: innerPadding,
+      boxSizing: 'border-box',
+      position: 'relative',
+    }}>
       <div style={{
-        width: '100%', height: '100%',
-        display: 'grid', gridTemplateColumns: '1fr 1fr',
-        gridTemplateRows: '1fr 1fr', gap: '2px',
+        display: 'grid',
+        gridTemplateColumns: schema.grid.columns,
+        gridTemplateRows: schema.grid.rows,
+        gridTemplateAreas: schema.grid.areas,
+        gap: '2px',
+        width: '100%',
+        height: '100%',
       }}>
-        {photoIds.slice(0, 4).map(id => (
-          <div key={id} style={{ position: 'relative', minWidth: 0, minHeight: 0 }}>
-            {frameFor(id)}
-          </div>
-        ))}
+        {schema.slots.map((slot, i) => {
+          const id = photoIds[i]
+          return (
+            <div
+              key={slot}
+              style={{
+                gridArea: slot,
+                position: 'relative',
+                minWidth: 0,
+                minHeight: 0,
+                overflow: 'hidden',
+              }}
+            >
+              {id ? frameFor(id) : null}
+            </div>
+          )
+        })}
       </div>
-    )
-  }
-
-  return null
+    </div>
+  )
 }
 
 const AVAILABLE_LAYOUTS: PageLayout[] = [
-  'single', 'stack-2', 'side-2', 'grid-3', 'grid-4', 'portrait', 'hero-spread',
+  // Básicos
+  'single', 'side-2', 'stack-2', 'portrait',
+  // Trío
+  'trio-row', 'trio-column', 'trio-portrait',
+  // Grids
+  'grid-3', 'grid-4', 'quad-mixed',
+  // Hero
+  'hero-2-bottom', 'hero-3-top', 'hero-3-left', 'hero-3-right',
+  // Mosaicos densos
+  'mosaic-5', 'hero-4-grid',
+  // Especiales
+  'portrait-pair', 'hero-spread',
 ]
 
 export default function EditorView({ book, onSave }: EditorViewProps) {

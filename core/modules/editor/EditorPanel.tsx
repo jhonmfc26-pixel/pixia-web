@@ -1,5 +1,8 @@
 'use client'
+import { useState } from 'react'
 import type { PageLayout } from '@/core/modules/album/types'
+import { getLayoutById } from '@/core/modules/album/layouts/helpers'
+import LayoutThumbnail from '@/core/modules/album/layouts/LayoutThumbnail'
 
 interface EditorPanelProps {
   availableLayouts: PageLayout[]
@@ -10,70 +13,21 @@ interface EditorPanelProps {
   onClose: () => void
 }
 
-const LAYOUT_LABELS: Record<PageLayout, string> = {
-  'single':       '1 foto',
-  'stack-2':      '2 apiladas',
-  'side-2':       '2 lado a lado',
-  'grid-3':       '3 fotos',
-  'grid-4':       '4 fotos',
-  'portrait':     'Vertical con aire',
-  'hero-spread':  'Doble página',
-}
-
-const LAYOUT_PREVIEWS: Record<PageLayout, React.ReactElement> = {
-  'single': (
-    <svg width="44" height="32" viewBox="0 0 44 32">
-      <rect x="2" y="2" width="40" height="28" fill="rgba(255,255,255,0.18)" rx="2"/>
-    </svg>
-  ),
-  'stack-2': (
-    <svg width="44" height="32" viewBox="0 0 44 32">
-      <rect x="2" y="2" width="40" height="13" fill="rgba(255,255,255,0.18)" rx="2"/>
-      <rect x="2" y="17" width="40" height="13" fill="rgba(255,255,255,0.18)" rx="2"/>
-    </svg>
-  ),
-  'side-2': (
-    <svg width="44" height="32" viewBox="0 0 44 32">
-      <rect x="2" y="2" width="19" height="28" fill="rgba(255,255,255,0.18)" rx="2"/>
-      <rect x="23" y="2" width="19" height="28" fill="rgba(255,255,255,0.18)" rx="2"/>
-    </svg>
-  ),
-  'grid-3': (
-    <svg width="44" height="32" viewBox="0 0 44 32">
-      <rect x="2" y="2" width="19" height="28" fill="rgba(255,255,255,0.18)" rx="2"/>
-      <rect x="23" y="2" width="19" height="13" fill="rgba(255,255,255,0.18)" rx="2"/>
-      <rect x="23" y="17" width="19" height="13" fill="rgba(255,255,255,0.18)" rx="2"/>
-    </svg>
-  ),
-  'grid-4': (
-    <svg width="44" height="32" viewBox="0 0 44 32">
-      <rect x="2" y="2" width="19" height="13" fill="rgba(255,255,255,0.18)" rx="2"/>
-      <rect x="23" y="2" width="19" height="13" fill="rgba(255,255,255,0.18)" rx="2"/>
-      <rect x="2" y="17" width="19" height="13" fill="rgba(255,255,255,0.18)" rx="2"/>
-      <rect x="23" y="17" width="19" height="13" fill="rgba(255,255,255,0.18)" rx="2"/>
-    </svg>
-  ),
-  'portrait': (
-    <svg width="44" height="32" viewBox="0 0 44 32">
-      <rect x="14" y="5" width="16" height="22" fill="rgba(255,255,255,0.18)" rx="2"/>
-    </svg>
-  ),
-  'hero-spread': (
-    <svg width="44" height="32" viewBox="0 0 44 32">
-      <rect x="2" y="2" width="40" height="28" fill="rgba(255,255,255,0.28)" rx="2"/>
-      <line x1="22" y1="2" x2="22" y2="30" stroke="rgba(0,0,0,0.3)" strokeWidth="1" strokeDasharray="3 2"/>
-    </svg>
-  ),
-}
+const VISIBLE_INITIAL = 8
+const VISIBLE_STEP = 8
 
 export default function EditorPanel({
   availableLayouts, currentLayout, selectedPageIndex,
   totalPages, onChangeLayout, onClose,
 }: EditorPanelProps) {
+  const [visibleCount, setVisibleCount] = useState(VISIBLE_INITIAL)
+  const visible = availableLayouts.slice(0, visibleCount)
+  const hasMore = visibleCount < availableLayouts.length
+
   return (
     <div style={{
       position: 'fixed', right: 0, top: '56px', bottom: '48px',
-      width: '240px',
+      width: '280px',
       background: 'rgba(10,10,10,0.97)',
       borderLeft: '1px solid rgba(255,255,255,0.06)',
       display: 'flex', flexDirection: 'column',
@@ -95,36 +49,43 @@ export default function EditorPanel({
             de {totalPages} páginas
           </span>
         </div>
-        <button
-          onClick={onClose}
-          style={{ background: 'none', border: 'none',
-            color: 'rgba(255,255,255,0.3)', cursor: 'pointer',
-            fontSize: '20px', lineHeight: 1 }}
-        >×</button>
+        <button onClick={onClose} style={{
+          background: 'none', border: 'none',
+          color: 'rgba(255,255,255,0.3)', cursor: 'pointer',
+          fontSize: '20px', lineHeight: 1,
+        }}>×</button>
       </div>
 
       <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)' }} />
 
-      {/* Layouts */}
       <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
         Diseño de página
       </span>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {availableLayouts.map(layout => {
-          const isActive = layout === currentLayout
+      {/* Grid 2 columnas */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+        {visible.map(layoutId => {
+          const schema = getLayoutById(layoutId)
+          if (!schema) return null
+          const isActive = layoutId === currentLayout
           return (
             <button
-              key={layout}
-              onClick={() => onChangeLayout(layout)}
+              key={layoutId}
+              onClick={() => onChangeLayout(layoutId)}
+              title={schema.name}
               style={{
                 background: isActive ? 'rgba(232,85,58,0.12)' : 'rgba(255,255,255,0.04)',
                 border: '1px solid',
                 borderColor: isActive ? '#E8553A' : 'rgba(255,255,255,0.08)',
-                borderRadius: '8px', padding: '10px',
-                cursor: 'pointer', display: 'flex',
-                alignItems: 'center', gap: '12px',
-                width: '100%', transition: 'all 0.15s',
+                borderRadius: '8px',
+                padding: '10px 8px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s',
+                aspectRatio: '1',
               }}
               onMouseEnter={e => {
                 if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
@@ -133,15 +94,45 @@ export default function EditorPanel({
                 if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
               }}
             >
-              {LAYOUT_PREVIEWS[layout]}
-              <span style={{ fontSize: '12px', color: isActive ? '#E8553A' : 'rgba(255,255,255,0.55)' }}>
-                {LAYOUT_LABELS[layout]}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                <LayoutThumbnail schema={schema} size={schema.scope === 'spread' ? 36 : 60} active={isActive} />
+              </div>
+              <span style={{
+                fontSize: '10px',
+                color: isActive ? '#E8553A' : 'rgba(255,255,255,0.4)',
+                textAlign: 'center',
+                lineHeight: 1.2,
+              }}>
+                {schema.name}
               </span>
             </button>
           )
         })}
       </div>
 
+      {/* Botón Ver más */}
+      {hasMore && (
+        <button
+          onClick={() => setVisibleCount(c => Math.min(c + VISIBLE_STEP, availableLayouts.length))}
+          style={{
+            background: 'none',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '8px',
+            padding: '10px',
+            color: 'rgba(255,255,255,0.5)',
+            cursor: 'pointer',
+            fontSize: '11px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+        >
+          Ver más ↓
+        </button>
+      )}
     </div>
   )
 }
