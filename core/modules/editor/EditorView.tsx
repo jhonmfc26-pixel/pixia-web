@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { AlbumBlueprint, AlbumStyle, PhotoAsset, CoverConfig } from '@/core/contracts/AlbumBlueprint'
 import type { LayoutConfig, Page, PhotoPlacement, PageLayout } from '@/core/modules/album/types'
@@ -32,13 +32,14 @@ interface EditorSpreadPageProps {
   onUpdatePlacement: (photoId: string, placement: PhotoPlacement) => void
   onOpenLayoutPanel: (pageId: string) => void
   onReplacePhoto: (photoId: string) => void
+  onDeletePhoto: (photoId: string) => void
   albumStyle: AlbumStyle
 }
 
 function EditorSpreadPage({
   page, photosById, placements,
   adjustingPhotoId, onStartAdjust, onEndAdjust,
-  onUpdatePlacement, onOpenLayoutPanel, onReplacePhoto,
+  onUpdatePlacement, onOpenLayoutPanel, onReplacePhoto, onDeletePhoto,
 }: EditorSpreadPageProps) {
   const photoIds = page.photoIds
 
@@ -55,6 +56,7 @@ function EditorSpreadPage({
         onEndAdjust={onEndAdjust}
         onUpdatePlacement={(p) => onUpdatePlacement(id, p)}
         onReplace={() => onReplacePhoto(id)}
+        onDelete={() => onDeletePhoto(id)}
       />
     )
   }
@@ -225,6 +227,7 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
   const [coverEditorOpen, setCoverEditorOpen] = useState(false)
   const [replacePhotoOpen, setReplacePhotoOpen] = useState<string | null>(null)
   const [reorderOpen, setReorderOpen] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const albumPages = useMemo(
     () => buildPages(photoPool, layoutConfig),
@@ -295,6 +298,28 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
     setManualPhotoOrder(newOrder)
     setReplacePhotoOpen(null)
   }
+
+  const handleRequestDelete = useCallback((photoId: string) => {
+    setConfirmDeleteId(photoId)
+  }, [])
+
+  const handleConfirmDelete = useCallback(() => {
+    const photoId = confirmDeleteId
+    if (!photoId) return
+    setManualPhotoOrder(prev => {
+      const base = prev ?? currentOrder
+      return base.filter(id => id !== photoId)
+    })
+    setPlacements(prev => {
+      const next = new Map(prev)
+      next.delete(photoId)
+      return next
+    })
+    if (cover.photoId === photoId) {
+      setCover(prev => ({ ...prev, photoId: '' }))
+    }
+    setConfirmDeleteId(null)
+  }, [confirmDeleteId, currentOrder, cover.photoId])
 
   const handleDone = () => {
     onSave({ layoutConfig, placements, cover, manualPhotoOrder })
@@ -397,6 +422,7 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
                   onUpdatePlacement={handleUpdatePlacement}
                   onOpenLayoutPanel={(id) => setLayoutPanelOpen(id)}
                   onReplacePhoto={(photoId) => setReplacePhotoOpen(photoId)}
+                  onDeletePhoto={handleRequestDelete}
                   albumStyle={book.style || 'con-margen'}
                 />
               )}
@@ -418,6 +444,7 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
                   onUpdatePlacement={handleUpdatePlacement}
                   onOpenLayoutPanel={(id) => setLayoutPanelOpen(id)}
                   onReplacePhoto={(photoId) => setReplacePhotoOpen(photoId)}
+                  onDeletePhoto={handleRequestDelete}
                   albumStyle={book.style || 'con-margen'}
                 />
               )}
@@ -494,6 +521,62 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
           onSave={(newOrder) => setManualPhotoOrder(newOrder)}
           onClose={() => setReorderOpen(false)}
         />
+      )}
+
+      {confirmDeleteId && (
+        <div
+          onClick={() => setConfirmDeleteId(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 600,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#161616',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '380px',
+              width: '90%',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+            }}
+          >
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', color: 'white', marginBottom: '8px' }}>
+              Eliminar esta foto?
+            </div>
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', marginBottom: '20px', lineHeight: 1.5 }}>
+              La foto se quitará del álbum y las páginas se rearmarán automáticamente.
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '6px',
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: '13px', cursor: 'pointer',
+                }}
+              >Cancelar</button>
+              <button
+                onClick={handleConfirmDelete}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: '#dc2626',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: 'white',
+                  fontSize: '13px', fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >Eliminar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {replacePhotoOpen && (() => {

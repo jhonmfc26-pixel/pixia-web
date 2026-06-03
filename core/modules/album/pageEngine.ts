@@ -181,14 +181,14 @@ export function extractPhotoPool(spreads: any, manualOrder?: string[]): { photo:
   }
 
   if (manualOrder && manualOrder.length > 0) {
+    // manualOrder es la lista DEFINITIVA de fotos del álbum.
+    // Si una foto está en spreads pero no en manualOrder, fue eliminada por el usuario.
+    // NO appendear "huérfanos" — eso re-introducía fotos eliminadas al final.
     const byId = new Map(pool.map(item => [item.photo.id, item]))
     const reordered: typeof pool = []
     for (const id of manualOrder) {
       const item = byId.get(id)
-      if (item) { reordered.push(item); byId.delete(id) }
-    }
-    for (const item of pool) {
-      if (byId.has(item.photo.id)) reordered.push(item)
+      if (item) reordered.push(item)
     }
     return reordered
   }

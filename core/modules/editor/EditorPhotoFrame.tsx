@@ -11,11 +11,12 @@ interface EditorPhotoFrameProps {
   onEndAdjust: () => void
   onUpdatePlacement: (placement: PhotoPlacement) => void
   onReplace?: () => void
+  onDelete?: () => void
 }
 
 export default function EditorPhotoFrame({
   photo, placement, isAdjusting,
-  onStartAdjust, onEndAdjust, onUpdatePlacement, onReplace,
+  onStartAdjust, onEndAdjust, onUpdatePlacement, onReplace, onDelete,
 }: EditorPhotoFrameProps) {
   const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
@@ -119,6 +120,25 @@ export default function EditorPhotoFrame({
               }}
             >
               ↔ Cambiar
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              title="Eliminar foto"
+              style={{
+                position: 'absolute', top: '10px', right: '10px',
+                background: 'rgba(220,38,38,0.85)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 8px',
+                color: 'white', fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                lineHeight: 1, zIndex: 30,
+              }}
+            >
+              🗑
             </button>
           )}
         </>
