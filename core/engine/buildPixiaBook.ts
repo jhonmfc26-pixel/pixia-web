@@ -256,6 +256,50 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
 
     console.log('[Pixia] Fotos únicas usadas:', usedIndices.size, 'de', draft.photos.length, 'disponibles')
 
+    // Recuperar fotos omitidas por la IA (no debería pasar pero pasa)
+    const unusedPhotos = draft.photos.filter((_, i) => !usedIndices.has(i))
+
+    if (unusedPhotos.length > 0) {
+      console.warn('[Pixia] IA omitió', unusedPhotos.length, 'fotos — recuperándolas como spreads extra')
+
+      let i = 0
+      while (i < unusedPhotos.length) {
+        const photo = unusedPhotos[i]
+        const next = unusedPhotos[i + 1]
+        const orientation = photo.orientation || 'landscape'
+        const nextOri = next?.orientation || 'landscape'
+
+        let layout = 'full-bleed'
+        let photosInSpread = [photo]
+
+        if (next && orientation === 'portrait' && nextOri === 'portrait') {
+          layout = 'split-horizontal'
+          photosInSpread = [photo, next]
+          i += 2
+        } else if (next && orientation === 'portrait' && nextOri === 'landscape') {
+          layout = 'editorial-right'
+          photosInSpread = [photo, next]
+          i += 2
+        } else {
+          i += 1
+        }
+
+        spreads.push({
+          id: `spread-extra-${spreads.length}`,
+          act: 'cierre' as ActId,
+          layout,
+          photos: photosInSpread.map(p => ({
+            id: p.id,
+            src: p.src,
+            orientation: p.orientation,
+          })),
+          caption: '',
+        })
+      }
+
+      console.log('[Pixia] Total spreads finales:', spreads.length, '— fotos garantizadas:', draft.photos.length)
+    }
+
     return {
       identity: {
         bookId: `pb-${Date.now()}`,

@@ -16,6 +16,36 @@ import { usePhotoAnalysis } from "@/core/modules/scoring/usePhotoAnalysis";
 import { useUpload } from "@/core/modules/upload/useUpload";
 import { useSession } from "@/core/modules/session/useSession";
 
+// Genera thumbnail 150x150 base64 (~8-12KB por foto) para grids rápidos
+async function generateThumbnail(file: File, maxSize = 150): Promise<string | null> {
+  try {
+    return await new Promise((resolve, reject) => {
+      const img = new window.Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const ratio = img.width / img.height
+        let w = maxSize, h = maxSize
+        if (ratio > 1) h = Math.round(maxSize / ratio)
+        else w = Math.round(maxSize * ratio)
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, w, h)
+        URL.revokeObjectURL(url)
+        resolve(canvas.toDataURL('image/jpeg', 0.6))
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        reject(new Error('thumbnail gen failed'))
+      }
+      img.src = url
+    })
+  } catch {
+    return null
+  }
+}
+
 export default function Step2Upload() {
   const { state, dispatch } = useWizard();
   const photos = state.photos;
@@ -42,12 +72,18 @@ export default function Step2Upload() {
         // Mostrar thumbnails inmediatamente — no esperar análisis
         dispatch({
           type: "SET_PHOTOS",
-          payload: [...photos, ...newPhotos].slice(0, 30),
+          payload: [...photos, ...newPhotos].slice(0, 60),
         });
 
         console.log('[Step2] Iniciando análisis...')
         const analyzed = await analyzePhotos(acceptedFiles);
         console.log('[Step2] Análisis completado:', analyzed.length, 'fotos')
+
+        console.log('[Step2] Generando thumbnails...')
+        const thumbnails = await Promise.all(
+          analyzed.map(p => generateThumbnail(p.file))
+        )
+        console.log('[Step2] Thumbnails generadas:', thumbnails.filter(Boolean).length)
 
         if (analyzed.length > 0) {
           localStorage.setItem(
@@ -59,6 +95,7 @@ export default function Step2Upload() {
               takenAt: p.exif.takenAt?.toISOString() || null,
               gps: p.exif.gps || null,
               originalIndex: index,
+              thumbnail: thumbnails[index],
             })))
           );
           console.log('[Step2] Análisis guardado en localStorage')
@@ -145,7 +182,7 @@ export default function Step2Upload() {
           </p>
 
           <motion.p className="text-white/50 text-sm">
-            <motion.span>{rounded}</motion.span> / 30 fotos
+            <motion.span>{rounded}</motion.span> / 60 fotos
           </motion.p>
 
           {priorityCount > 0 && (

@@ -10,6 +10,7 @@ import EditorPanel from './EditorPanel'
 import CoverEditor from '@/core/modules/cover/CoverEditor'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
 import PhotoReplaceModal from './PhotoReplaceModal'
+import PhotoReorderModal from './PhotoReorderModal'
 
 interface EditorViewProps {
   book: AlbumBlueprint
@@ -196,21 +197,19 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
     return map
   }, [photoPool])
 
-  const heroPhotos = useMemo(() => {
-    const heroes = photoPool
-      .map(item => item.photo)
-      .filter(p => p.score?.recommendation === 'hero')
-    return heroes.length > 0 ? heroes.slice(0, 24) : photoPool.map(item => item.photo).slice(0, 24)
-  }, [photoPool])
+  const coverPhotoOptions = useMemo(
+    () => photoPool.map(item => item.photo),
+    [photoPool]
+  )
 
   const [cover, setCover] = useState<CoverConfig>(book.cover)
 
   const coverPhotoUrl = useMemo(() => {
     const photo = (cover.photoId && photosById.get(cover.photoId))
-                  || heroPhotos[0]
+                  || coverPhotoOptions[0]
                   || photoPool[0]?.photo
     return photo?.url
-  }, [cover.photoId, photosById, heroPhotos, photoPool])
+  }, [cover.photoId, photosById, coverPhotoOptions, photoPool])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bookAny = book as any
@@ -225,6 +224,7 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
   const [layoutPanelOpen, setLayoutPanelOpen] = useState<string | null>(null)
   const [coverEditorOpen, setCoverEditorOpen] = useState(false)
   const [replacePhotoOpen, setReplacePhotoOpen] = useState<string | null>(null)
+  const [reorderOpen, setReorderOpen] = useState(false)
 
   const albumPages = useMemo(
     () => buildPages(photoPool, layoutConfig),
@@ -333,6 +333,20 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
           <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '15px', color: 'white' }}>
             Editando · Páginas {currentSpread * 2 + 1}-{currentSpread * 2 + 2} de {totalSpreads * 2}
           </span>
+          <button
+            onClick={() => setReorderOpen(true)}
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '6px',
+              padding: '6px 14px',
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: '12px',
+              cursor: 'pointer',
+            }}
+          >
+            Reordenar fotos
+          </button>
           <button
             onClick={() => setCoverEditorOpen(true)}
             style={{
@@ -465,11 +479,20 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
           config={cover}
           occasion={book.occasion}
           format={book.format || '30x30'}
-          heroPhotos={heroPhotos}
+          heroPhotos={coverPhotoOptions}
           photoUrl={coverPhotoUrl}
           photosById={photosById}
           onUpdate={setCover}
           onClose={() => setCoverEditorOpen(false)}
+        />
+      )}
+
+      {reorderOpen && (
+        <PhotoReorderModal
+          photoIds={currentOrder}
+          photosById={photosById}
+          onSave={(newOrder) => setManualPhotoOrder(newOrder)}
+          onClose={() => setReorderOpen(false)}
         />
       )}
 

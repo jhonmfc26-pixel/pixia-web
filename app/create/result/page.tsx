@@ -81,7 +81,7 @@ export default function ResultPage() {
         // Reordenar state.photos según el orden cronológico del análisis
         const filesToProcess = sortedAnalysis.length === state.photos.length
           ? sortedAnalysis.map((a: any) => state.photos[a.originalIndex])
-          : state.photos.slice(0, 40)
+          : state.photos.slice(0, 60)
 
         console.log('[Result] Orden de archivos:',
           sortedAnalysis.map((a: any) => `${a.originalIndex}→${a.takenAt || 'sin-fecha'}`)
@@ -92,7 +92,7 @@ export default function ResultPage() {
         )
 
         const photos = await Promise.all(
-          filesToProcess.slice(0, 40).map(async (p: any, index: number) => {
+          filesToProcess.slice(0, 60).map(async (p: any, index: number) => {
             const meta = sortedAnalysis[index]
             const r2Url = meta?.id ? r2Map.get(meta.id) : null
             const src = r2Url || await fileToCompressedBase64(p.file)
@@ -100,7 +100,7 @@ export default function ResultPage() {
               id: meta?.id || `photo-${index}`,
               src,
               url: src,
-              thumbnailUrl: r2Url || '',
+              thumbnailUrl: meta?.thumbnail || '',
               r2Key: '',
               width: 0,
               height: 0,
