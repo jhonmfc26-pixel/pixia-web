@@ -27,67 +27,126 @@ export default function PhotoReplaceModal({
         style={{
           background: '#161616',
           borderRadius: '16px',
-          padding: '32px',
-          maxWidth: '900px',
           width: '100%',
+          maxWidth: '720px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
           boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-          <div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Reemplazar foto
+        {/* Header — fijo */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          padding: '20px 24px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <div style={{
+              width: '60px', height: '60px',
+              borderRadius: '6px',
+              overflow: 'hidden',
+              border: '2px solid #E8553A',
+              flexShrink: 0,
+            }}>
+              <img
+                src={currentPhoto.thumbnailUrl || currentPhoto.url}
+                alt=""
+                loading="eager"
+                width={60}
+                height={60}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
             </div>
-            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', color: 'white', marginTop: '4px' }}>
-              Elige una alternativa
+            <div>
+              <div style={{
+                fontSize: '11px',
+                color: 'rgba(255,255,255,0.4)',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+              }}>
+                Reemplazar foto
+              </div>
+              <div style={{
+                fontFamily: 'Playfair Display, serif',
+                fontSize: '17px',
+                color: 'white',
+                marginTop: '2px',
+              }}>
+                Elige una alternativa
+              </div>
             </div>
           </div>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
-            fontSize: '22px', cursor: 'pointer', lineHeight: 1,
-          }}>×</button>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'rgba(255,255,255,0.4)',
+              fontSize: '22px',
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: '4px 8px',
+            }}
+          >×</button>
         </div>
 
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
-            Actual
-          </div>
-          <div style={{ width: '140px', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', border: '2px solid #E8553A' }}>
-            <img src={currentPhoto.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          </div>
+        {/* Contenido scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          {candidates.length === 0 ? (
+            <div style={{
+              padding: '40px',
+              textAlign: 'center',
+              color: 'rgba(255,255,255,0.4)',
+              fontSize: '13px',
+            }}>
+              No hay otras fotos disponibles para reemplazar.
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: '10px',
+            }}>
+              {candidates.map(photo => (
+                <button
+                  key={photo.id}
+                  onClick={() => onPick(photo)}
+                  style={{
+                    background: 'none',
+                    border: '2px solid rgba(255,255,255,0.08)',
+                    borderRadius: '6px',
+                    padding: 0,
+                    cursor: 'pointer',
+                    aspectRatio: '1',
+                    overflow: 'hidden',
+                    transition: 'border-color 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = '#E8553A'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+                >
+                  <img
+                    src={photo.thumbnailUrl || photo.url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    width={140}
+                    height={140}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-
-        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
-          Alternativas
-        </div>
-        {candidates.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
-            No hay otras fotos disponibles para reemplazar.
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-            {candidates.map(photo => (
-              <button
-                key={photo.id}
-                onClick={() => onPick(photo)}
-                style={{
-                  background: 'none',
-                  border: '2px solid rgba(255,255,255,0.08)',
-                  borderRadius: '8px',
-                  padding: 0,
-                  cursor: 'pointer',
-                  aspectRatio: '1',
-                  overflow: 'hidden',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = '#E8553A'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
-              >
-                <img src={photo.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )

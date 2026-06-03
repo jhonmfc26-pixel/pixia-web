@@ -280,14 +280,35 @@ export default function EditorView({ book, onSave }: EditorViewProps) {
 
   const replaceCandidates = useMemo((): PhotoAsset[] => {
     if (!replacePhotoOpen) return []
-    const currentPage = albumPages.pages.find(p => p.photoIds.includes(replacePhotoOpen))
-    const photosInPage = new Set(currentPage?.photoIds ?? [])
-    const candidates = photoPool
+    const currentPhoto = photosById.get(replacePhotoOpen)
+    if (!currentPhoto) return []
+
+    const pages = albumPages.pages
+    const targetPageIdx = pages.findIndex(p => p.photoIds?.includes(replacePhotoOpen))
+    const targetSpreadIdx = targetPageIdx >= 0 ? Math.floor(targetPageIdx / 2) : -1
+
+    const photosInCurrentSpread = new Set<string>()
+    if (targetSpreadIdx >= 0) {
+      const leftIdx = targetSpreadIdx * 2
+      pages[leftIdx]?.photoIds?.forEach((id: string) => photosInCurrentSpread.add(id))
+      pages[leftIdx + 1]?.photoIds?.forEach((id: string) => photosInCurrentSpread.add(id))
+    }
+    photosInCurrentSpread.add(replacePhotoOpen)
+
+    const available = photoPool
       .map(item => item.photo)
-      .filter(p => !photosInPage.has(p.id))
-    candidates.sort((a, b) => (b.score?.finalScore ?? 0) - (a.score?.finalScore ?? 0))
-    return candidates.slice(0, 3)
-  }, [replacePhotoOpen, photoPool, albumPages])
+      .filter(p => !photosInCurrentSpread.has(p.id))
+
+    const targetOrientation = currentPhoto.orientation
+    const sameOrientation = available.filter(p => p.orientation === targetOrientation)
+    const filtered = sameOrientation.length >= 3 ? sameOrientation : available
+
+    const sorted = [...filtered].sort(
+      (a, b) => (b.score?.finalScore ?? 0) - (a.score?.finalScore ?? 0)
+    )
+
+    return sorted.slice(0, 6)
+  }, [replacePhotoOpen, photosById, photoPool, albumPages])
 
   const handleReplacePhoto = (oldPhotoId: string, newPhotoId: string) => {
     const newOrder = [...currentOrder]
