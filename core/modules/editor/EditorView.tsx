@@ -89,16 +89,52 @@ function EditorSpreadPage({
             }}
           />
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onOpenLayoutPanel(page.id) }}
-          style={{
-            position: 'absolute', bottom: 12, right: 12,
-            background: 'rgba(0,0,0,0.7)', color: 'white',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 6, padding: '6px 12px',
-            fontSize: 12, cursor: 'pointer', zIndex: 10,
-          }}
-        >◫ Diseño</button>
+        <div style={{
+          position: 'absolute', bottom: 12, right: 12,
+          display: 'flex', gap: '6px', zIndex: 10,
+        }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onStartAdjust(photo.id) }}
+            title="Ajustar"
+            style={{
+              background: 'rgba(0,0,0,0.7)', color: 'white',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 6, padding: '6px 10px',
+              fontSize: 13, cursor: 'pointer', lineHeight: 1,
+            }}
+          >🔧</button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onReplacePhoto(photo.id) }}
+            title="Cambiar"
+            style={{
+              background: 'rgba(0,0,0,0.7)', color: 'white',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 6, padding: '6px 10px',
+              fontSize: 13, cursor: 'pointer', lineHeight: 1,
+            }}
+          >🔄</button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenLayoutPanel(page.id) }}
+            title="Cambiar diseño"
+            style={{
+              background: 'rgba(0,0,0,0.7)', color: 'white',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 6, padding: '6px 12px',
+              fontSize: 12, cursor: 'pointer',
+            }}
+          >◫ Diseño</button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDeletePhoto(photo.id) }}
+            title="Eliminar foto"
+            style={{
+              background: 'rgba(220,38,38,0.85)',
+              border: 'none',
+              borderRadius: 6, padding: '6px 10px',
+              color: 'white', fontSize: 13,
+              cursor: 'pointer', lineHeight: 1,
+            }}
+          >🗑</button>
+        </div>
       </div>
     )
   }

@@ -93,55 +93,53 @@ export default function EditorPhotoFrame({
       />
 
       {!isAdjusting && (
-        <>
+        <div style={{
+          position: 'absolute', top: 10, right: 10,
+          display: 'flex', gap: '6px', zIndex: 30,
+        }}>
           <button
             onClick={(e) => { e.stopPropagation(); onStartAdjust() }}
+            title="Ajustar"
             style={{
-              position: 'absolute', top: '10px', left: '10px',
-              background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+              background: 'rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(8px)',
               border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '6px', padding: '6px 10px',
-              color: 'rgba(255,255,255,0.9)', fontSize: '10px',
-              cursor: 'pointer', zIndex: 30,
+              borderRadius: '6px',
+              padding: '6px 10px',
+              color: 'white', fontSize: '13px',
+              cursor: 'pointer', lineHeight: 1,
             }}
-          >
-            ✋ Ajustar
-          </button>
+          >🔧</button>
           {onReplace && (
             <button
               onClick={(e) => { e.stopPropagation(); onReplace() }}
+              title="Cambiar foto"
               style={{
-                position: 'absolute', bottom: '10px', left: '10px',
-                background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+                background: 'rgba(0,0,0,0.7)',
+                backdropFilter: 'blur(8px)',
                 border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '6px', padding: '6px 10px',
-                color: 'rgba(255,255,255,0.9)', fontSize: '10px',
-                cursor: 'pointer', zIndex: 30,
+                borderRadius: '6px',
+                padding: '6px 10px',
+                color: 'white', fontSize: '13px',
+                cursor: 'pointer', lineHeight: 1,
               }}
-            >
-              ↔ Cambiar
-            </button>
+            >🔄</button>
           )}
           {onDelete && (
             <button
               onClick={(e) => { e.stopPropagation(); onDelete() }}
               title="Eliminar foto"
               style={{
-                position: 'absolute', top: '10px', right: '10px',
                 background: 'rgba(220,38,38,0.85)',
                 border: 'none',
-                borderRadius: '4px',
-                padding: '6px 8px',
+                borderRadius: '6px',
+                padding: '6px 10px',
                 color: 'white', fontSize: '13px',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                lineHeight: 1, zIndex: 30,
+                cursor: 'pointer', lineHeight: 1,
               }}
-            >
-              🗑
-            </button>
+            >🗑</button>
           )}
-        </>
+        </div>
       )}
 
       {isAdjusting && (
