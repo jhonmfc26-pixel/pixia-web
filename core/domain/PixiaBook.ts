@@ -17,7 +17,7 @@ export interface PixiaBook {
   content: {
     spreads: {
       id: string; act: ActId; layout: string
-      photos: { id: string; src: string }[]
+      photos: { id: string; src: string; orientation?: string }[]
       caption?: string
     }[]
   }

@@ -62,8 +62,14 @@ function detectOrientation(src: string): Promise<'landscape' | 'portrait' | 'squ
 export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
   const photos = draft.photos
 
+  // Usar p.orientation del scoring si existe, fallback a detectOrientation
   const orientations = await Promise.all(
-    photos.map((p) => detectOrientation(p.src))
+    photos.map(async (p) => {
+      if (p.orientation === 'landscape' || p.orientation === 'portrait' || p.orientation === 'square') {
+        return p.orientation
+      }
+      return detectOrientation(p.src)
+    })
   )
 
   type Spread = PixiaBook['content']['spreads'][number]
@@ -81,7 +87,7 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
         id: `spread-${spreads.length}`,
         act: getActForIndex(spreads.length, Math.ceil(photos.length / 2)),
         layout: 'full-bleed',
-        photos: [{ id: photo.id, src: photo.src }],
+        photos: [{ id: photo.id, src: photo.src, orientation }],
       })
       i += 1
       continue
@@ -93,8 +99,8 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
         act: getActForIndex(spreads.length, Math.ceil(photos.length / 2)),
         layout: 'split-horizontal',
         photos: [
-          { id: photo.id, src: photo.src },
-          { id: nextPhoto.id, src: nextPhoto.src },
+          { id: photo.id, src: photo.src, orientation },
+          { id: nextPhoto.id, src: nextPhoto.src, orientation: nextOrientation },
         ],
       })
       i += 2
@@ -107,8 +113,8 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
         act: getActForIndex(spreads.length, Math.ceil(photos.length / 2)),
         layout: 'editorial-right',
         photos: [
-          { id: photo.id, src: photo.src },
-          { id: nextPhoto.id, src: nextPhoto.src },
+          { id: photo.id, src: photo.src, orientation },
+          { id: nextPhoto.id, src: nextPhoto.src, orientation: nextOrientation },
         ],
       })
       i += 2
@@ -119,7 +125,7 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
       id: `spread-${spreads.length}`,
       act: getActForIndex(spreads.length, Math.ceil(photos.length / 2)),
       layout: 'full-bleed',
-      photos: [{ id: photo.id, src: photo.src }],
+      photos: [{ id: photo.id, src: photo.src, orientation }],
     })
     i += 1
   }

@@ -34,60 +34,33 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{
           role: 'user',
-          content: `Eres el motor editorial de Pixia.
+          content: `Organiza fotos de un álbum en spreads narrativos.
 
 Evento: ${story}
-Estilo: ${style}
-Emoción: ${emotion}
+${total} fotos en orden cronológico (primera = inicio del evento, última = final).
 
-Fotos disponibles (${total} fotos):
+Divide en 4 actos:
+- inicio: primer 20% (preparación, llegada)
+- desarrollo: 40% intermedio (celebración, grupos)
+- climax: 30% siguiente (momentos clave)
+- cierre: último 10% (despedida)
+
+Reglas:
+- Cada foto solo UNA vez en todo el álbum (no repetir photoIndices).
+- Usa TODAS las fotos.
+- Layouts:
+  - "full-bleed": 1 foto (momentos especiales)
+  - "split-horizontal": 2 fotos verticales juntas
+  - "editorial-right": 2 fotos (vertical + horizontal)
+
+Fotos disponibles:
 ${enrichedDescriptions.join('\n')}
 
-El orden de las fotos es cronológico — las primeras fotos ocurrieron antes en el tiempo que las últimas.
-Respeta este orden temporal al asignar los actos.
-Las fotos de preparación siempre van en INICIO.
-Las fotos del momento principal van en CLÍMAX.
-Las fotos de celebración final van en CIERRE.
-
-CRÍTICO: Cada foto solo puede aparecer UNA VEZ en todo el álbum. Nunca repitas un photoIndex.
-
-IMPORTANTE: Todos los captions deben estar en español. El albumTitle también en español.
-
-Construye el álbum editorial dividiendo en 4 actos narrativos.
-Responde SOLO con JSON válido, sin markdown:
-
-{
-  "albumTitle": "título poético máximo 5 palabras",
-  "spreads": [
-    {
-      "id": "spread-0",
-      "act": "inicio",
-      "layout": "full-bleed",
-      "photoIndices": [0],
-      "caption": "caption poético máximo 10 palabras"
-    }
-  ]
-}
-
-Reglas de actos (proporciones del total de fotos):
-- inicio: primeras 20% fotos (llegada, preparación, contexto)
-- desarrollo: siguientes 40% (momentos grupales, celebración)
-- climax: siguientes 30% (momentos más emotivos e importantes)
-- cierre: últimas 10% (despedida, final)
-
-Reglas de layout:
-- foto horizontal sola → "full-bleed" (photoIndices: 1 foto)
-- dos fotos verticales → "split-horizontal" (photoIndices: 2 fotos)
-- mezcla vertical+horizontal → "editorial-right" (photoIndices: 2 fotos)
-- momentos muy especiales solos → "full-bleed"
-
-Usa photoIndices (números 0-based) para referenciar fotos.
-Usa TODAS las fotos. Ninguna puede quedar sin asignar.
-
-REGLA ABSOLUTA: Haz una lista mental de todos los photoIndices que usas. Antes de finalizar el JSON, verifica que ningún número aparezca dos veces en toda la respuesta. Si una foto ya fue usada en un spread anterior, NO la uses de nuevo. Es preferible tener menos spreads que repetir fotos.`
+Responde SOLO JSON, sin markdown ni explicaciones:
+{"albumTitle":"título 3-5 palabras","spreads":[{"act":"inicio","layout":"full-bleed","photoIndices":[0]}]}`
         }]
       })
     })
