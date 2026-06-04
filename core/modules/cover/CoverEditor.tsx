@@ -218,12 +218,16 @@ export default function CoverEditor({
                       aspectRatio: '1',
                       contentVisibility: 'auto',
                       containIntrinsicSize: '110px 110px',
+                      willChange: 'transform',
+                      transform: 'translateZ(0)',
                     }}>
                     <img src={photo.thumbnailUrl || photo.url} alt="" loading="lazy" decoding="async"
                       style={{
                         width: '100%', height: '100%',
                         objectFit: 'cover', borderRadius: '4px',
                         display: 'block',
+                        transform: 'translateZ(0)',
+                        backfaceVisibility: 'hidden',
                       }} />
                   </button>
                 ))}
