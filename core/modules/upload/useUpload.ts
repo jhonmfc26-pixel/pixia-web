@@ -1,5 +1,7 @@
 'use client'
+
 import { useState, useCallback } from 'react'
+import { getPhotoCacheEntry, updatePhotoCacheEntry } from './photoCache'
 
 export interface UploadedPhoto {
   photoId: string
@@ -15,6 +17,7 @@ export interface UploadProgress {
   failed: string[]
 }
 
+
 export function useUpload(sessionId: string) {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
     total: 0, completed: 0, isUploading: false, failed: [],
@@ -26,34 +29,69 @@ export function useUpload(sessionId: string) {
   ): Promise<UploadedPhoto[]> => {
     if (!sessionId) return []
 
+    // PASO 1 — Separar files ya en cache vs nuevos
+    const cachedResults: UploadedPhoto[] = []
+    const filesToUpload: typeof files = []
+
+    for (const item of files) {
+      const hit = getPhotoCacheEntry(item.file)
+      if (hit?.r2Key && hit?.url) {
+        cachedResults.push({
+          photoId: item.photoId,
+          r2Key: hit.r2Key,
+          url: hit.url,
+          thumbnailUrl: hit.url,
+        })
+        console.log('[Upload] CACHE HIT:', item.file.name, '→', hit.url.slice(0, 60) + '...')
+      } else {
+        filesToUpload.push(item)
+      }
+    }
+
+    if (cachedResults.length > 0) {
+      console.log(`[Upload] ${cachedResults.length} fotos reusadas desde cache, ${filesToUpload.length} a subir`)
+    }
+
+    // PASO 2 — Si todas estaban en cache, retornar directo
+    if (filesToUpload.length === 0) {
+      setUploadProgress({
+        total: files.length,
+        completed: files.length,
+        isUploading: false,
+        failed: [],
+      })
+      setUploadedPhotos(cachedResults)
+      return cachedResults
+    }
+
+    // PASO 3 — Subir solo los nuevos
     setUploadProgress({
-      total: files.length, completed: 0, isUploading: true, failed: [],
+      total: files.length,
+      completed: cachedResults.length,
+      isUploading: true,
+      failed: [],
     })
 
-    const results: UploadedPhoto[] = []
+    const results: UploadedPhoto[] = [...cachedResults]
     const failed: string[] = []
-
     const BATCH_SIZE = 2
-    for (let i = 0; i < files.length; i += BATCH_SIZE) {
-      const batch = files.slice(i, i + BATCH_SIZE)
 
+    for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
+      const batch = filesToUpload.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.allSettled(
         batch.map(async ({ file, photoId }) => {
           const formData = new FormData()
           formData.append('file', file)
           formData.append('sessionId', sessionId)
           formData.append('photoId', photoId)
-
           const res = await fetch('/api/upload', {
             method: 'POST',
             body: formData,
           })
-
           if (!res.ok) {
             const errText = await res.text().catch(() => 'unknown')
             throw new Error(`HTTP ${res.status}: ${errText}`)
           }
-
           const data = await res.json()
           return {
             photoId,
@@ -67,7 +105,11 @@ export function useUpload(sessionId: string) {
       batchResults.forEach((result, idx) => {
         if (result.status === 'fulfilled') {
           results.push(result.value)
-          console.log('[Upload] OK:', batch[idx].photoId, 'size:', batch[idx].file.size)
+          updatePhotoCacheEntry(batch[idx].file, {
+            r2Key: result.value.r2Key,
+            url: result.value.url,
+          })
+          console.log('[Upload] OK + cached:', batch[idx].photoId, 'size:', batch[idx].file.size)
         } else {
           failed.push(batch[idx].photoId)
           console.error('[Upload] FAIL:', batch[idx].photoId,
@@ -78,7 +120,7 @@ export function useUpload(sessionId: string) {
 
       setUploadProgress(prev => ({
         ...prev,
-        completed: Math.min(i + BATCH_SIZE, files.length),
+        completed: cachedResults.length + Math.min(i + BATCH_SIZE, filesToUpload.length),
         failed,
       }))
     }

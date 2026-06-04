@@ -13,6 +13,7 @@ import ContinueButton from "@/components/create/ContinueButton";
 import { X, Star, Move } from "lucide-react";
 import { useWizard, PhotoItem } from "@/components/create/WizardProvider";
 import { usePhotoAnalysis } from "@/core/modules/scoring/usePhotoAnalysis";
+import { getPhotoCacheEntry, updatePhotoCacheEntry, hasFullAnalysis } from "@/core/modules/upload/photoCache";
 import { useUpload } from "@/core/modules/upload/useUpload";
 import { useSession } from "@/core/modules/session/useSession";
 
@@ -75,15 +76,88 @@ export default function Step2Upload() {
           payload: [...photos, ...newPhotos].slice(0, 60),
         });
 
-        console.log('[Step2] Iniciando análisis...')
-        const analyzed = await analyzePhotos(acceptedFiles);
-        console.log('[Step2] Análisis completado:', analyzed.length, 'fotos')
+        // Separar files con análisis cacheado de los nuevos
+        const cachedItems: Array<{
+          file: File
+          orientation: 'landscape' | 'portrait' | 'square'
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          score: any
+          takenAt: Date | null
+          gps: { lat: number; lng: number } | null
+          thumbnail?: string
+          photoId: string
+        }> = []
+        const filesToAnalyze: File[] = []
 
-        console.log('[Step2] Generando thumbnails...')
+        for (let idx = 0; idx < acceptedFiles.length; idx++) {
+          const file = acceptedFiles[idx]
+          const entry = getPhotoCacheEntry(file)
+          if (hasFullAnalysis(entry)) {
+            cachedItems.push({
+              file,
+              orientation: entry!.orientation!,
+              score: entry!.score,
+              takenAt: entry!.takenAt ? new Date(entry!.takenAt) : null,
+              gps: entry!.gps || null,
+              thumbnail: entry!.thumbnail,
+              photoId: newPhotos[idx].id,
+            })
+          } else {
+            filesToAnalyze.push(file)
+          }
+        }
+
+        console.log(`[Step2] Cache: ${cachedItems.length} con análisis, ${filesToAnalyze.length} a analizar`)
+
+        // Analizar solo los nuevos
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let newAnalysis: any[] = []
+        if (filesToAnalyze.length > 0) {
+          console.log('[Step2] Iniciando análisis de', filesToAnalyze.length, 'fotos nuevas...')
+          newAnalysis = await analyzePhotos(filesToAnalyze)
+          console.log('[Step2] Análisis completado:', newAnalysis.length, 'fotos')
+        }
+
+        // Combinar análisis cacheados + nuevos
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const analyzed: any[] = [
+          ...cachedItems.map(c => ({
+            id: c.photoId,
+            file: c.file,
+            orientation: c.orientation,
+            score: c.score,
+            exif: { takenAt: c.takenAt, gps: c.gps },
+          })),
+          ...newAnalysis,
+        ]
+
+        // Thumbnails: cacheados primero, generar los faltantes
+        console.log('[Step2] Generando thumbnails faltantes...')
         const thumbnails = await Promise.all(
-          analyzed.map(p => generateThumbnail(p.file))
+          analyzed.map(async (item) => {
+            const entry = getPhotoCacheEntry(item.file)
+            if (entry?.thumbnail) return entry.thumbnail
+            try {
+              return await generateThumbnail(item.file)
+            } catch {
+              return null
+            }
+          })
         )
-        console.log('[Step2] Thumbnails generadas:', thumbnails.filter(Boolean).length)
+        console.log('[Step2] Thumbnails listos:', thumbnails.filter(Boolean).length)
+
+        // Guardar TODO en cache (análisis + thumbnails) para la próxima vez
+        for (let i = 0; i < analyzed.length; i++) {
+          const item = analyzed[i]
+          if (!item) continue
+          updatePhotoCacheEntry(item.file, {
+            orientation: item.orientation,
+            score: item.score,
+            takenAt: item.exif?.takenAt?.toISOString() || null,
+            gps: item.exif?.gps || null,
+            thumbnail: thumbnails[i] || undefined,
+          })
+        }
 
         if (analyzed.length > 0) {
           localStorage.setItem(
