@@ -216,8 +216,10 @@ export default function CoverEditor({
                       padding: '2px',
                       cursor: 'pointer',
                       aspectRatio: '1',
+                      contentVisibility: 'auto',
+                      containIntrinsicSize: '110px 110px',
                     }}>
-                    <img src={photo.url} alt=""
+                    <img src={photo.thumbnailUrl || photo.url} alt="" loading="lazy" decoding="async"
                       style={{
                         width: '100%', height: '100%',
                         objectFit: 'cover', borderRadius: '4px',

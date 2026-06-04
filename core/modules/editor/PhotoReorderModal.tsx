@@ -1,5 +1,5 @@
 'use client'
-import { useState, memo } from 'react'
+import { useState, memo, useRef } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -36,11 +36,14 @@ interface SortablePhotoProps {
 
 const SortablePhoto = memo(function SortablePhoto({ id, index, photo }: SortablePhotoProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const renderCountRef = useRef(0)
+  renderCountRef.current++
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Transform.toString(transform) || 'translateZ(0)',
     transition,
     opacity: isDragging ? 0.4 : 1,
+    willChange: 'transform',
   }
 
   if (!photo) return null
@@ -57,6 +60,10 @@ const SortablePhoto = memo(function SortablePhoto({ id, index, photo }: Sortable
         cursor: 'grab',
         background: '#0a0a0a',
         touchAction: 'none',
+      }}
+      onMouseDown={() => {
+        // Exponer timestamp al window para que perfRef del padre lo lea
+        ;(window as unknown as Record<string, number>).__pixia_mousedown = performance.now()
       }}
       {...attributes}
       {...listeners}
@@ -75,6 +82,8 @@ const SortablePhoto = memo(function SortablePhoto({ id, index, photo }: Sortable
           display: 'block',
           pointerEvents: 'none',
           userSelect: 'none',
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
         }}
       />
       <div style={{
@@ -99,6 +108,13 @@ export default function PhotoReorderModal({
   const [order, setOrder] = useState<string[]>(photoIds)
   const [activeId, setActiveId] = useState<string | null>(null)
 
+  const perfRef = useRef<{
+    mousedownAt: number
+    renderCount: number
+    dragStartedAt: number
+  }>({ mousedownAt: 0, renderCount: 0, dragStartedAt: 0 })
+  perfRef.current.renderCount++
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
@@ -109,6 +125,14 @@ export default function PhotoReorderModal({
   )
 
   const handleDragStart = (event: DragStartEvent) => {
+    const now = performance.now()
+    perfRef.current.dragStartedAt = now
+    const mousedownAt = (window as unknown as Record<string, number>).__pixia_mousedown || now
+    console.log('[Perf] dragStart latency:',
+      (now - mousedownAt).toFixed(1), 'ms',
+      '| renders desde mount:', perfRef.current.renderCount,
+      '| items:', order.length
+    )
     setActiveId(event.active.id as string)
   }
 
@@ -120,6 +144,10 @@ export default function PhotoReorderModal({
     const newIndex = order.indexOf(over.id as string)
     if (oldIndex < 0 || newIndex < 0) return
     setOrder(arrayMove(order, oldIndex, newIndex))
+    const duration = performance.now() - perfRef.current.dragStartedAt
+    console.log('[Perf] drag duration:', duration.toFixed(1), 'ms',
+      '| moved:', oldIndex, '→', newIndex
+    )
   }
 
   const handleSave = () => {
