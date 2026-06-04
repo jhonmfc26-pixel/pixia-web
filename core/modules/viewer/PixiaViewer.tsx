@@ -28,7 +28,30 @@ export default function PixiaViewer({
   const [currentPage, setCurrentPage] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
   const [pageSize, setPageSize] = useState(420)
-  const bookRef = useRef<{ pageFlip(): { flipPrev(): void; flipNext(): void } } | null>(null)
+  const [pageInput, setPageInput] = useState('1')
+
+  useEffect(() => {
+    setPageInput((currentPage + 1).toString())
+  }, [currentPage])
+
+  const handleGoToPage = (target: number) => {
+    if (isNaN(target) || target < 1 || target > totalPages) {
+      setPageInput((currentPage + 1).toString())
+      return
+    }
+    bookRef.current?.pageFlip()?.turnToPage(target - 1)
+  }
+
+  const handleGoToCover = () => {
+    bookRef.current?.pageFlip()?.turnToPage(0)
+  }
+  const bookRef = useRef<{
+    pageFlip(): {
+      flipPrev(): void
+      flipNext(): void
+      turnToPage(page: number): void
+    }
+  } | null>(null)
 
   useEffect(() => {
     function calc() {
@@ -189,9 +212,56 @@ export default function PixiaViewer({
         background: 'rgba(10,10,10,0.95)', borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 250,
       }}>
-        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-          {currentPage + 1} / {totalPages}
-        </span>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          fontSize: '13px', color: 'rgba(255,255,255,0.7)',
+        }}>
+          <button
+            onClick={handleGoToCover}
+            title="Ir a portada"
+            disabled={currentPage === 0}
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              color: currentPage === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.7)',
+              fontSize: '13px',
+              cursor: currentPage === 0 ? 'default' : 'pointer',
+              lineHeight: 1,
+            }}
+          >↺ Portada</button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>Página</span>
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur()
+                  handleGoToPage(parseInt(pageInput, 10))
+                }
+              }}
+              onBlur={() => handleGoToPage(parseInt(pageInput, 10))}
+              style={{
+                width: '50px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '4px',
+                padding: '4px 6px',
+                color: 'white',
+                fontSize: '13px',
+                textAlign: 'center',
+                outline: 'none',
+              }}
+            />
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>/ {totalPages}</span>
+          </div>
+        </div>
       </div>
 
     </div>

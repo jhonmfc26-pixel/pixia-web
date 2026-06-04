@@ -7,16 +7,7 @@ import { useParams } from 'next/navigation'
 import type { AlbumBlueprint, CoverConfig } from '@/core/contracts/AlbumBlueprint'
 import type { LayoutConfig, PhotoPlacement } from '@/core/modules/album/types'
 import EditorView from '@/core/modules/editor/EditorView'
-
-// Mismo mapeo que el viewer (page.tsx) — vocabularios IA → contrato
-function mapOldLayout(layout: string | undefined): string {
-  switch (layout) {
-    case 'full-bleed': return 'full'
-    case 'split-horizontal': return 'duo-v'
-    case 'editorial-right': return 'hero-2'
-    default: return layout || 'full'
-  }
-}
+import { normalizeBook } from '@/core/modules/album/normalizeBook'
 
 export default function EditPage() {
   const params = useParams()
@@ -28,95 +19,12 @@ export default function EditPage() {
     if (!raw) return
     try {
       const books = JSON.parse(raw)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const b: any = books[id]
+      const b = books[id]
       if (!b) return
-
-      const isOldFormat = !!b.content && !b.spreads
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const spreads = isOldFormat
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? (b.content?.spreads || []).map((spread: any, i: number) => ({
-            id: spread.id ?? `spread-${i}`,
-            act: spread.act ?? 'inicio',
-            layout: mapOldLayout(spread.layout),
-            isLocked: false,
-            pageNumber: i * 2 + 1,
-            caption: spread.caption,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            photos: (spread.photos || []).map((photo: any) => ({
-              id: photo.id,
-              url: photo.url || photo.src || photo.thumbnailUrl || '',
-              thumbnailUrl: photo.thumbnailUrl || photo.url || photo.src || '',
-              r2Key: photo.r2Key || '',
-              width: photo.width || 0,
-              height: photo.height || 0,
-              orientation: (photo.orientation ?? 'landscape') as 'landscape' | 'portrait' | 'square',
-              originalName: photo.originalName ?? photo.id,
-              score: photo.score || {
-                sharpness: 0, exposure: 0, composition: 0, faces: 0,
-                resolution: 0, uniqueness: 100, emotionalWeight: 50,
-                finalScore: 50, recommendation: 'supporting' as const,
-              },
-            })),
-          }))
-        : (b.spreads || [])
-
-      console.log('[Edit] Total spreads encontrados:', spreads.length)
-      console.log('[Edit] Primera foto - tamaño src:', spreads[0]?.photos?.[0]?.src?.length || 0)
-      console.log('[Edit] Primera foto - primeros 100 chars:', spreads[0]?.photos?.[0]?.src?.slice(0, 100))
-      console.log('[Edit] Primer spread keys:', spreads[0] ? Object.keys(spreads[0]) : 'no hay')
-      console.log('[Edit] Primer spread completo:', JSON.stringify(spreads[0]))
-      console.log('[Edit] Primera foto del primer spread:', JSON.stringify(spreads[0]?.photos?.[0]))
-
-      // Priorizar b.cover (raíz) porque ahí guarda handleSave.
-      // Si no existe, caer al cover legacy del formato viejo.
-      const rawCover = b.cover
-        || (isOldFormat ? (b.content?.cover || b.identity || {}) : {})
-
-      const occasion = b.occasion || b.identity?.occasion || 'boda'
-      const style = b.style || b.identity?.style || 'con-margen'
-      const format = b.format || b.identity?.format || '30x30'
-
-      const layoutConfig = Array.isArray(b.layoutConfig)
-        ? new Map(b.layoutConfig)
-        : new Map()
-
-      const placements = Array.isArray(b.placements)
-        ? new Map(b.placements)
-        : new Map()
-
-      console.log('[Edit] Book normalizado:', {
-        spreads: spreads.length,
-        occasion,
-        format,
-        hasCover: !!(rawCover.photoId || rawCover.title),
-      })
-
-      setBook({
-        ...b,
-        id,   // siempre usa el id del URL param — PixiaBook viejo no tiene b.id
-        spreads,
-        cover: {
-          photoId: rawCover.photoId || '',
-          templateId: rawCover.templateId || 'wedding-classic',
-          title: rawCover.title || b.narrative?.title || 'Mi álbum',
-          subtitle: rawCover.subtitle || '',
-          date: rawCover.date || '',
-          textPosition: rawCover.textPosition || 'bottom',
-          textAlign: rawCover.textAlign || 'center',
-          textColor: rawCover.textColor || 'auto',
-        },
-        occasion,
-        style,
-        format,
-        layoutConfig,
-        placements,
-        manualPhotoOrder: Array.isArray(b.manualPhotoOrder) ? b.manualPhotoOrder : undefined,
-      } as AlbumBlueprint)
-    } catch (e) {
-      console.error('[Edit] Error:', e)
+      const normalized = normalizeBook(b, id)
+      setBook(normalized)
+    } catch (err) {
+      console.error('[Edit] Error normalizando book:', err)
     }
   }, [id])
 
