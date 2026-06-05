@@ -10,6 +10,7 @@ import type { AlbumBlueprint } from '../../../core/contracts/AlbumBlueprint'
 import { normalizeBook } from '../../../core/modules/album/normalizeBook'
 import { extractPhotoPool, buildPages } from '../../../core/modules/album/pageEngine'
 import type { LayoutConfig, PhotoPlacement } from '../../../core/modules/album/types'
+import { generatePdfFromBook, downloadPdf } from '../../../core/modules/pdf/generatePdf'
 
 export default function BookPage() {
   const params = useParams()
@@ -18,6 +19,7 @@ export default function BookPage() {
   const pageParam = parseInt(searchParams.get('page') || '0', 10)
   const [book, setBook] = useState<AlbumBlueprint | null>(null)
   const [notFound, setNotFound] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
     const loaded = getBookFromLocal(params.id as string)
@@ -67,6 +69,20 @@ export default function BookPage() {
     [book, photosById, photoPool]
   )
 
+  const handleDownloadPdf = async () => {
+    if (!book) return
+    setPdfLoading(true)
+    try {
+      const bytes = await generatePdfFromBook({ book, photosById, layoutConfig, placements })
+      downloadPdf(bytes, `${book.cover?.title || 'pixia-album'}.pdf`)
+    } catch (err) {
+      console.error('[PDF] Falló la generación:', err)
+      alert('No se pudo generar el PDF. Revisa la consola.')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
   if (!book) return <p style={{ color: 'white', padding: 32 }}>Cargando...</p>
 
   return (
@@ -82,6 +98,8 @@ export default function BookPage() {
         title={book.cover.title || book.narrative?.title || 'Mi álbum'}
         startPage={Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 0}
         onEdit={(currentPage) => router.push(`/book/${book.id}/edit?page=${currentPage}`)}
+        onDownloadPdf={handleDownloadPdf}
+        pdfLoading={pdfLoading}
       />
     </main>
   )

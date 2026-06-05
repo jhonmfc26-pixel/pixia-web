@@ -19,11 +19,14 @@ interface PixiaViewerProps {
   title: string
   onEdit?: (currentPage: number) => void
   startPage?: number
+  onDownloadPdf?: () => void
+  pdfLoading?: boolean
 }
 
 export default function PixiaViewer({
   pages, photosById, placements,
   coverPhoto, cover, style, format, title, onEdit, startPage,
+  onDownloadPdf, pdfLoading,
 }: PixiaViewerProps) {
   const [currentPage, setCurrentPage] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
@@ -127,7 +130,24 @@ export default function PixiaViewer({
           {title}
         </span>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', minWidth: '60px', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: '60px', justifyContent: 'flex-end' }}>
+          {onDownloadPdf && (
+            <button
+              onClick={onDownloadPdf}
+              disabled={pdfLoading}
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '6px',
+                padding: '6px 14px',
+                color: pdfLoading ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)',
+                fontSize: '12px',
+                cursor: pdfLoading ? 'wait' : 'pointer',
+              }}
+            >
+              {pdfLoading ? 'Generando PDF...' : '📄 Descargar PDF'}
+            </button>
+          )}
           {onEdit && (
             <button
               onClick={() => onEdit(currentPage)}
