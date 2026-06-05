@@ -98,6 +98,8 @@ export interface AlbumBlueprint {
   version: number
 
   format: AlbumFormat
+  /** Identificador del formato físico. Si no se especifica, default 'square-30'. */
+  formatId?: string
   style: AlbumStyle
   occasion: OccasionType
   pageCount: number
