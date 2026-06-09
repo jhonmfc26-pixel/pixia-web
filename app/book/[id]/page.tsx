@@ -100,6 +100,7 @@ export default function BookPage() {
         onEdit={(currentPage) => router.push(`/book/${book.id}/edit?page=${currentPage}`)}
         onDownloadPdf={handleDownloadPdf}
         pdfLoading={pdfLoading}
+        onCheckout={() => router.push(`/checkout/${book.id}`)}
       />
     </main>
   )

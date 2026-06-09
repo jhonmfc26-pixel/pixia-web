@@ -148,7 +148,10 @@ export default function CheckoutPage() {
       })
 
       checkout.open((result) => {
-        if (!result?.transaction) {
+        if (result?.transaction) {
+          router.push(`/checkout/success?ref=${data.reference}`)
+        } else {
+          console.log('[checkout] Widget cerrado sin transacción')
           setSubmitting(false)
         }
       })

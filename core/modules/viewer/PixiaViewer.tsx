@@ -21,12 +21,13 @@ interface PixiaViewerProps {
   startPage?: number
   onDownloadPdf?: () => void
   pdfLoading?: boolean
+  onCheckout?: () => void
 }
 
 export default function PixiaViewer({
   pages, photosById, placements,
   coverPhoto, cover, style, format, title, onEdit, startPage,
-  onDownloadPdf, pdfLoading,
+  onDownloadPdf, pdfLoading, onCheckout,
 }: PixiaViewerProps) {
   const [currentPage, setCurrentPage] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
@@ -131,6 +132,23 @@ export default function PixiaViewer({
         </span>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: '60px', justifyContent: 'flex-end' }}>
+          {onCheckout && (
+            <button
+              onClick={onCheckout}
+              style={{
+                background: '#fff',
+                color: '#000',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Comprar álbum
+            </button>
+          )}
           {onDownloadPdf && (
             <button
               onClick={onDownloadPdf}
