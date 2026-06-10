@@ -167,20 +167,6 @@ export default function Hero() {
         </a>
       </motion.div>
 
-      {/* Social proof */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.5 }}
-        style={{
-          marginTop: '48px',
-          fontSize: '13px',
-          color: 'var(--text-tertiary)',
-          letterSpacing: '0.03em',
-        }}
-      >
-        Más de 500 historias impresas este mes
-      </motion.p>
 
     </section>
   )

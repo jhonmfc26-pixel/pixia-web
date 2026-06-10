@@ -1,21 +1,16 @@
-import { Sparkles, Clock, Heart, Package } from 'lucide-react'
+import { Sparkles, Clock, Package } from 'lucide-react'
 import Reveal from '@/components/ui/Reveal'
 
 const features = [
   {
     icon: Sparkles,
-    title: 'Diseño editorial con IA',
-    description: 'La IA analiza tus fotos, selecciona los mejores momentos y construye una maquetación automáticamente.',
+    title: 'Pixia decide por ti',
+    description: 'No eliges layouts, no organizas páginas. Pixia analiza tus fotos y construye un álbum editorial con criterio propio.',
   },
   {
     icon: Clock,
     title: 'Listo en minutos',
     description: 'Sube tus fotos y recibe un libro completamente diseñado en menos de 5 minutos.',
-  },
-  {
-    icon: Heart,
-    title: 'Tu historia, a tu manera',
-    description: 'Edita, reorganiza y personaliza cada página hasta que tu historia se sienta perfecta.',
   },
   {
     icon: Package,
