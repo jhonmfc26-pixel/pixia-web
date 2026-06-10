@@ -17,7 +17,7 @@ export default function Pricing() {
     <section
       id="precios"
       style={{
-        padding: '96px 24px',
+        padding: '72px 24px',
         background: 'var(--bg-surface)',
         borderTop: '1px solid var(--border-subtle)',
         borderBottom: '1px solid var(--border-subtle)',
@@ -25,7 +25,7 @@ export default function Pricing() {
     >
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <Reveal>
-          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '36px' }}>
             <h2 style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'clamp(28px, 4vw, 42px)',
@@ -52,14 +52,14 @@ export default function Pricing() {
             background: 'var(--bg-elevated)',
             border: '1px solid var(--border-subtle)',
             borderRadius: '16px',
-            padding: '40px 36px',
+            padding: '32px 28px',
             position: 'relative',
           }}>
             {/* Header */}
             <div style={{
               borderBottom: '1px solid var(--border-subtle)',
-              paddingBottom: '24px',
-              marginBottom: '24px',
+              paddingBottom: '20px',
+              marginBottom: '20px',
             }}>
               <p style={{
                 fontSize: '11px',
@@ -82,7 +82,7 @@ export default function Pricing() {
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                 <span style={{
                   fontFamily: 'var(--font-display)',
-                  fontSize: '44px',
+                  fontSize: '36px',
                   fontWeight: 500,
                   color: 'var(--text-primary)',
                   letterSpacing: '-0.02em',
@@ -108,7 +108,7 @@ export default function Pricing() {
             </div>
 
             {/* Incluye */}
-            <ul style={{ listStyle: 'none', padding: 0, marginBottom: '32px' }}>
+            <ul style={{ listStyle: 'none', padding: 0, marginBottom: '24px' }}>
               {includes.map((item, i) => (
                 <li
                   key={i}
@@ -119,7 +119,7 @@ export default function Pricing() {
                     fontSize: '14px',
                     color: 'var(--text-secondary)',
                     lineHeight: 1.6,
-                    marginBottom: '12px',
+                    marginBottom: '10px',
                     fontWeight: 300,
                   }}
                 >

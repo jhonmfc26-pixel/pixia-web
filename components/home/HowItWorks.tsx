@@ -28,13 +28,13 @@ export default function HowItWorks() {
     <section
       id="como-funciona"
       style={{
-        padding: '96px 24px',
+        padding: '72px 24px',
         background: 'var(--bg-base)',
       }}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <Reveal>
-          <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
             <h2 style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'clamp(28px, 4vw, 42px)',
@@ -58,19 +58,13 @@ export default function HowItWorks() {
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '32px',
           position: 'relative',
         }}>
           {steps.map((step, index) => (
             <Reveal key={step.number} delay={0.1 + index * 0.1}>
-              <div style={{
-                padding: '0 32px 0 0',
-                borderRight: index < steps.length - 1
-                  ? '1px dashed rgba(255,255,255,0.1)'
-                  : 'none',
-                paddingRight: index < steps.length - 1 ? '32px' : '0',
-                paddingLeft: index > 0 ? '32px' : '0',
-              }}>
+              <div>
                 <span style={{
                   display: 'block',
                   fontSize: '11px',

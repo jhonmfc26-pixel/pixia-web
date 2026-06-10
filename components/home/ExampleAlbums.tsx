@@ -36,14 +36,14 @@ export default function ExampleAlbums() {
     <section
       id="ejemplos"
       style={{
-        padding: '96px 24px',
+        padding: '80px 24px',
         background: 'var(--bg-base)',
         borderTop: '1px solid var(--border-subtle)',
       }}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <Reveal>
-          <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
             <h2 style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'clamp(28px, 4vw, 42px)',
@@ -67,8 +67,10 @@ export default function ExampleAlbums() {
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
           gap: '20px',
+          maxWidth: '1100px',
+          margin: '0 auto',
         }}>
           {occasions.map((occ, i) => (
             <Reveal key={occ.id} delay={0.1 + i * 0.08}>
@@ -92,7 +94,7 @@ export default function ExampleAlbums() {
               >
                 <div style={{
                   width: '100%',
-                  aspectRatio: '4 / 5',
+                  aspectRatio: '3 / 4',
                   position: 'relative',
                   overflow: 'hidden',
                   background: 'var(--bg-elevated)',
