@@ -133,7 +133,6 @@ export async function POST(req: NextRequest) {
 
   console.log('[webhook] Orden actualizada:', verified.reference, '→', newStatus)
 
-  // Enviar email de confirmación (no bloqueante - si falla no afecta el pago)
   if (newStatus === 'approved') {
     const { data: fullOrder } = await supabaseAdmin
       .from('orders')
@@ -142,18 +141,26 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (fullOrder) {
-      sendOrderConfirmation({
-        reference: fullOrder.reference,
-        customerName: fullOrder.customer_name,
-        customerEmail: fullOrder.customer_email,
-        totalCop: fullOrder.total_cop,
-        pagesTotal: fullOrder.pages_total,
-        shippingAddress: fullOrder.shipping_address,
-        shippingCity: fullOrder.shipping_city,
-        shippingState: fullOrder.shipping_state,
-      }).catch(err => {
+      try {
+        // AWAIT: en Cloudflare Workers el dispatch-and-forget no funciona,
+        // el worker termina antes de que la promise resuelva
+        await sendOrderConfirmation({
+          reference: fullOrder.reference,
+          customerName: fullOrder.customer_name,
+          customerEmail: fullOrder.customer_email,
+          totalCop: fullOrder.total_cop,
+          pagesTotal: fullOrder.pages_total,
+          shippingAddress: fullOrder.shipping_address,
+          shippingCity: fullOrder.shipping_city,
+          shippingState: fullOrder.shipping_state,
+        })
+      } catch (err) {
+        // Si el email falla, lo loggeamos pero NO afectamos el éxito del webhook.
+        // El pago YA fue procesado, la orden YA está aprobada en DB.
         console.error('[webhook] Email falló (no afecta orden):', err)
-      })
+      }
+    } else {
+      console.warn('[webhook] No se pudo cargar orden para email:', verified.reference)
     }
   }
 
