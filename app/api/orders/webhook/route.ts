@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { validateWebhookSignature, fetchTransactionStatus } from '@/lib/wompi'
+import { sendOrderConfirmation } from '@/lib/email'
 
 export const runtime = 'edge'
 
@@ -132,7 +133,29 @@ export async function POST(req: NextRequest) {
 
   console.log('[webhook] Orden actualizada:', verified.reference, '→', newStatus)
 
-  // TODO Día 5: disparar email de confirmación si newStatus === 'approved'
+  // Enviar email de confirmación (no bloqueante - si falla no afecta el pago)
+  if (newStatus === 'approved') {
+    const { data: fullOrder } = await supabaseAdmin
+      .from('orders')
+      .select('reference, customer_name, customer_email, total_cop, pages_total, shipping_address, shipping_city, shipping_state')
+      .eq('reference', verified.reference)
+      .single()
+
+    if (fullOrder) {
+      sendOrderConfirmation({
+        reference: fullOrder.reference,
+        customerName: fullOrder.customer_name,
+        customerEmail: fullOrder.customer_email,
+        totalCop: fullOrder.total_cop,
+        pagesTotal: fullOrder.pages_total,
+        shippingAddress: fullOrder.shipping_address,
+        shippingCity: fullOrder.shipping_city,
+        shippingState: fullOrder.shipping_state,
+      }).catch(err => {
+        console.error('[webhook] Email falló (no afecta orden):', err)
+      })
+    }
+  }
 
   return NextResponse.json({ received: true, status: newStatus }, { status: 200 })
 }

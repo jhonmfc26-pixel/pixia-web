@@ -26,6 +26,7 @@
     "react-dom": "19.2.3",
     "react-dropzone": "^14.3.8",
     "react-pageflip": "^2.0.3",
+    "resend": "^6.12.4",
     "uuid": "^14.0.0",
     "zustand": "^5.0.11"
   },
