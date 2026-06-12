@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/core/middleware/rateLimiter'
 
 export const runtime = 'edge'
 
@@ -108,6 +109,9 @@ async function signedR2Put(
 }
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, '/api/upload')
+  if (limited) return limited
+
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File

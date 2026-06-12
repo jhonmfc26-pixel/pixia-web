@@ -2,3 +2,10 @@ name = "pixia-web"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
+
+# Rate limiting via KV
+# Crear con: wrangler kv:namespace create RATE_LIMIT_KV
+# Luego reemplaza el id con el que devuelve el comando anterior
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "8196b73f4749453cb5e6188fd80b1097"

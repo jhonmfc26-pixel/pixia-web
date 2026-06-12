@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { generateIntegrityHash, calculateOrderTotal, generateOrderReference } from '@/lib/wompi'
+import { rateLimit } from '@/core/middleware/rateLimiter'
 
 export const runtime = 'edge'
 
@@ -23,6 +24,9 @@ interface CreateOrderRequest {
 }
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, '/api/orders')
+  if (limited) return limited
+
   try {
     const body = (await req.json()) as CreateOrderRequest
 

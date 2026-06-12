@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/core/middleware/rateLimiter'
 
 export const runtime = 'edge'
 
@@ -7,6 +8,9 @@ const MAX_DESCRIPTION_LENGTH = 2000
 const MAX_STRING_FIELD_LENGTH = 200
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, '/api/editorial')
+  if (limited) return limited
+
   try {
     const body = await req.json()
     const { photoDescriptions, story, style, emotion } = body
