@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'edge'
 
+const MAX_FILE_BYTES = 25 * 1024 * 1024  // 25 MB
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function detectImageType(buffer: ArrayBuffer): 'image/jpeg' | 'image/png' | 'image/webp' | null {
+  if (buffer.byteLength < 12) return null
+  const b = new Uint8Array(buffer, 0, 12)
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'image/jpeg'
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'image/png'
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp'
+  return null
+}
+
 // AWS Signature V4 using Web Crypto (edge-compatible)
 async function hmacSHA256(key: BufferSource | CryptoKey, data: string): Promise<ArrayBuffer> {
   const cryptoKey = key instanceof CryptoKey ? key : await crypto.subtle.importKey(
@@ -105,16 +118,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     }
 
+    // Validar formato UUID v4 del sessionId
+    if (!UUID_V4.test(sessionId)) {
+      return NextResponse.json({ error: 'sessionId inválido' }, { status: 400 })
+    }
+
+    // Validar tamaño antes de leer el buffer completo
+    if (file.size > MAX_FILE_BYTES) {
+      return NextResponse.json({ error: 'Archivo demasiado grande (máx 25 MB)' }, { status: 413 })
+    }
+
+    const buffer = await file.arrayBuffer()
+
+    // Validar tipo real por magic bytes — no confiar en file.type del cliente
+    const detectedType = detectImageType(buffer)
+    if (!detectedType) {
+      return NextResponse.json({ error: 'Tipo de archivo no soportado' }, { status: 415 })
+    }
+
     const endpoint = process.env.R2_ENDPOINT!
     const bucket = process.env.R2_BUCKET!
     const accessKeyId = process.env.R2_ACCESS_KEY_ID!
     const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY!
 
-    const buffer = await file.arrayBuffer()
     const key = `users/${sessionId}/original/${photoId}.jpg`
-    const contentType = file.type || 'image/jpeg'
 
-    const r2Res = await signedR2Put(endpoint, bucket, key, buffer, contentType, accessKeyId, secretAccessKey)
+    const r2Res = await signedR2Put(endpoint, bucket, key, buffer, detectedType, accessKeyId, secretAccessKey)
 
     if (!r2Res.ok) {
       const errText = await r2Res.text()

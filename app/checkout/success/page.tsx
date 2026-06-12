@@ -5,8 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 
 interface Order {
   reference: string
-  customer_name: string
-  customer_email: string
+  customer_email_masked: string
   total_cop: number
   pages_total: number
   payment_status: string
@@ -125,7 +124,7 @@ function CheckoutSuccessContent() {
         </h1>
 
         <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.7)', marginBottom: 32, lineHeight: 1.5 }}>
-          {isPaid && `Hola ${order.customer_name}, recibimos tu pago correctamente. Tu álbum entrará en producción en las próximas 24 horas.`}
+          {isPaid && 'Recibimos tu pago correctamente. Tu álbum entrará en producción en las próximas 24 horas.'}
           {isPending && 'Tu pago está siendo procesado. Recibirás un email cuando se confirme.'}
           {!isPaid && !isPending && 'El pago no se completó. Si crees que es un error, contáctanos.'}
         </p>
@@ -134,7 +133,7 @@ function CheckoutSuccessContent() {
           <Detail label="Número de orden" value={order.reference} />
           <Detail label="Álbum" value={`${order.pages_total} páginas`} />
           <Detail label="Total" value={formatCop(order.total_cop)} />
-          <Detail label="Email" value={order.customer_email} />
+          <Detail label="Email" value={order.customer_email_masked} />
         </div>
 
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 24, lineHeight: 1.6 }}>

@@ -20,6 +20,7 @@ export default function BookPage() {
   const [book, setBook] = useState<AlbumBlueprint | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [pdfHasFailures, setPdfHasFailures] = useState(false)
 
   useEffect(() => {
     const loaded = getBookFromLocal(params.id as string)
@@ -72,9 +73,14 @@ export default function BookPage() {
   const handleDownloadPdf = async () => {
     if (!book) return
     setPdfLoading(true)
+    setPdfHasFailures(false)
     try {
-      const bytes = await generatePdfFromBook({ book, photosById, layoutConfig, placements })
+      const { bytes, failedPhotos } = await generatePdfFromBook({ book, photosById, layoutConfig, placements })
       downloadPdf(bytes, `${book.cover?.title || 'pixia-album'}.pdf`)
+      if (failedPhotos > 0) {
+        setPdfHasFailures(true)
+        alert(`⚠️ ${failedPhotos} foto${failedPhotos > 1 ? 's' : ''} no se pudo${failedPhotos > 1 ? 'ieron' : ''} incluir en el PDF.\nRevisa tu conexión y descarga de nuevo antes de enviar a impresión.`)
+      }
     } catch (err) {
       console.error('[PDF] Falló la generación:', err)
       alert('No se pudo generar el PDF. Revisa la consola.')
@@ -100,7 +106,13 @@ export default function BookPage() {
         onEdit={(currentPage) => router.push(`/book/${book.id}/edit?page=${currentPage}`)}
         onDownloadPdf={handleDownloadPdf}
         pdfLoading={pdfLoading}
-        onCheckout={() => router.push(`/checkout/${book.id}`)}
+        onCheckout={() => {
+            if (pdfHasFailures) {
+              alert('El PDF descargado tiene fotos faltantes. Descárgalo de nuevo para verificarlo antes de enviar a impresión.')
+              return
+            }
+            router.push(`/checkout/${book.id}`)
+          }}
       />
     </main>
   )

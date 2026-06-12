@@ -114,11 +114,13 @@ function getSlotCssRect(
 
 async function loadImage(url: string): Promise<HTMLImageElement> {
   const img = new Image()
-  img.crossOrigin = 'anonymous'
+  img.crossOrigin = 'anonymous'   // debe ir ANTES de img.src
+  // ?pdf=1 evita que el navegador reutilice una respuesta cacheada sin cabeceras CORS
+  const src = url.startsWith('/') ? url : (url.includes('?') ? `${url}&pdf=1` : `${url}?pdf=1`)
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve()
     img.onerror = () => reject(new Error(`No se pudo cargar: ${url}`))
-    img.src = url
+    img.src = src
   })
   return img
 }
@@ -354,11 +356,12 @@ async function renderImageToCanvasBytes(params: RenderParams): Promise<Uint8Arra
   }
 
   const img = new Image()
-  img.crossOrigin = 'anonymous'
+  img.crossOrigin = 'anonymous'   // debe ir ANTES de img.src
+  const pdfUrl = url.includes('?') ? `${url}&pdf=1` : `${url}?pdf=1`
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve()
     img.onerror = () => reject(new Error(`No se pudo cargar: ${url}`))
-    img.src = url
+    img.src = pdfUrl
   })
 
   const canvasW = Math.round(targetWPt * ptToPx)
@@ -419,23 +422,27 @@ async function renderPageInArea(
   albumStyle: AlbumStyle,
   pdfPageH: number,
   ptToPx: number
-): Promise<void> {
+): Promise<{ attempted: number; failed: number }> {
   const layout = getLayoutById(page.layout)
   if (!layout) {
     console.warn('[PDF] Layout no encontrado:', page.layout)
-    return
+    return { attempted: 0, failed: 0 }
   }
 
   const gap = albumStyle === 'con-margen' ? GAP_CON_MARGEN_PT : GAP_SIN_MARGEN_PT
   const outerMargin = albumStyle === 'con-margen' ? MARGIN_CON_MARGEN_PT : 0
 
   const photoIds = page.photoIds || []
+  let attempted = 0
+  let failed = 0
 
   for (let i = 0; i < layout.slots.length && i < photoIds.length; i++) {
     const slot = layout.slots[i]
     const photoId = photoIds[i]
     const photo = photosById.get(photoId)
     if (!photo?.url) continue
+
+    attempted++
 
     const rect = getSlotCssRect(slot, layout, areaW, areaH, gap, outerMargin)
     if (!rect) continue
@@ -463,8 +470,11 @@ async function renderPageInArea(
       pdfPage.drawImage(img, { x: finalX, y: finalY, width: rect.w, height: rect.h })
     } catch (err) {
       console.error(`[PDF] Error en slot ${slot} (page ${page.id}):`, err)
+      failed++
     }
   }
+
+  return { attempted, failed }
 }
 
 // ============ PORTADA ============
@@ -584,7 +594,7 @@ async function renderBackCoverPdf(
 
 // ============ MAIN ============
 
-export async function generatePdfFromBook(opts: GeneratePdfOptions): Promise<Uint8Array> {
+export async function generatePdfFromBook(opts: GeneratePdfOptions): Promise<{ bytes: Uint8Array; failedPhotos: number }> {
   const { book, photosById, layoutConfig, placements } = opts
 
   // Resolver formato del álbum (con fallback a default)
@@ -611,6 +621,8 @@ export async function generatePdfFromBook(opts: GeneratePdfOptions): Promise<Uin
 
   await renderCoverPdf(pdfDoc, book, photosById, pageWPt, pageHPt, ptToPx)
 
+  let totalPhotos = 0
+  let failedPhotos = 0
   let i = 0
   let spreadIdx = 0
   while (i < pages.length) {
@@ -631,18 +643,20 @@ export async function generatePdfFromBook(opts: GeneratePdfOptions): Promise<Uin
       const spreadPage = pdfDoc.addPage([spreadWPt, pageHPt])
       const photo = photosById.get(leftPage.photoIds[0])
       if (photo?.url) {
+        totalPhotos++
         try {
-          const bytes = await renderImageToCanvasBytes({
+          const imgBytes = await renderImageToCanvasBytes({
             url: normalizeR2Url(photo.url),
             targetWPt: spreadWPt,
             targetHPt: pageHPt,
             placement: placements.get(photo.id) ?? DEFAULT_PLACEMENT,
             ptToPx,
           })
-          const img = await pdfDoc.embedJpg(bytes)
+          const img = await pdfDoc.embedJpg(imgBytes)
           spreadPage.drawImage(img, { x: 0, y: 0, width: spreadWPt, height: pageHPt })
         } catch (err) {
           console.error('[PDF] Error en hero-spread:', err)
+          failedPhotos++
         }
       }
       i += 2
@@ -653,18 +667,22 @@ export async function generatePdfFromBook(opts: GeneratePdfOptions): Promise<Uin
     console.log(`[PDF] Spread ${spreadIdx} (${leftPage.layout}${rightPage ? ' + ' + rightPage.layout : ''})`)
     const spreadPage = pdfDoc.addPage([spreadWPt, pageHPt])
 
-    await renderPageInArea(
+    const leftResult = await renderPageInArea(
       pdfDoc, spreadPage, leftPage, photosById, placements,
       0, 0, pageWPt, pageHPt,
       albumStyle, pageHPt, ptToPx
     )
+    totalPhotos += leftResult.attempted
+    failedPhotos += leftResult.failed
 
     if (rightPage) {
-      await renderPageInArea(
+      const rightResult = await renderPageInArea(
         pdfDoc, spreadPage, rightPage, photosById, placements,
         pageWPt, 0, pageWPt, pageHPt,
         albumStyle, pageHPt, ptToPx
       )
+      totalPhotos += rightResult.attempted
+      failedPhotos += rightResult.failed
     }
 
     i += 2
@@ -673,8 +691,8 @@ export async function generatePdfFromBook(opts: GeneratePdfOptions): Promise<Uin
   await renderBackCoverPdf(pdfDoc, pageWPt, pageHPt, ptToPx)
 
   const bytes = await pdfDoc.save()
-  console.log('[PDF] Generado, tamaño:', (bytes.length / 1024 / 1024).toFixed(1), 'MB')
-  return bytes
+  console.log(`[PDF] ${spreadIdx} spreads, ${totalPhotos} fotos, ${failedPhotos} fallidas — ${(bytes.length / 1024 / 1024).toFixed(1)} MB`)
+  return { bytes, failedPhotos }
 }
 
 export function downloadPdf(bytes: Uint8Array, filename: string) {

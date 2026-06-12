@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react'
 import { readExif, type ExifData } from './exifReader'
 import { scorePhoto, type PhotoScore } from './photoScorer'
+import { MAX_PHOTOS } from '@/core/modules/upload/limits'
 
 export interface AnalyzedPhoto {
   id: string
@@ -33,16 +34,22 @@ export function usePhotoAnalysis() {
       console.warn('[Scoring] Skipping — no window')
       return []
     }
+
+    if (files.length > MAX_PHOTOS) {
+      console.warn(`[usePhotoAnalysis] Recibidas ${files.length} fotos, limitando a ${MAX_PHOTOS}`)
+      files = files.slice(0, MAX_PHOTOS)
+    }
+
     console.log('[Scoring] Iniciando análisis de', files.length, 'fotos')
     setProgress({ total: files.length, completed: 0, isAnalyzing: true, insights: [] })
 
-    const BATCH_SIZE = 5
+    const BATCH_SIZE = 3
     const results: AnalyzedPhoto[] = new Array(files.length)
 
     for (let i = 0; i < files.length; i += BATCH_SIZE) {
       const batch = files.slice(i, Math.min(i + BATCH_SIZE, files.length))
 
-      await Promise.all(
+      const settled = await Promise.allSettled(
         batch.map(async (file, batchIdx) => {
           const globalIdx = i + batchIdx
 
@@ -69,6 +76,15 @@ export function usePhotoAnalysis() {
           }
         })
       )
+
+      settled.forEach((result, batchIdx) => {
+        if (result.status === 'rejected') {
+          console.warn(
+            `[Scoring] Foto omitida (${batch[batchIdx].name}):`,
+            result.reason
+          )
+        }
+      })
 
       const completed = Math.min(i + BATCH_SIZE, files.length)
       const insight = generateInsight(results.filter(Boolean) as AnalyzedPhoto[], completed, files.length)
@@ -115,7 +131,8 @@ function sortByExif(photos: AnalyzedPhoto[]): AnalyzedPhoto[] {
   if (withDate.length < 2) return photos
 
   withDate.sort((a, b) =>
-    (a.exif.takenAt?.getTime() ?? 0) - (b.exif.takenAt?.getTime() ?? 0)
+    (a.exif.takenAt ? new Date(a.exif.takenAt).getTime() : 0) -
+    (b.exif.takenAt ? new Date(b.exif.takenAt).getTime() : 0)
   )
 
   return [...withDate, ...withoutDate]
@@ -124,26 +141,52 @@ function sortByExif(photos: AnalyzedPhoto[]): AnalyzedPhoto[] {
 async function compressFile(file: File, maxSize: number, quality: number): Promise<string> {
   if (typeof window === 'undefined') return ''
   return new Promise((resolve, reject) => {
-    const img = new window.Image()
     const url = URL.createObjectURL(file)
-    img.onload = () => {
-      let { width, height } = img
-      if (width > height && width > maxSize) {
-        height = Math.round(height * maxSize / width)
-        width = maxSize
-      } else if (height > maxSize) {
-        width = Math.round(width * maxSize / height)
-        height = maxSize
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, width, height)
+    const img = new window.Image()
+    let settled = false
+
+    const cleanup = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeoutId)
       URL.revokeObjectURL(url)
-      resolve(canvas.toDataURL('image/jpeg', quality))
     }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load failed')) }
+
+    const timeoutId = setTimeout(() => {
+      if (settled) return
+      cleanup()
+      reject(new Error(`compress timeout: ${file.name}`))
+    }, 10000)
+
+    img.onload = () => {
+      try {
+        let { width, height } = img
+        if (width > height && width > maxSize) {
+          height = Math.round(height * maxSize / width)
+          width = maxSize
+        } else if (height > maxSize) {
+          width = Math.round(width * maxSize / height)
+          height = maxSize
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, width, height)
+        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        cleanup()
+        resolve(dataUrl)
+      } catch {
+        cleanup()
+        reject(new Error(`compress canvas failed: ${file.name}`))
+      }
+    }
+
+    img.onerror = () => {
+      cleanup()
+      reject(new Error(`compress failed: ${file.name}`))
+    }
+
     img.src = url
   })
 }

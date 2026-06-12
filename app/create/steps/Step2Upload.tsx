@@ -13,9 +13,10 @@ import ContinueButton from "@/components/create/ContinueButton";
 import { X, Star, Move } from "lucide-react";
 import { useWizard, PhotoItem } from "@/components/create/WizardProvider";
 import { usePhotoAnalysis } from "@/core/modules/scoring/usePhotoAnalysis";
-import { getPhotoCacheEntry, updatePhotoCacheEntry, hasFullAnalysis } from "@/core/modules/upload/photoCache";
+import { getPhotoCacheEntry, updatePhotoCacheEntry, hasFullAnalysis, clearPixiaCache } from "@/core/modules/upload/photoCache";
 import { useUpload } from "@/core/modules/upload/useUpload";
 import { useSession } from "@/core/modules/session/useSession";
+import { MIN_PHOTOS, MAX_PHOTOS } from "@/core/modules/upload/limits";
 
 // Genera thumbnail 150x150 base64 (~8-12KB por foto) para grids rápidos
 async function generateThumbnail(file: File, maxSize = 150): Promise<string | null> {
@@ -47,6 +48,31 @@ async function generateThumbnail(file: File, maxSize = 150): Promise<string | nu
   }
 }
 
+type ImageFormat = 'jpeg' | 'png' | 'webp' | 'heic' | 'unknown'
+
+async function detectImageFormat(file: File): Promise<ImageFormat> {
+  try {
+    const buffer = await file.slice(0, 12).arrayBuffer()
+    const b = new Uint8Array(buffer)
+
+    // JPEG: FF D8 FF
+    if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'jpeg'
+    // PNG: 89 50 4E 47
+    if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'png'
+    // WebP: RIFF....WEBP (bytes 0-3 = RIFF, bytes 8-11 = WEBP)
+    if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+        b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'webp'
+    // HEIC/HEIF: bytes 4-7 = 'ftyp', bytes 8-11 = brand
+    if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+      const brand = String.fromCharCode(b[8], b[9], b[10], b[11]).toLowerCase()
+      if (['heic', 'heix', 'hevc', 'mif1', 'msf1', 'avif'].some(t => brand.startsWith(t))) return 'heic'
+    }
+    return 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
 export default function Step2Upload() {
   const { state, dispatch } = useWizard();
   const photos = state.photos;
@@ -54,6 +80,8 @@ export default function Step2Upload() {
   const { sessionId } = useSession();
   const { uploadProgress, uploadPhotos } = useUpload(sessionId || '');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [minPhotosError, setMinPhotosError] = useState<string | null>(null);
+  const [heicWarning, setHeicWarning] = useState<string | null>(null);
 
   const count = useMotionValue(0);
   const rounded = useTransform(count, (latest) => Math.round(latest));
@@ -64,7 +92,38 @@ export default function Step2Upload() {
       setIsProcessing(true)
 
       try {
-        const newPhotos: PhotoItem[] = acceptedFiles.map((file) => ({
+        // Detectar formato real por magic bytes antes de cualquier procesamiento
+        const formats = await Promise.all(acceptedFiles.map(detectImageFormat))
+        const validFiles = acceptedFiles.filter((_, i) => {
+          const fmt = formats[i]
+          return fmt === 'jpeg' || fmt === 'png' || fmt === 'webp'
+        })
+        const heicCount = formats.filter(f => f === 'heic').length
+        const unknownCount = formats.filter(f => f === 'unknown').length
+        const rejectedCount = heicCount + unknownCount
+
+        if (rejectedCount > 0) {
+          if (heicCount > 0) {
+            setHeicWarning(
+              `${heicCount} foto${heicCount > 1 ? 's' : ''} ` +
+              `están en formato HEIC, que los navegadores no pueden procesar. ` +
+              `Tip: si subes directo desde tu iPhone, se convierten automáticamente. ` +
+              `Si las descargaste a tu computador, conviértelas a JPG primero.`
+            )
+          } else {
+            setHeicWarning(
+              `${unknownCount} foto${unknownCount > 1 ? 's' : ''} ` +
+              `tienen un formato no soportado y fueron omitidas. ` +
+              `Usa JPG, PNG o WebP.`
+            )
+          }
+        } else {
+          setHeicWarning(null)
+        }
+
+        if (validFiles.length === 0) return
+
+        const newPhotos: PhotoItem[] = validFiles.map((file) => ({
           id: crypto.randomUUID(),
           file,
           priority: false,
@@ -73,7 +132,7 @@ export default function Step2Upload() {
         // Mostrar thumbnails inmediatamente — no esperar análisis
         dispatch({
           type: "SET_PHOTOS",
-          payload: [...photos, ...newPhotos].slice(0, 60),
+          payload: [...photos, ...newPhotos].slice(0, MAX_PHOTOS),
         });
 
         // Separar files con análisis cacheado de los nuevos
@@ -89,8 +148,8 @@ export default function Step2Upload() {
         }> = []
         const filesToAnalyze: File[] = []
 
-        for (let idx = 0; idx < acceptedFiles.length; idx++) {
-          const file = acceptedFiles[idx]
+        for (let idx = 0; idx < validFiles.length; idx++) {
+          const file = validFiles[idx]
           const entry = getPhotoCacheEntry(file)
           if (hasFullAnalysis(entry)) {
             cachedItems.push({
@@ -126,7 +185,7 @@ export default function Step2Upload() {
             file: c.file,
             orientation: c.orientation,
             score: c.score,
-            exif: { takenAt: c.takenAt, gps: c.gps },
+            exif: { takenAt: c.takenAt?.toISOString() ?? null, lat: c.gps?.lat, lng: c.gps?.lng },
           })),
           ...newAnalysis,
         ]
@@ -153,8 +212,8 @@ export default function Step2Upload() {
           updatePhotoCacheEntry(item.file, {
             orientation: item.orientation,
             score: item.score,
-            takenAt: item.exif?.takenAt?.toISOString() || null,
-            gps: item.exif?.gps || null,
+            takenAt: item.exif?.takenAt || null,
+            gps: (item.exif?.lat != null && item.exif?.lng != null) ? { lat: item.exif.lat, lng: item.exif.lng } : null,
             thumbnail: thumbnails[i] || undefined,
           })
         }
@@ -166,8 +225,8 @@ export default function Step2Upload() {
               id: p.id,
               orientation: p.orientation,
               score: p.score,
-              takenAt: p.exif.takenAt?.toISOString() || null,
-              gps: p.exif.gps || null,
+              takenAt: p.exif.takenAt || null,
+              gps: (p.exif.lat != null && p.exif.lng != null) ? { lat: p.exif.lat, lng: p.exif.lng } : null,
               originalIndex: index,
               thumbnail: thumbnails[index],
             })))
@@ -215,15 +274,30 @@ export default function Step2Upload() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { "image/*": [] },
+    // Tipos explícitos: en iOS, declarar JPEG hace que el sistema convierta HEIC automáticamente
+    accept: {
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+    },
   });
 
   useEffect(() => {
     count.set(photos.length);
   }, [photos.length, count]);
 
-  const unlocked = photos.length >= 5;
+  const unlocked = photos.length >= MIN_PHOTOS;
   const priorityCount = photos.filter((p) => p.priority).length;
+
+  const handleContinue = () => {
+    if (photos.length < MIN_PHOTOS) {
+      setMinPhotosError(
+        `Necesitas al menos ${MIN_PHOTOS} fotos para crear tu álbum. Llevas ${photos.length}.`
+      )
+      return
+    }
+    setMinPhotosError(null)
+  }
 
   return (
     <div className="w-full">
@@ -256,7 +330,7 @@ export default function Step2Upload() {
           </p>
 
           <motion.p className="text-white/50 text-sm">
-            <motion.span>{rounded}</motion.span> / 60 fotos
+            <motion.span>{rounded}</motion.span> / {MAX_PHOTOS} fotos (mínimo {MIN_PHOTOS})
           </motion.p>
 
           {priorityCount > 0 && (
@@ -267,6 +341,33 @@ export default function Step2Upload() {
           )}
         </div>
       </motion.div>
+
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ textAlign: 'right', marginTop: 6 }}>
+          <button
+            type="button"
+            onClick={clearPixiaCache}
+            style={{ fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+          >
+            🧹 Limpiar caché (dev)
+          </button>
+        </div>
+      )}
+
+      {heicWarning && (
+        <div style={{
+          marginTop: 12,
+          padding: '12px 16px',
+          background: 'rgba(251,191,36,0.08)',
+          border: '1px solid rgba(251,191,36,0.2)',
+          borderRadius: 8,
+          fontSize: 13,
+          color: '#fbbf24',
+          lineHeight: 1.6,
+        }}>
+          {heicWarning}
+        </div>
+      )}
 
       {progress.isAnalyzing && (
         <div style={{
@@ -393,8 +494,24 @@ export default function Step2Upload() {
         </Reorder.Group>
       )}
 
-      <ContinueButton disabled={isProcessing || !unlocked} />
+      {minPhotosError && (
+        <div style={{
+          marginTop: '12px',
+          padding: '10px 14px',
+          background: 'rgba(255,60,60,0.1)',
+          border: '1px solid rgba(255,60,60,0.25)',
+          borderRadius: '8px',
+          fontSize: '13px',
+          color: '#ff8080',
+          textAlign: 'center',
+        }}>
+          {minPhotosError}
+        </div>
+      )}
+
+      <div onClick={handleContinue}>
+        <ContinueButton disabled={isProcessing || !unlocked} />
+      </div>
     </div>
   );
 }
-

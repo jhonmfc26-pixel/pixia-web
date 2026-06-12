@@ -2,16 +2,39 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'edge'
 
+const MAX_DESCRIPTIONS = 100
+const MAX_DESCRIPTION_LENGTH = 2000
+const MAX_STRING_FIELD_LENGTH = 200
+
 export async function POST(req: NextRequest) {
   try {
-    const { photoDescriptions, story, style, emotion } = await req.json()
+    const body = await req.json()
+    const { photoDescriptions, story, style, emotion } = body
 
-    console.log('[Editorial] Iniciando con', photoDescriptions?.length, 'descripciones')
-    console.log('[Editorial] API key existe:', !!process.env.ANTHROPIC_API_KEY)
-    console.log('[Editorial] API key prefix:', process.env.ANTHROPIC_API_KEY?.slice(0, 10))
+    // Validar estructura mínima del payload
+    if (!Array.isArray(photoDescriptions) || photoDescriptions.length === 0) {
+      return NextResponse.json({ error: 'photoDescriptions debe ser un array no vacío' }, { status: 400 })
+    }
+    if (photoDescriptions.length > MAX_DESCRIPTIONS) {
+      return NextResponse.json({ error: `Máximo ${MAX_DESCRIPTIONS} descripciones` }, { status: 400 })
+    }
+    if (typeof story !== 'string' || typeof style !== 'string' || typeof emotion !== 'string') {
+      return NextResponse.json({ error: 'story, style y emotion son requeridos' }, { status: 400 })
+    }
+    if (story.length > MAX_STRING_FIELD_LENGTH || style.length > MAX_STRING_FIELD_LENGTH || emotion.length > MAX_STRING_FIELD_LENGTH) {
+      return NextResponse.json({ error: 'Campos de texto demasiado largos' }, { status: 400 })
+    }
+    for (const d of photoDescriptions) {
+      if (typeof d !== 'string' || d.length > MAX_DESCRIPTION_LENGTH) {
+        return NextResponse.json({ error: 'Descripción de foto inválida o demasiado larga' }, { status: 400 })
+      }
+    }
 
     const descriptions = photoDescriptions as string[]
     const total = descriptions.length
+
+    console.log('[Editorial] Iniciando con', total, 'descripciones')
+    console.log('[Editorial] API key existe:', !!process.env.ANTHROPIC_API_KEY)
 
     const enrichedDescriptions = descriptions.map((d, i) => {
       const position = total <= 1 ? 0 : i / (total - 1)
@@ -96,7 +119,6 @@ Responde SOLO JSON, sin markdown ni explicaciones:
         .filter((spread: { photoIndices: number[] }) => spread.photoIndices.length > 0)
 
       editorial.spreads = deduplicatedSpreads
-      console.log('[Editorial] Índices únicos usados:', [...usedIndices])
       console.log('[Editorial] Spreads tras deduplicar:', deduplicatedSpreads.length)
 
       return NextResponse.json({ editorial })

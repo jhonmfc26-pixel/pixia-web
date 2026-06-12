@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { buildPixiaBookWithAI } from '../../../core/engine/buildPixiaBook'
 import { saveBookToLocal } from '../../../core/engine/localBookStorage'
 import { useWizard } from '../../../components/create/WizardProvider'
+import { MIN_PHOTOS, MAX_PHOTOS } from '@/core/modules/upload/limits'
 
 async function fileToCompressedBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -36,7 +37,7 @@ async function fileToCompressedBase64(file: File): Promise<string> {
       resolve(canvas.toDataURL('image/jpeg', 0.70))
     }
 
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Error cargando imagen')) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Error cargando imagen: ${file.name}`)) }
 
     img.src = url
   })
@@ -81,7 +82,7 @@ export default function ResultPage() {
         // Reordenar state.photos según el orden cronológico del análisis
         const filesToProcess = sortedAnalysis.length === state.photos.length
           ? sortedAnalysis.map((a: any) => state.photos[a.originalIndex])
-          : state.photos.slice(0, 60)
+          : state.photos.slice(0, MAX_PHOTOS)
 
         console.log('[Result] Orden de archivos:',
           sortedAnalysis.map((a: any) => `${a.originalIndex}→${a.takenAt || 'sin-fecha'}`)
@@ -91,11 +92,11 @@ export default function ResultPage() {
           new Set(analysis.map((a: any) => a.id)).size, 'de', analysis.length
         )
 
-        const photos = await Promise.all(
-          filesToProcess.slice(0, 60).map(async (p: any, index: number) => {
+        const results = await Promise.allSettled(
+          filesToProcess.slice(0, MAX_PHOTOS).map(async (p: any, index: number) => {
             const meta = sortedAnalysis[index]
             const r2Url = meta?.id ? r2Map.get(meta.id) : null
-            const src = r2Url || await fileToCompressedBase64(p.file)
+            const src = r2Url ?? await fileToCompressedBase64(p.file)
             return {
               id: meta?.id || `photo-${index}`,
               src,
@@ -111,6 +112,23 @@ export default function ResultPage() {
             }
           })
         )
+
+        const photos: any[] = []
+        for (const result of results) {
+          if (result.status === 'fulfilled') {
+            photos.push(result.value)
+          } else {
+            console.warn('[Result] Foto omitida:', result.reason?.message ?? result.reason)
+          }
+        }
+
+        if (photos.length < MIN_PHOTOS) {
+          setError(
+            `No se pudieron procesar suficientes fotos. Solo ${photos.length} de ${filesToProcess.length} se cargaron correctamente. ` +
+            `Necesitas al menos ${MIN_PHOTOS} fotos válidas. Vuelve atrás y agrega más.`
+          )
+          return
+        }
 
         console.log('[Result] Fotos con R2 URL:', photos.filter((p: any) => p.url?.startsWith('http')).length)
         console.log('[Result] orden después de sort:',
@@ -141,11 +159,18 @@ export default function ResultPage() {
 
   return (
     <div>
-      Generando tu libro...
-      {error && (
-        <div style={{ color: 'red', fontSize: 12, marginTop: 16, maxWidth: 300, textAlign: 'center' }}>
-          {error}
+      {error ? (
+        <div style={{ color: 'red', fontSize: 14, marginTop: 16, maxWidth: 360, textAlign: 'center' }}>
+          <p>{error}</p>
+          <button
+            onClick={() => router.back()}
+            style={{ marginTop: 12, padding: '8px 16px', cursor: 'pointer' }}
+          >
+            Volver a edición
+          </button>
         </div>
+      ) : (
+        'Generando tu libro...'
       )}
     </div>
   )

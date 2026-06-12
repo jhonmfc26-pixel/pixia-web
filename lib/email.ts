@@ -181,7 +181,8 @@ PIXIA · Álbumes que perduran
       return { ok: false, error: result.error.message }
     }
 
-    console.log('[email] Confirmación enviada a', data.customerEmail, '- id:', result.data?.id)
+    const masked = `${data.customerEmail[0]}***@${data.customerEmail.split('@')[1] ?? ''}`
+    console.log('[email] Confirmación enviada a', masked, '- id:', result.data?.id)
     return { ok: true }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'

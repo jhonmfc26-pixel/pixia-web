@@ -225,24 +225,29 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
       caption?: string
     }
 
+    function sanitizeIndices(indices: number[], max: number, used: Set<number>): number[] {
+      return indices.filter(i => {
+        if (!Number.isInteger(i) || i < 0 || i >= max) {
+          console.warn('[Pixia] Índice inválido propuesto por IA, descartado:', i)
+          return false
+        }
+        if (used.has(i)) return false
+        return true
+      })
+    }
+
     const usedIndices = new Set<number>()
 
     const spreads = (editorial.spreads as AISSpread[])
       .map((s, index) => {
-        const uniqueIndices = (s.photoIndices ?? []).filter((i) => {
-          if (usedIndices.has(i)) return false
-          usedIndices.add(i)
-          return true
-        })
+        const validIndices = sanitizeIndices(s.photoIndices ?? [], draft.photos.length, usedIndices)
+        validIndices.forEach(i => usedIndices.add(i))
 
-        if (uniqueIndices.length === 0) return null
+        if (validIndices.length === 0) return null
 
-        const photos = uniqueIndices
+        const photos = validIndices
           .map((i) => draft.photos[i])
-          .filter((p) => p !== undefined)
-          .map((p) => ({ id: p!.id, src: p!.src, orientation: p!.orientation }))
-
-        if (photos.length === 0) return null
+          .map((p) => ({ id: p.id, src: p.src, orientation: p.orientation }))
 
         const layout = (() => {
           if (s.layout === 'split-horizontal' && photos.length < 2) return 'full-bleed'
@@ -304,6 +309,13 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
       }
 
       console.log('[Pixia] Total spreads finales:', spreads.length, '— fotos garantizadas:', draft.photos.length)
+    }
+
+    // Invariante: detectar IDs duplicados en spreads finales
+    const allIds = spreads.flatMap(s => s.photos.map(p => p.id))
+    const dupIds = allIds.filter((id, i) => allIds.indexOf(id) !== i)
+    if (dupIds.length > 0) {
+      console.error('[Pixia] ⚠️ IDs DUPLICADOS en spreads:', [...new Set(dupIds)])
     }
 
     return {

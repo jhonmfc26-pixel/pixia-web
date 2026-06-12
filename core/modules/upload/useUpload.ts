@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { getPhotoCacheEntry, updatePhotoCacheEntry } from './photoCache'
+import { compressInWorker } from './compressWorkerPool'
 
 export interface UploadedPhoto {
   photoId: string
@@ -74,14 +75,38 @@ export function useUpload(sessionId: string) {
 
     const results: UploadedPhoto[] = [...cachedResults]
     const failed: string[] = []
-    const BATCH_SIZE = 2
+    const BATCH_SIZE = 4
 
     for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
       const batch = filesToUpload.slice(i, i + BATCH_SIZE)
+      // Registra el tamaño real subido (blob comprimido o file original)
+      // para que el log post-upload sea verídico
+      const actualUploadSizes: number[] = new Array(batch.length).fill(0)
+
       const batchResults = await Promise.allSettled(
-        batch.map(async ({ file, photoId }) => {
+        batch.map(async ({ file, photoId }, batchIdx) => {
+          // Comprimir en Web Worker (off-thread) — no bloquea el main thread
+          let uploadBody: Blob = file
+          try {
+            const compressed = await compressInWorker(file)
+            if (compressed.savedRatio > 0) {
+              uploadBody = compressed.blob
+              const beforeMb = (compressed.sizeBefore / 1024 / 1024).toFixed(2)
+              const afterMb = (compressed.sizeAfter / 1024 / 1024).toFixed(2)
+              const savedPct = Math.round(compressed.savedRatio * 100)
+              console.log(`[Upload] Comprimido ${photoId}: ${beforeMb}MB → ${afterMb}MB (-${savedPct}%)`)
+            }
+            // savedRatio === 0 → archivo ya era pequeño (<1.5MB), se sube el File original
+          } catch (err) {
+            // Si la compresión falla, subir el original (degradación graciosa)
+            console.warn('[Upload] Compresión falló, subiendo original:', photoId, err)
+            uploadBody = file
+          }
+
+          actualUploadSizes[batchIdx] = uploadBody.size
+
           const formData = new FormData()
-          formData.append('file', file)
+          formData.append('file', uploadBody, file.name)
           formData.append('sessionId', sessionId)
           formData.append('photoId', photoId)
           const res = await fetch('/api/upload', {
@@ -109,7 +134,12 @@ export function useUpload(sessionId: string) {
             r2Key: result.value.r2Key,
             url: result.value.url,
           })
-          console.log('[Upload] OK + cached:', batch[idx].photoId, 'size:', batch[idx].file.size)
+          const uploadedMb = (actualUploadSizes[idx] / 1024 / 1024).toFixed(2)
+          const originalMb = (batch[idx].file.size / 1024 / 1024).toFixed(2)
+          console.log(
+            `[Upload] OK + cached: ${batch[idx].photoId}`,
+            `subido: ${uploadedMb}MB (original: ${originalMb}MB)`
+          )
         } else {
           failed.push(batch[idx].photoId)
           console.error('[Upload] FAIL:', batch[idx].photoId,
