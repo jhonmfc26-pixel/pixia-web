@@ -60,13 +60,13 @@ export const pixiaBookMock: PixiaBook = {
       {
         id: 's1',
         act: 'inicio',
-        layout: 'single-full',
+        layout: 'single',
         photos: [{ id: 'p1', src: '/story/anniversary.jpg' }]
       },
       {
         id: 's2',
         act: 'desarrollo',
-        layout: 'double-balanced',
+        layout: 'side-2',
         photos: [
           { id: 'p2', src: '/story/trip.jpg' },
           { id: 'p3', src: '/story/honeymoon.jpg' }
@@ -75,13 +75,13 @@ export const pixiaBookMock: PixiaBook = {
       {
         id: 's3',
         act: 'climax',
-        layout: 'single-impact',
+        layout: 'single',
         photos: [{ id: 'p4', src: '/story/wedding.jpg' }]
       },
       {
         id: 's4',
         act: 'cierre',
-        layout: 'single-minimal',
+        layout: 'single',
         photos: [{ id: 'p5', src: '/story/other.jpg' }]
       }
     ]

@@ -1,9 +1,11 @@
+import type { LayoutId } from '@/core/modules/album/layouts/registry'
+
 interface Props {
   photoId: string
   spread: {
     id: string
     act: string
-    layout: string
+    layout: LayoutId
     photos: { id: string }[]
   }
   onClose: () => void

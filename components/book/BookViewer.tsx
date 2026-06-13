@@ -105,7 +105,7 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
     const act = spread.act
     const caption = spread.caption ?? ''
 
-    if (spread.layout === 'full-bleed') {
+    if (spread.layout === 'single') {
       const photo = spread.photos[0] ?? null
 
       // Left page
@@ -148,7 +148,7 @@ export default function BookViewer({ book, onEmphasize, onReduceImpact }: Props)
         </div>
       )
     } else {
-      // split-horizontal and editorial-right
+      // Layouts de 2 fotos del registry
       const leftPhoto  = spread.photos[0] ?? null
       const rightPhoto = spread.photos[1] ?? null
 

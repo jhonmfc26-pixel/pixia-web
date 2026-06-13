@@ -1,6 +1,7 @@
 // core/editorial/albumBlueprint.ts
 
 import { ActId, NarrativeTone } from '@/core/domain/PixiaBook'
+import type { LayoutId } from '@/core/modules/album/layouts/registry'
 
 export interface AlbumBlueprint {
   albumId: string
@@ -26,7 +27,7 @@ export interface AlbumBlueprint {
   spreads: {
     id: string
     act: ActId
-    layout: string
+    layout: LayoutId
     photos: {
       id: string
       src: string

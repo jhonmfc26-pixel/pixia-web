@@ -1,6 +1,8 @@
 'use client'
 import { useState, useCallback } from 'react'
-import type { AlbumBlueprint, PhotoAsset, LayoutType } from '@/core/contracts/AlbumBlueprint'
+import type { AlbumBlueprint, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { LayoutId } from '@/core/modules/album/layouts/registry'
+import { PHOTOS_PER_LAYOUT } from '@/core/modules/album/types'
 import type { EditorState } from './types'
 
 export function useEditor(book: AlbumBlueprint) {
@@ -21,9 +23,9 @@ export function useEditor(book: AlbumBlueprint) {
 
     const alternatives: PhotoAsset[] = []
 
-    const compatibleLayouts: LayoutType[] = spread.photos.length === 1
-      ? ['full', 'portrait']
-      : ['duo-v', 'duo-h', 'hero-2']
+    const compatibleLayouts: LayoutId[] = spread.photos.length === 1
+      ? ['single', 'portrait']
+      : ['side-2', 'stack-2', 'portrait-pair']
 
     setState({
       selectedSpreadId: spreadId,
@@ -46,18 +48,12 @@ export function useEditor(book: AlbumBlueprint) {
     setState(prev => ({ ...prev, isDirty: true, selectedPhotoId: null }))
   }, [])
 
-  const changeLayout = useCallback((spreadId: string, newLayout: LayoutType) => {
-    const PHOTOS_NEEDED: Record<LayoutType, number> = {
-      'full': 1, 'double': 1, 'portrait': 1,
-      'duo-v': 2, 'duo-h': 2,
-      'trio': 3, 'hero-2': 3,
-    }
-
+  const changeLayout = useCallback((spreadId: string, newLayout: LayoutId) => {
     setSpreads(prev => {
       const idx = prev.findIndex(s => s.id === spreadId)
       if (idx === -1) return prev
 
-      const needed  = PHOTOS_NEEDED[newLayout]
+      const needed  = PHOTOS_PER_LAYOUT[newLayout]
       const current = prev[idx]
       const next    = prev[idx + 1]
       const pool    = [...current.photos, ...(next?.photos ?? [])]
@@ -77,7 +73,7 @@ export function useEditor(book: AlbumBlueprint) {
         newSpreads[idx + 1] = {
           ...next,
           photos: forNext,
-          layout: forNext.length >= 2 ? 'duo-v' : 'full',
+          layout: forNext.length >= 2 ? 'side-2' : 'single',
         }
       }
 

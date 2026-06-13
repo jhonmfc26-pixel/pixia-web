@@ -49,13 +49,13 @@ export const albumBlueprintMock: AlbumBlueprint = {
     {
       id: 'spread-01',
       act: 'inicio',
-      layout: 'single-full',
+      layout: 'single',
       photos: [{ id: 'p1', src: '/mock/photos/01.jpg' }]
     },
     {
       id: 'spread-02',
       act: 'desarrollo',
-      layout: 'double-balanced',
+      layout: 'side-2',
       photos: [
         { id: 'p2', src: '/mock/photos/02.jpg' },
         { id: 'p3', src: '/mock/photos/03.jpg' }
@@ -64,7 +64,7 @@ export const albumBlueprintMock: AlbumBlueprint = {
     {
       id: 'spread-03',
       act: 'climax',
-      layout: 'double-impact',
+      layout: 'stack-2',
       photos: [
         { id: 'p4', src: '/mock/photos/04.jpg' },
         { id: 'p5', src: '/mock/photos/05.jpg' }
@@ -73,7 +73,7 @@ export const albumBlueprintMock: AlbumBlueprint = {
     {
       id: 'spread-04',
       act: 'cierre',
-      layout: 'single-minimal',
+      layout: 'single',
       photos: [{ id: 'p6', src: '/mock/photos/06.jpg' }]
     }
   ]

@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function EditableSpread({ spread, onSelectPhoto }: Props) {
-  const isSingle = spread.layout.includes('single')
+  const isSingle = spread.layout === 'single'
   const actColor = ACT_COLORS[spread.act]
 
   return (

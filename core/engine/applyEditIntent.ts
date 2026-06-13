@@ -18,7 +18,7 @@ export function applyEditIntent(
 
     const spread = newBook.content.spreads[index]
 
-    spread.layout = 'single-impact'
+    spread.layout = 'single'
     spread.act = 'climax'
 
     newBook.narrative.acts.forEach(act => {
@@ -42,7 +42,7 @@ export function applyEditIntent(
 
     const spread = newBook.content.spreads[index]
 
-    spread.layout = 'double-balanced'
+    spread.layout = 'side-2'
     spread.act = 'desarrollo'
 
     newBook.narrative.acts.forEach(act => {
