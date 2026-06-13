@@ -1,47 +1,13 @@
 import type { ActId } from '@/core/contracts/AlbumBlueprint'
+import { LAYOUTS, type LayoutId } from './layouts/registry'
 
-// Layouts por PÁGINA individual
-export type PageLayout =
-  | 'single'
-  | 'stack-2'
-  | 'side-2'
-  | 'grid-3'
-  | 'grid-4'
-  | 'portrait'
-  | 'hero-spread'
-  | 'hero-3-top'
-  | 'hero-2-bottom'
-  | 'hero-3-left'
-  | 'hero-3-right'
-  | 'trio-row'
-  | 'trio-column'
-  | 'trio-portrait'
-  | 'hero-4-grid'
-  | 'mosaic-5'
-  | 'portrait-pair'
-  | 'quad-mixed'
+// Layouts por PÁGINA individual. El vocabulario nace en el registry.
+export type PageLayout = LayoutId
 
-// Cuántas fotos consume cada layout
-export const PHOTOS_PER_LAYOUT: Record<PageLayout, number> = {
-  'single': 1,
-  'stack-2': 2,
-  'side-2': 2,
-  'grid-3': 3,
-  'grid-4': 4,
-  'portrait': 1,
-  'hero-spread': 1,
-  'hero-3-top': 4,
-  'hero-2-bottom': 3,
-  'hero-3-left': 4,
-  'hero-3-right': 4,
-  'trio-row': 3,
-  'trio-column': 3,
-  'trio-portrait': 3,
-  'hero-4-grid': 5,
-  'mosaic-5': 5,
-  'portrait-pair': 2,
-  'quad-mixed': 3,
-}
+// Cuántas fotos consume cada layout, derivado del registry.
+export const PHOTOS_PER_LAYOUT = Object.fromEntries(
+  LAYOUTS.map(layout => [layout.id, layout.photoCount])
+) as Record<PageLayout, number>
 
 // Ajuste de foto dentro de su marco (zoom + pan)
 export interface PhotoPlacement {

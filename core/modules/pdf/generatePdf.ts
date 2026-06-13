@@ -6,6 +6,7 @@ import type { LayoutConfig, PhotoPlacement, Page } from '@/core/modules/album/ty
 import { DEFAULT_PLACEMENT } from '@/core/modules/album/types'
 import { buildPages, extractPhotoPool } from '@/core/modules/album/pageEngine'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
+import { computeObjectPosition } from '@/core/modules/album/smartCrop'
 import type { LayoutSchema } from '@/core/modules/album/layouts/types'
 import { getFormatById } from '@/core/modules/album/formats/registry'
 import { cmToPt, ptToPxFactor } from '@/core/modules/album/formats/units'
@@ -452,6 +453,16 @@ async function renderPageInArea(
       ? DEFAULT_PLACEMENT
       : (placements.get(photo.id) ?? DEFAULT_PLACEMENT)
 
+    // Smart crop: igual que el viewer — mismo cálculo, cero reimplementación
+    const isDefault = effectivePlacement.offsetX === 0 && effectivePlacement.offsetY === 0 && effectivePlacement.zoom === 1
+    let resolvedObjectPosition = slotCfg?.objectPosition
+    if (!resolvedObjectPosition && isDefault && photo.meaningRegions?.length) {
+      const photoAspect = (photo.width && photo.height) ? photo.width / photo.height
+        : (photo.orientation === 'portrait' ? 3 / 4 : 4 / 3)
+      const { x, y } = computeObjectPosition(photoAspect, rect.w / rect.h, photo.meaningRegions.map(r => r.rect), photo.id)
+      resolvedObjectPosition = `${x}% ${y}%`
+    }
+
     try {
       const bytes = await renderImageToCanvasBytes({
         url: normalizeR2Url(photo.url),
@@ -459,7 +470,7 @@ async function renderPageInArea(
         targetHPt: rect.h,
         placement: effectivePlacement,
         ptToPx,
-        objectPositionOverride: slotCfg?.objectPosition,
+        objectPositionOverride: resolvedObjectPosition,
       })
       const img = await pdfDoc.embedJpg(bytes)
 
@@ -645,12 +656,21 @@ export async function generatePdfFromBook(opts: GeneratePdfOptions): Promise<{ b
       if (photo?.url) {
         totalPhotos++
         try {
+          const heroPlacement = placements.get(photo.id) ?? DEFAULT_PLACEMENT
+          const heroIsDefault = heroPlacement.offsetX === 0 && heroPlacement.offsetY === 0 && heroPlacement.zoom === 1
+          let heroObjectPosition: string | undefined
+          if (heroIsDefault && photo.meaningRegions?.length) {
+            const photoAspect = (photo.width && photo.height) ? photo.width / photo.height : 4 / 3
+            const { x, y } = computeObjectPosition(photoAspect, spreadWPt / pageHPt, photo.meaningRegions.map(r => r.rect), photo.id)
+            heroObjectPosition = `${x}% ${y}%`
+          }
           const imgBytes = await renderImageToCanvasBytes({
             url: normalizeR2Url(photo.url),
             targetWPt: spreadWPt,
             targetHPt: pageHPt,
-            placement: placements.get(photo.id) ?? DEFAULT_PLACEMENT,
+            placement: heroPlacement,
             ptToPx,
+            objectPositionOverride: heroObjectPosition,
           })
           const img = await pdfDoc.embedJpg(imgBytes)
           spreadPage.drawImage(img, { x: 0, y: 0, width: spreadWPt, height: pageHPt })

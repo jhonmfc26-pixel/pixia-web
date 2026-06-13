@@ -1,15 +1,17 @@
 'use client'
+import type { MeaningRegion } from '@/core/contracts/AlbumBlueprint'
 
 /**
  * Incrementar cada vez que cambie la lógica de análisis (readExif, scoring, etc).
  * Invalida automáticamente el caché viejo sin borrar los datos de upload (r2Key/url).
+ * v3 — añade detección de caras (meaningRegions) para smart crop.
  */
-export const ANALYSIS_VERSION = 2
+export const ANALYSIS_VERSION = 3
 
 const CACHE_KEY = 'pixia_photo_cache'
 
 // Campos que pertenecen al análisis — se invalidan con ANALYSIS_VERSION
-const ANALYSIS_FIELDS = new Set(['orientation', 'score', 'takenAt', 'gps', 'thumbnail'])
+const ANALYSIS_FIELDS = new Set(['orientation', 'score', 'takenAt', 'gps', 'thumbnail', 'meaningRegions'])
 
 export interface PhotoCacheEntry {
   /** Versión del análisis con que se generaron estos datos. */
@@ -27,6 +29,7 @@ export interface PhotoCacheEntry {
   takenAt?: string | null
   gps?: { lat: number; lng: number } | null
   thumbnail?: string
+  meaningRegions?: MeaningRegion[]
 }
 
 export function fileToKey(file: File): string {

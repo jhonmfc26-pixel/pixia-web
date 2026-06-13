@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { PhotoPlacement } from '@/core/modules/album/types'
+import { computeObjectPosition } from '@/core/modules/album/smartCrop'
 
 interface EditorPhotoFrameProps {
   photo: PhotoAsset
@@ -19,20 +20,41 @@ export default function EditorPhotoFrame({
   onStartAdjust, onEndAdjust, onUpdatePlacement, onReplace, onDelete,
 }: EditorPhotoFrameProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const [slotAspect, setSlotAspect] = useState(1)
   const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const posX = 50 + placement.offsetX
-  const posY = 50 + placement.offsetY
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect
+      if (height > 0) setSlotAspect(width / height)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const isDefault = placement.offsetX === 0 && placement.offsetY === 0 && placement.zoom === 1
+  const photoAspect = (photo.width && photo.height) ? photo.width / photo.height
+    : (photo.orientation === 'portrait' ? 3 / 4 : 4 / 3)
+  const smartPos = isDefault
+    ? computeObjectPosition(photoAspect, slotAspect, (photo.meaningRegions ?? []).map(r => r.rect), photo.id)
+    : null
+
+  const posX = smartPos ? smartPos.x : 50 + placement.offsetX
+  const posY = smartPos ? smartPos.y : 50 + placement.offsetY
   const safeZoom = Math.max(1, placement.zoom)
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isAdjusting) return
     setIsDragging(true)
-    dragStart.current = {
-      x: e.clientX, y: e.clientY,
-      offsetX: placement.offsetX,
-      offsetY: placement.offsetY,
-    }
+    // Al empezar a arrastrar, convertir la posición smart en offset explícito
+    // para que el drag parta de donde se ve la imagen, no de (0,0)
+    const initOffX = smartPos ? smartPos.x - 50 : placement.offsetX
+    const initOffY = smartPos ? smartPos.y - 50 : placement.offsetY
+    if (smartPos) onUpdatePlacement({ zoom: placement.zoom, offsetX: initOffX, offsetY: initOffY })
+    dragStart.current = { x: e.clientX, y: e.clientY, offsetX: initOffX, offsetY: initOffY }
   }
 
   useEffect(() => {
@@ -66,6 +88,7 @@ export default function EditorPhotoFrame({
 
   return (
     <div
+      ref={containerRef}
       onMouseDown={handleMouseDown}
       onWheel={handleWheel}
       style={{

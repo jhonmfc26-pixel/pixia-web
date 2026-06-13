@@ -1,13 +1,6 @@
-export type PhotoOrientation = 'landscape' | 'portrait' | 'square'
+import type { LayoutId } from '@/core/modules/album/layouts/registry'
 
-export type LayoutType =
-  | 'full'       // 1 foto página completa
-  | 'double'     // 1 foto doble página (layflat)
-  | 'duo-v'      // 2 fotos verticales
-  | 'duo-h'      // 2 fotos horizontales
-  | 'trio'       // 3 fotos
-  | 'hero-2'     // 1 grande + 2 pequeñas
-  | 'portrait'   // 1 vertical con aire
+export type PhotoOrientation = 'landscape' | 'portrait' | 'square'
 
 export type ActId = 'inicio' | 'desarrollo' | 'climax' | 'cierre'
 
@@ -54,6 +47,11 @@ export interface PhotoScore {
   recommendation: PhotoRecommendation
 }
 
+export interface MeaningRegion {
+  type: 'face'
+  rect: { x: number; y: number; w: number; h: number }  // coordenadas normalizadas 0-1
+}
+
 export interface PhotoAsset {
   id: string              // UUID único — NUNCA se repite en el álbum
   r2Key: string           // Clave en Cloudflare R2
@@ -63,15 +61,16 @@ export interface PhotoAsset {
   height: number
   orientation: PhotoOrientation
   score: PhotoScore
-  takenAt?: Date          // EXIF timestamp
+  takenAt?: string | Date | null // EXIF timestamp
   gps?: { lat: number; lng: number }
   originalName: string
+  meaningRegions?: MeaningRegion[]
 }
 
 export interface Spread {
   id: string
   act: ActId
-  layout: LayoutType
+  layout: LayoutId
   photos: PhotoAsset[]    // IDs únicos garantizados
   caption?: string
   isLocked: boolean

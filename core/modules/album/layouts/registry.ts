@@ -4,7 +4,7 @@ import type { LayoutSchema } from './types'
  * Registry de layouts. Para agregar uno nuevo, solo añade un objeto aquí.
  * El LayoutRenderer lo pinta automáticamente con CSS Grid.
  */
-export const LAYOUTS: LayoutSchema[] = [
+const LAYOUT_REGISTRY = [
   {
     id: 'single',
     name: 'Foto única',
@@ -135,4 +135,8 @@ export const LAYOUTS: LayoutSchema[] = [
     slots: ['a'],
     disableMargin: true,
   },
-]
+] as const satisfies readonly LayoutSchema[]
+
+export type LayoutId = (typeof LAYOUT_REGISTRY)[number]['id']
+
+export const LAYOUTS: readonly LayoutSchema[] = LAYOUT_REGISTRY

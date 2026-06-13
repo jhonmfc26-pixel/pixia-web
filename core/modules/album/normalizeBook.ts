@@ -1,13 +1,46 @@
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
+import type { LayoutId } from '@/core/modules/album/layouts/registry'
 import { getDefaultTemplate } from '@/core/modules/cover/coverTemplates'
 
-// Vocabulario de layouts: IA viejo → contrato actual
-export function mapOldLayout(layout: string | undefined): AlbumBlueprint['spreads'][number]['layout'] {
+const DEFAULT_SCORE: AlbumBlueprint['spreads'][number]['photos'][number]['score'] = {
+  sharpness: 0,
+  exposure: 0,
+  composition: 0,
+  faces: 0,
+  resolution: 0,
+  uniqueness: 100,
+  emotionalWeight: 50,
+  finalScore: 50,
+  recommendation: 'supporting',
+}
+
+function normalizeScore(score: unknown): AlbumBlueprint['spreads'][number]['photos'][number]['score'] {
+  if (!score || typeof score !== 'object') return DEFAULT_SCORE
+  const raw = score as Partial<typeof DEFAULT_SCORE>
+  const recommendation = raw.recommendation === 'hero' || raw.recommendation === 'discard'
+    ? raw.recommendation
+    : 'supporting'
+
+  return {
+    sharpness: raw.sharpness ?? DEFAULT_SCORE.sharpness,
+    exposure: raw.exposure ?? DEFAULT_SCORE.exposure,
+    composition: raw.composition ?? DEFAULT_SCORE.composition,
+    faces: raw.faces ?? DEFAULT_SCORE.faces,
+    resolution: raw.resolution ?? DEFAULT_SCORE.resolution,
+    uniqueness: raw.uniqueness ?? DEFAULT_SCORE.uniqueness,
+    emotionalWeight: raw.emotionalWeight ?? DEFAULT_SCORE.emotionalWeight,
+    finalScore: raw.finalScore ?? DEFAULT_SCORE.finalScore,
+    recommendation,
+  }
+}
+
+/** @deprecated Compatibilidad exclusiva con libros viejos en localStorage creados por Claude. */
+export function mapLegacyClaudeLayout(layout: string | undefined): LayoutId {
   switch (layout) {
-    case 'full-bleed': return 'full'
-    case 'split-horizontal': return 'duo-v'
-    case 'editorial-right': return 'hero-2'
-    default: return (layout || 'full') as AlbumBlueprint['spreads'][number]['layout']
+    case 'full-bleed': return 'single'
+    case 'split-horizontal': return 'side-2'
+    case 'editorial-right': return 'stack-2'
+    default: return (layout || 'single') as LayoutId
   }
 }
 
@@ -26,6 +59,26 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
     const occasion = raw.occasion || 'boda'
     const defaultTemplate = getDefaultTemplate(occasion)
     const cover = raw.cover
+    const spreads = raw.spreads.map((spread: any) => ({
+      ...spread,
+      photos: Array.isArray(spread.photos)
+        ? spread.photos.map((photo: any) => ({
+            ...photo,
+            url: photo.url ?? photo.src ?? photo.thumbnailUrl ?? '',
+            thumbnailUrl: photo.thumbnailUrl ?? photo.url ?? photo.src ?? '',
+            r2Key: photo.r2Key || '',
+            width: photo.width || 0,
+            height: photo.height || 0,
+            orientation: photo.orientation ?? 'landscape',
+            originalName: photo.originalName ?? photo.id,
+            score: normalizeScore(photo.score),
+            takenAt: photo.takenAt ?? null,
+            gps: photo.gps,
+            meaningRegions: photo.meaningRegions,
+          }))
+        : [],
+    }))
+
     return {
       ...raw,
       id: idOverride ?? raw.id,
@@ -44,6 +97,7 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       placements: Array.isArray(raw.placements) ? new Map(raw.placements as any) : new Map(),
       manualPhotoOrder: Array.isArray(raw.manualPhotoOrder) ? raw.manualPhotoOrder : undefined,
+      spreads,
     } as AlbumBlueprint
   }
 
@@ -55,7 +109,7 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
   const spreads = oldSpreads.map((s: any, i: number) => ({
     id: s.id ?? `spread-${i}`,
     act: s.act ?? 'inicio',
-    layout: mapOldLayout(s.layout),
+    layout: mapLegacyClaudeLayout(s.layout),
     isLocked: false,
     pageNumber: i * 2 + 1,
     caption: s.caption,
@@ -69,11 +123,10 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
       height: p.height || 0,
       orientation: (p.orientation ?? 'landscape') as 'landscape' | 'portrait' | 'square',
       originalName: p.originalName ?? p.id,
-      score: p.score || {
-        sharpness: 0, exposure: 0, composition: 0, faces: 0,
-        resolution: 0, uniqueness: 100, emotionalWeight: 50,
-        finalScore: 50, recommendation: 'supporting' as const,
-      },
+      score: normalizeScore(p.score),
+      takenAt: p.takenAt ?? null,
+      gps: p.gps,
+      meaningRegions: p.meaningRegions,
     })),
   }))
 

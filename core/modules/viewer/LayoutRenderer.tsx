@@ -1,8 +1,10 @@
 'use client'
+import { useRef, useState, useEffect } from 'react'
 import type { PhotoAsset, AlbumStyle } from '@/core/contracts/AlbumBlueprint'
 import type { PhotoPlacement } from '@/core/modules/album/types'
 import { DEFAULT_PLACEMENT } from '@/core/modules/album/types'
 import type { LayoutSchema } from '@/core/modules/album/layouts/types'
+import { computeObjectPosition } from '@/core/modules/album/smartCrop'
 
 interface LayoutRendererProps {
   schema: LayoutSchema
@@ -20,11 +22,24 @@ function PhotoFrame({ photo, placement, style, objectPositionOverride, spreadHal
   spreadHalf?: 'left' | 'right'
 }) {
   const radius = style === 'con-margen' ? '2px' : '0'
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [slotAspect, setSlotAspect] = useState(1)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect
+      if (height > 0) setSlotAspect(width / height)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Modo spread: div contenedor al 200% ancho, anclado por el lado correcto
   if (spreadHalf) {
     return (
-      <div style={{
+      <div ref={containerRef} style={{
         position: 'relative', width: '100%', height: '100%',
         overflow: 'hidden', borderRadius: radius,
       }}>
@@ -53,15 +68,23 @@ function PhotoFrame({ photo, placement, style, objectPositionOverride, spreadHal
     )
   }
 
-  // Modo normal
-  const posX = 50 + placement.offsetX
-  const posY = 50 + placement.offsetY
-  const safeZoom = Math.max(1, placement.zoom)
+  // Smart crop: usar si no hay ajuste manual del usuario
+  const isDefault = placement.offsetX === 0 && placement.offsetY === 0 && placement.zoom === 1
+  const photoAspect = (photo.width && photo.height) ? photo.width / photo.height
+    : (photo.orientation === 'portrait' ? 3 / 4 : 4 / 3)
+  const regions = photo.meaningRegions ?? []
+  const smartPos = isDefault
+    ? computeObjectPosition(photoAspect, slotAspect, regions.map(r => r.rect), photo.id)
+    : null
+
+  const posX = smartPos ? smartPos.x : 50 + placement.offsetX
+  const posY = smartPos ? smartPos.y : 50 + placement.offsetY
+  const safeZoom = smartPos ? 1 : Math.max(1, placement.zoom)
   const objectPosition = objectPositionOverride ?? `${posX}% ${posY}%`
   const scale = objectPositionOverride ? 1 : safeZoom
 
   return (
-    <div style={{
+    <div ref={containerRef} style={{
       position: 'relative', width: '100%', height: '100%',
       overflow: 'hidden', borderRadius: radius,
     }}>

@@ -3,6 +3,12 @@ import { useState, useCallback } from 'react'
 import { readExif, type ExifData } from './exifReader'
 import { scorePhoto, type PhotoScore } from './photoScorer'
 import { MAX_PHOTOS } from '@/core/modules/upload/limits'
+import type { MeaningRegion } from '@/core/contracts/AlbumBlueprint'
+
+// FaceDetector es una API experimental — solo Chrome. TypeScript no la conoce.
+declare class FaceDetector {
+  detect(image: HTMLImageElement): Promise<Array<{ boundingBox: DOMRectReadOnly }>>
+}
 
 export interface AnalyzedPhoto {
   id: string
@@ -14,6 +20,7 @@ export interface AnalyzedPhoto {
   orientation: 'landscape' | 'portrait' | 'square'
   exif: ExifData
   score: PhotoScore
+  meaningRegions: MeaningRegion[]
 }
 
 export interface AnalysisProgress {
@@ -63,6 +70,11 @@ export function usePhotoAnalysis() {
             ratio < 0.87 ? 'portrait' : 'square'
 
           const score = await scorePhoto(src)
+          // TODO: reemplazar por face-api.js/MediaPipe cuando esté integrado.
+          // FaceDetector (Shape Detection API) no está disponible en la mayoría de
+          // navegadores sin flags experimentales — omitir la llamada evita el fallback
+          // silencioso que ejecuta lógica inútil en cada análisis.
+          const meaningRegions: MeaningRegion[] = []
 
           results[globalIdx] = {
             id: crypto.randomUUID(),
@@ -73,6 +85,7 @@ export function usePhotoAnalysis() {
             orientation,
             exif,
             score,
+            meaningRegions,
           }
         })
       )
@@ -136,6 +149,34 @@ function sortByExif(photos: AnalyzedPhoto[]): AnalyzedPhoto[] {
   )
 
   return [...withDate, ...withoutDate]
+}
+
+// TODO: reemplazar por face-api.js/MediaPipe — FaceDetector no disponible en la mayoría de navegadores.
+// Mantener la función para cuando se integre el detector ML; por ahora no se llama.
+async function detectFaces(src: string, imgW: number, imgH: number): Promise<MeaningRegion[]> {
+  if (typeof window === 'undefined' || !('FaceDetector' in window)) return []
+  if (!imgW || !imgH) return []
+  try {
+    const img = new window.Image()
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject()
+      img.src = src
+    })
+    const detector = new FaceDetector()
+    const faces = await detector.detect(img)
+    return faces.map(f => ({
+      type: 'face' as const,
+      rect: {
+        x: Math.max(0, f.boundingBox.x / imgW),
+        y: Math.max(0, f.boundingBox.y / imgH),
+        w: Math.min(1, f.boundingBox.width / imgW),
+        h: Math.min(1, f.boundingBox.height / imgH),
+      },
+    }))
+  } catch {
+    return []
+  }
 }
 
 async function compressFile(file: File, maxSize: number, quality: number): Promise<string> {

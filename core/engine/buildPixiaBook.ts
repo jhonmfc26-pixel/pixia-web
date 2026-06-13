@@ -1,4 +1,5 @@
 import { ActId, NarrativeTone, PixiaBook } from '../domain/PixiaBook'
+import type { PhotoOrientation, MeaningRegion } from '../contracts/AlbumBlueprint'
 
 export interface AlbumDraft {
   title?: string
@@ -11,9 +12,11 @@ export interface AlbumDraft {
     width?: number
     height?: number
     orientation?: string
-    score?: { finalScore: number; recommendation: string }
+    score?: PixiaBook['content']['spreads'][number]['photos'][number]['score']
     takenAt?: string | null
+    gps?: { lat: number; lng: number }
     originalName?: string
+    meaningRegions?: MeaningRegion[]
   }[]
   style?: string
   emotion?: string
@@ -59,6 +62,35 @@ function detectOrientation(src: string): Promise<'landscape' | 'portrait' | 'squ
   })
 }
 
+function layoutForPhotoCount(count: number): PixiaBook['content']['spreads'][number]['layout'] {
+  if (count >= 5) return 'mosaic-5'
+  if (count === 4) return 'grid-4'
+  if (count === 3) return 'grid-3'
+  if (count === 2) return 'side-2'
+  return 'single'
+}
+
+function toBookPhoto(
+  photo: AlbumDraft['photos'][number],
+  orientation: PhotoOrientation,
+): PixiaBook['content']['spreads'][number]['photos'][number] {
+  return {
+    id: photo.id,
+    src: photo.src,
+    url: photo.url,
+    thumbnailUrl: photo.thumbnailUrl,
+    r2Key: photo.r2Key,
+    width: photo.width,
+    height: photo.height,
+    orientation,
+    score: photo.score,
+    takenAt: photo.takenAt ?? null,
+    gps: photo.gps,
+    originalName: photo.originalName,
+    meaningRegions: photo.meaningRegions,
+  }
+}
+
 export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
   const photos = draft.photos
 
@@ -86,8 +118,8 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
       spreads.push({
         id: `spread-${spreads.length}`,
         act: getActForIndex(spreads.length, Math.ceil(photos.length / 2)),
-        layout: 'full-bleed',
-        photos: [{ id: photo.id, src: photo.src, orientation }],
+        layout: 'single',
+        photos: [toBookPhoto(photo, orientation)],
       })
       i += 1
       continue
@@ -97,10 +129,10 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
       spreads.push({
         id: `spread-${spreads.length}`,
         act: getActForIndex(spreads.length, Math.ceil(photos.length / 2)),
-        layout: 'split-horizontal',
+        layout: 'side-2',
         photos: [
-          { id: photo.id, src: photo.src, orientation },
-          { id: nextPhoto.id, src: nextPhoto.src, orientation: nextOrientation },
+          toBookPhoto(photo, orientation),
+          toBookPhoto(nextPhoto, nextOrientation),
         ],
       })
       i += 2
@@ -111,10 +143,10 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
       spreads.push({
         id: `spread-${spreads.length}`,
         act: getActForIndex(spreads.length, Math.ceil(photos.length / 2)),
-        layout: 'editorial-right',
+        layout: 'stack-2',
         photos: [
-          { id: photo.id, src: photo.src, orientation },
-          { id: nextPhoto.id, src: nextPhoto.src, orientation: nextOrientation },
+          toBookPhoto(photo, orientation),
+          toBookPhoto(nextPhoto, nextOrientation),
         ],
       })
       i += 2
@@ -124,8 +156,8 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
     spreads.push({
       id: `spread-${spreads.length}`,
       act: getActForIndex(spreads.length, Math.ceil(photos.length / 2)),
-      layout: 'full-bleed',
-      photos: [{ id: photo.id, src: photo.src, orientation }],
+      layout: 'single',
+      photos: [toBookPhoto(photo, orientation)],
     })
     i += 1
   }
@@ -220,7 +252,6 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
     type AISSpread = {
       id?: string
       act: string
-      layout: string
       photoIndices: number[]
       caption?: string
     }
@@ -247,18 +278,17 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
 
         const photos = validIndices
           .map((i) => draft.photos[i])
-          .map((p) => ({ id: p.id, src: p.src, orientation: p.orientation }))
-
-        const layout = (() => {
-          if (s.layout === 'split-horizontal' && photos.length < 2) return 'full-bleed'
-          if (s.layout === 'editorial-right' && photos.length < 2) return 'full-bleed'
-          return s.layout ?? 'full-bleed'
-        })()
+          .map((p) => toBookPhoto(
+            p,
+            p.orientation === 'landscape' || p.orientation === 'portrait' || p.orientation === 'square'
+              ? p.orientation
+              : 'landscape'
+          ))
 
         return {
           id: s.id ?? `spread-${index}`,
           act: s.act as ActId,
-          layout,
+          layout: layoutForPhotoCount(photos.length),
           photos,
           caption: s.caption ?? '',
         }
@@ -280,15 +310,15 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
         const orientation = photo.orientation || 'landscape'
         const nextOri = next?.orientation || 'landscape'
 
-        let layout = 'full-bleed'
+        let layout: PixiaBook['content']['spreads'][number]['layout'] = 'single'
         let photosInSpread = [photo]
 
         if (next && orientation === 'portrait' && nextOri === 'portrait') {
-          layout = 'split-horizontal'
+          layout = 'side-2'
           photosInSpread = [photo, next]
           i += 2
         } else if (next && orientation === 'portrait' && nextOri === 'landscape') {
-          layout = 'editorial-right'
+          layout = 'stack-2'
           photosInSpread = [photo, next]
           i += 2
         } else {
@@ -299,11 +329,12 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
           id: `spread-extra-${spreads.length}`,
           act: 'cierre' as ActId,
           layout,
-          photos: photosInSpread.map(p => ({
-            id: p.id,
-            src: p.src,
-            orientation: p.orientation,
-          })),
+          photos: photosInSpread.map(p => toBookPhoto(
+            p,
+            p.orientation === 'landscape' || p.orientation === 'portrait' || p.orientation === 'square'
+              ? p.orientation
+              : 'landscape'
+          )),
           caption: '',
         })
       }

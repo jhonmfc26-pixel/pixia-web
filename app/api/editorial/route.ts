@@ -78,16 +78,13 @@ Divide en 4 actos:
 Reglas:
 - Cada foto solo UNA vez en todo el álbum (no repetir photoIndices).
 - Usa TODAS las fotos.
-- Layouts:
-  - "full-bleed": 1 foto (momentos especiales)
-  - "split-horizontal": 2 fotos verticales juntas
-  - "editorial-right": 2 fotos (vertical + horizontal)
+- No propongas layouts. Solo agrupa fotos y textos.
 
 Fotos disponibles:
 ${enrichedDescriptions.join('\n')}
 
 Responde SOLO JSON, sin markdown ni explicaciones:
-{"albumTitle":"título 3-5 palabras","spreads":[{"act":"inicio","layout":"full-bleed","photoIndices":[0]}]}`
+{"albumTitle":"título 3-5 palabras","spreads":[{"act":"inicio","photoIndices":[0]}]}`
         }]
       })
     })
