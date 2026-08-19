@@ -1,4 +1,5 @@
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
+import type { AlbumStructure } from '@/core/modules/foldModel/types'
 
 export type PhotoOrientation = 'landscape' | 'portrait' | 'square'
 
@@ -65,6 +66,8 @@ export interface PhotoAsset {
   gps?: { lat: number; lng: number }
   originalName: string
   meaningRegions?: MeaningRegion[]
+  /** SHA-256 del contenido del archivo original — usado para deduplicar uploads. Ausente en fotos pre-existentes a esta feature. */
+  contentHash?: string
 }
 
 export interface Spread {
@@ -115,6 +118,12 @@ export interface AlbumBlueprint {
   status: BlueprintStatus
   aiGenerated: boolean
   purchaseId?: string
+
+  /**
+   * Estructura mutable del álbum guardada desde el editor v2.
+   * JSON-serializable por diseño. Ausente en blueprints pre-editV2.
+   */
+  structure?: AlbumStructure
 }
 
 // Eventos del funnel para métricas

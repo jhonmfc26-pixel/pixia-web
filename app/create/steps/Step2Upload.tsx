@@ -17,6 +17,8 @@ import { getPhotoCacheEntry, updatePhotoCacheEntry, hasFullAnalysis, clearPixiaC
 import { useUpload } from "@/core/modules/upload/useUpload";
 import { useSession } from "@/core/modules/session/useSession";
 import { MIN_PHOTOS, MAX_PHOTOS } from "@/core/modules/upload/limits";
+import { normalizeFiles, isHeicFile } from "@/core/modules/upload/normalizeFiles";
+import { hashFileContent } from "@/core/modules/upload/contentHash";
 
 // Genera thumbnail 150x150 base64 (~8-12KB por foto) para grids rápidos
 async function generateThumbnail(file: File, maxSize = 150): Promise<string | null> {
@@ -80,24 +82,64 @@ export default function Step2Upload() {
   const { sessionId } = useSession();
   const { uploadProgress, uploadPhotos } = useUpload(sessionId || '');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [normalizingMsg, setNormalizingMsg] = useState<string | null>(null);
   const [minPhotosError, setMinPhotosError] = useState<string | null>(null);
   const [heicWarning, setHeicWarning] = useState<string | null>(null);
+  const [dupWarning, setDupWarning] = useState<string | null>(null);
 
   const count = useMotionValue(0);
   const rounded = useTransform(count, (latest) => Math.round(latest));
 
   const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      console.log('[Step2] onDrop recibió', acceptedFiles.length, 'archivos')
+    async (
+      acceptedFiles: File[],
+      fileRejections: { file: File; errors: readonly { code: string; message: string }[] }[]
+    ) => {
+      // Rescatar HEIC desde fileRejections: react-dropzone los rechaza cuando el
+      // MIME es vacío (habitual en Chrome/macOS), aunque estén en el accept config.
+      const heicRescued = fileRejections
+        .map(r => r.file)
+        .filter(f => {
+          const name = f.name.toLowerCase()
+          return name.endsWith('.heic') || name.endsWith('.heif')
+        })
+      const allFiles = [...acceptedFiles, ...heicRescued]
+
+      console.log('[Step2] onDrop recibió', allFiles.length, 'archivos',
+        heicRescued.length > 0 ? `(${heicRescued.length} HEIC rescatados de rejection)` : '')
       setIsProcessing(true)
 
       try {
+        // PASO 0: Normalizar HEIC→JPEG antes de análisis y upload
+        const heicCount0 = allFiles.filter(isHeicFile).length
+        if (heicCount0 > 0) {
+          setNormalizingMsg(`Convirtiendo 0/${heicCount0} HEIC...`)
+        }
+        const { files: normalizedList, failed: heicFailed } = await normalizeFiles(
+          allFiles,
+          (done, total) => setNormalizingMsg(`Convirtiendo ${done}/${total} HEIC...`)
+        )
+        setNormalizingMsg(null)
+
+        if (heicFailed.length > 0) {
+          setHeicWarning(
+            `No pudimos procesar ${heicFailed.length} foto${heicFailed.length > 1 ? 's' : ''} HEIC: ` +
+            `${heicFailed.join(', ')}. Podrías convertirlas a JPEG y subirlas de nuevo.`
+          )
+        }
+
+        const normalizedFiles = normalizedList.map(n => n.file)
+        const heicExifMap = new Map(
+          normalizedList.filter(n => n.heicExif !== null).map(n => [n.file, n.heicExif!])
+        )
+
         // Detectar formato real por magic bytes antes de cualquier procesamiento
-        const formats = await Promise.all(acceptedFiles.map(detectImageFormat))
-        const validFiles = acceptedFiles.filter((_, i) => {
+        const formats = await Promise.all(normalizedFiles.map(detectImageFormat))
+        const validFiles = normalizedFiles.filter((_, i) => {
           const fmt = formats[i]
           return fmt === 'jpeg' || fmt === 'png' || fmt === 'webp'
         })
+        // Después de normalización, heicCount solo cuenta conversiones fallidas
         const heicCount = formats.filter(f => f === 'heic').length
         const unknownCount = formats.filter(f => f === 'unknown').length
         const rejectedCount = heicCount + unknownCount
@@ -105,10 +147,8 @@ export default function Step2Upload() {
         if (rejectedCount > 0) {
           if (heicCount > 0) {
             setHeicWarning(
-              `${heicCount} foto${heicCount > 1 ? 's' : ''} ` +
-              `están en formato HEIC, que los navegadores no pueden procesar. ` +
-              `Tip: si subes directo desde tu iPhone, se convierten automáticamente. ` +
-              `Si las descargaste a tu computador, conviértelas a JPG primero.`
+              `${heicCount} foto${heicCount > 1 ? 's' : ''} HEIC no ${heicCount > 1 ? 'pudieron convertirse' : 'pudo convertirse'} ` +
+              `automáticamente. Conviértela${heicCount > 1 ? 's' : ''} a JPG e inténtalo de nuevo.`
             )
           } else {
             setHeicWarning(
@@ -123,11 +163,43 @@ export default function Step2Upload() {
 
         if (validFiles.length === 0) return
 
-        const newPhotos: PhotoItem[] = validFiles.map((file) => ({
+        // Deduplicar por contenido (SHA-256): mismo archivo elegido 2 veces en
+        // este lote, o una foto que ya está en el álbum de esta sesión — no se
+        // sube de nuevo. Regla: cero fotos repetidas.
+        const validHashes = await Promise.all(validFiles.map(hashFileContent))
+        const existingHashes = new Set(
+          photos.map(p => p.contentHash).filter((h): h is string => !!h)
+        )
+        const dedupedFiles: File[] = []
+        const dedupedHashes: string[] = []
+        const seenInBatch = new Set<string>()
+        let duplicateCount = 0
+        validFiles.forEach((file, i) => {
+          const hash = validHashes[i]
+          if (existingHashes.has(hash) || seenInBatch.has(hash)) {
+            duplicateCount++
+            return
+          }
+          seenInBatch.add(hash)
+          dedupedFiles.push(file)
+          dedupedHashes.push(hash)
+        })
+
+        setDupWarning(
+          duplicateCount === 0 ? null :
+          duplicateCount === 1 ? 'Ya tienes esta foto, no la subimos de nuevo.' :
+          `${duplicateCount} fotos repetidas, no las subimos de nuevo.`
+        )
+
+        if (dedupedFiles.length === 0) return
+
+        const newPhotos: PhotoItem[] = dedupedFiles.map((file, i) => ({
           id: crypto.randomUUID(),
           file,
           priority: false,
+          contentHash: dedupedHashes[i],
         }));
+        const hashByPhotoId = new Map(newPhotos.map(p => [p.id, p.contentHash]))
 
         // Mostrar thumbnails inmediatamente — no esperar análisis
         dispatch({
@@ -148,8 +220,8 @@ export default function Step2Upload() {
         }> = []
         const filesToAnalyze: File[] = []
 
-        for (let idx = 0; idx < validFiles.length; idx++) {
-          const file = validFiles[idx]
+        for (let idx = 0; idx < dedupedFiles.length; idx++) {
+          const file = dedupedFiles[idx]
           const entry = getPhotoCacheEntry(file)
           if (hasFullAnalysis(entry)) {
             cachedItems.push({
@@ -190,51 +262,75 @@ export default function Step2Upload() {
           ...newAnalysis,
         ]
 
-        // Thumbnails: cacheados primero, generar los faltantes
+        // Parchear takenAt/gps desde HEIC EXIF (la conversión JPEG descarta el EXIF)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const patched: any[] = analyzed.map(item => {
+          const heicExif = heicExifMap.get(item.file)
+          if (!heicExif?.takenAt) return item
+          return {
+            ...item,
+            exif: {
+              ...item.exif,
+              takenAt: heicExif.takenAt,
+              lat: heicExif.lat ?? item.exif?.lat,
+              lng: heicExif.lng ?? item.exif?.lng,
+            },
+          }
+        })
+
+        // Thumbnails: Map por File para sobrevivir el re-sort posterior
         console.log('[Step2] Generando thumbnails faltantes...')
-        const thumbnails = await Promise.all(
-          analyzed.map(async (item) => {
+        const thumbnailsByFile = new Map<File, string | null>()
+        await Promise.all(
+          patched.map(async (item) => {
             const entry = getPhotoCacheEntry(item.file)
-            if (entry?.thumbnail) return entry.thumbnail
-            try {
-              return await generateThumbnail(item.file)
-            } catch {
-              return null
-            }
+            if (entry?.thumbnail) { thumbnailsByFile.set(item.file, entry.thumbnail); return }
+            try { thumbnailsByFile.set(item.file, await generateThumbnail(item.file)) }
+            catch { thumbnailsByFile.set(item.file, null) }
           })
         )
-        console.log('[Step2] Thumbnails listos:', thumbnails.filter(Boolean).length)
+        console.log('[Step2] Thumbnails listos:', [...thumbnailsByFile.values()].filter(Boolean).length)
+
+        // Re-ordenar cronológicamente (HEIC sin EXIF se habrían ido al final en analyzePhotos)
+        patched.sort((a, b) => {
+          const ta = a.exif?.takenAt ? new Date(a.exif.takenAt).getTime() : 0
+          const tb = b.exif?.takenAt ? new Date(b.exif.takenAt).getTime() : 0
+          if (ta && tb) return ta - tb
+          if (ta) return -1
+          if (tb) return 1
+          return 0
+        })
 
         // Guardar TODO en cache (análisis + thumbnails) para la próxima vez
-        for (let i = 0; i < analyzed.length; i++) {
-          const item = analyzed[i]
+        for (const item of patched) {
           if (!item) continue
           updatePhotoCacheEntry(item.file, {
             orientation: item.orientation,
             score: item.score,
             takenAt: item.exif?.takenAt || null,
             gps: (item.exif?.lat != null && item.exif?.lng != null) ? { lat: item.exif.lat, lng: item.exif.lng } : null,
-            thumbnail: thumbnails[i] || undefined,
+            thumbnail: thumbnailsByFile.get(item.file) || undefined,
           })
         }
 
-        if (analyzed.length > 0) {
+        if (patched.length > 0) {
           localStorage.setItem(
             'pixia_photo_analysis',
-            JSON.stringify(analyzed.map((p, index) => ({
+            JSON.stringify(patched.map((p, index) => ({
               id: p.id,
               orientation: p.orientation,
               score: p.score,
               takenAt: p.exif.takenAt || null,
               gps: (p.exif.lat != null && p.exif.lng != null) ? { lat: p.exif.lat, lng: p.exif.lng } : null,
               originalIndex: index,
-              thumbnail: thumbnails[index],
+              thumbnail: thumbnailsByFile.get(p.file) || undefined,
+              contentHash: hashByPhotoId.get(p.id),
             })))
           );
           console.log('[Step2] Análisis guardado en localStorage')
 
           if (sessionId) {
-            const filesToUpload = analyzed.map(p => ({
+            const filesToUpload = patched.map(p => ({
               file: p.file,
               photoId: p.id,
             }));
@@ -274,11 +370,12 @@ export default function Step2Upload() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    // Tipos explícitos: en iOS, declarar JPEG hace que el sistema convierta HEIC automáticamente
     accept: {
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/png': ['.png'],
       'image/webp': ['.webp'],
+      'image/heic': ['.heic'],
+      'image/heif': ['.heif'],
     },
   });
 
@@ -366,6 +463,40 @@ export default function Step2Upload() {
           lineHeight: 1.6,
         }}>
           {heicWarning}
+        </div>
+      )}
+
+      {dupWarning && (
+        <div style={{
+          marginTop: 12,
+          padding: '12px 16px',
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 8,
+          fontSize: 13,
+          color: 'rgba(255,255,255,0.6)',
+          lineHeight: 1.6,
+        }}>
+          {dupWarning}
+        </div>
+      )}
+
+      {normalizingMsg && (
+        <div style={{
+          padding: '12px 16px', marginTop: '16px',
+          background: 'rgba(255,255,255,0.04)',
+          borderRadius: '8px',
+          display: 'flex', alignItems: 'center', gap: '10px',
+        }}>
+          <div style={{
+            width: '14px', height: '14px', flexShrink: 0,
+            border: '2px solid rgba(255,255,255,0.12)',
+            borderTopColor: 'rgba(255,255,255,0.6)',
+            borderRadius: '50%',
+            animation: 'spin 0.7s linear infinite',
+          }} />
+          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{normalizingMsg}</span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
 

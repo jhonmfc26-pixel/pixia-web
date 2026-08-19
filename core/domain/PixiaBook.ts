@@ -34,6 +34,7 @@ export interface PixiaBook {
         gps?: { lat: number; lng: number }
         originalName?: string
         meaningRegions?: MeaningRegion[]
+        contentHash?: string
       }[]
       caption?: string
     }[]

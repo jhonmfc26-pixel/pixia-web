@@ -109,6 +109,7 @@ export default function ResultPage() {
               orientation: (meta?.orientation || 'landscape') as 'landscape' | 'portrait' | 'square',
               score: meta?.score || null,
               originalName: p.file?.name || `photo-${index}`,
+              contentHash: meta?.contentHash,
             }
           })
         )

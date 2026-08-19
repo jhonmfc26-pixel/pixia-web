@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { generateIntegrityHash, calculateOrderTotal, generateOrderReference } from '@/lib/wompi'
 import { rateLimit } from '@/core/middleware/rateLimiter'
+import { normalizeBook } from '@/core/modules/album/normalizeBook'
 
 export const runtime = 'edge'
 
 interface CreateOrderRequest {
   bookId: string
   bookSnapshot: unknown   // AlbumBlueprint completo
+  sessionId?: string
   pagesTotal: number
   customer: {
     email: string
@@ -26,6 +28,15 @@ interface CreateOrderRequest {
 export async function POST(req: NextRequest) {
   const limited = await rateLimit(req, '/api/orders')
   if (limited) return limited
+
+  // Extraer user_id del JWT si viene — no bloquea si falta o es inválido
+  const authHeader = req.headers.get('authorization') ?? ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+  let userId: string | null = null
+  if (token) {
+    const { data, error } = await supabaseAdmin.auth.getUser(token)
+    if (!error && data?.user) userId = data.user.id
+  }
 
   try {
     const body = (await req.json()) as CreateOrderRequest
@@ -54,6 +65,7 @@ export async function POST(req: NextRequest) {
         reference,
         book_id: body.bookId,
         book_snapshot: body.bookSnapshot,
+        user_id: userId,
         customer_email: body.customer.email,
         customer_phone: body.customer.phone,
         customer_name: body.customer.name,
@@ -76,6 +88,52 @@ export async function POST(req: NextRequest) {
     if (error || !order) {
       console.error('[orders/create] DB error:', error)
       return NextResponse.json({ error: 'No se pudo crear la orden' }, { status: 500 })
+    }
+
+    // Upsert de seguridad: si el blueprint no fue guardado en el callback
+    // (ej. el usuario fue directo al checkout sin magic link previo), lo
+    // guardamos aquí con el user_id ya conocido.
+    if (userId && body.bookSnapshot) {
+      try {
+        const blueprint = normalizeBook(body.bookSnapshot, body.bookId)
+        console.log('[orders/create] Intentando upsert blueprint con id:', body.bookId, 'userId:', userId)
+        console.log('[orders/create] Shape del blueprint normalizado:', {
+          id: blueprint.id,
+          occasion: blueprint.occasion,
+          hasCover: !!blueprint.cover,
+          hasSpreads: Array.isArray(blueprint.spreads),
+          spreadsCount: blueprint.spreads?.length,
+        })
+        const { error: bpError } = await supabaseAdmin
+          .from('blueprints')
+          .upsert({
+            id: blueprint.id,
+            user_id: userId,
+            session_id: body.sessionId ?? blueprint.sessionId ?? '',
+            status: blueprint.status ?? 'draft',
+            occasion: blueprint.occasion,
+            format: blueprint.format,
+            style: blueprint.style,
+            page_count: blueprint.pageCount,
+            cover: blueprint.cover,
+            spreads: blueprint.spreads,
+            narrative: blueprint.narrative,
+            ai_generated: blueprint.aiGenerated ?? false,
+            version: blueprint.version ?? 1,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' })
+        if (bpError) throw bpError
+      } catch (err: unknown) {
+        const e = err as { message?: string; code?: string; details?: string; hint?: string; stack?: string }
+        console.error('[orders/create] ERROR UPSERT BLUEPRINT:', {
+          message: e?.message,
+          code: e?.code,
+          details: e?.details,
+          hint: e?.hint,
+          stack: e?.stack?.split('\n').slice(0, 3),
+        })
+        // No bloquear la orden — el blueprint es valor agregado, no crítico
+      }
     }
 
     // Wompi requiere el monto en centavos

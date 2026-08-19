@@ -8,6 +8,7 @@ import Script from 'next/script'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
 import { calculateOrderTotal } from '@/lib/wompi'
+import { supabaseBrowser } from '@/lib/supabase-browser'
 
 declare global {
   interface Window {
@@ -59,6 +60,20 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [otpSending, setOtpSending] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpError, setOtpError] = useState<string | null>(null)
+  const [sessionBanner, setSessionBanner] = useState(false)
+
+  // Restaurar formulario guardado (sobrevive la redirección del magic link)
+  useEffect(() => {
+    const saved = localStorage.getItem('pixia_checkout_form')
+    if (saved) {
+      try { setForm(JSON.parse(saved)) } catch { /* ignorar */ }
+    }
+  }, [])
+
   useEffect(() => {
     if (!bookId) return
     try {
@@ -77,6 +92,14 @@ export default function CheckoutPage() {
       setBookError('Error al cargar el álbum')
       setLoadingBook(false)
     }
+
+    // Si el usuario acaba de volver del magic link, mostrar banner de confirmación
+    supabaseBrowser.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setSessionBanner(true)
+        setTimeout(() => setSessionBanner(false), 3000)
+      }
+    })
   }, [bookId])
 
   const pricing = useMemo(() => {
@@ -88,7 +111,11 @@ export default function CheckoutPage() {
   const handleChange = (field: keyof FormData) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    setForm(prev => ({ ...prev, [field]: e.target.value }))
+    setForm(prev => {
+      const next = { ...prev, [field]: e.target.value }
+      localStorage.setItem('pixia_checkout_form', JSON.stringify(next))
+      return next
+    })
   }
 
   const isFormValid = () => {
@@ -101,18 +128,56 @@ export default function CheckoutPage() {
     return true
   }
 
+  const sendMagicLink = async () => {
+    setOtpSending(true)
+    setOtpError(null)
+    const { error } = await supabaseBrowser.auth.signInWithOtp({
+      email: form.email,
+      options: {
+        // TODO: integrar Resend como SMTP custom de Supabase para emails de marca
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        shouldCreateUser: true,
+      },
+    })
+    setOtpSending(false)
+    if (error) {
+      setOtpError(error.message)
+    } else {
+      setOtpSent(true)
+      localStorage.setItem('pixia_pending_checkout', JSON.stringify({
+        bookId,
+        returnTo: window.location.pathname,
+      }))
+    }
+  }
+
   const handleCheckout = async () => {
     if (!book || !pricing || !isFormValid()) return
+
+    // Verificar sesión activa. Si no hay, interceptar con magic link.
+    const { data: { session } } = await supabaseBrowser.auth.getSession()
+    if (!session) {
+      setShowLoginModal(true)
+      return
+    }
+
     setSubmitting(true)
     setSubmitError(null)
 
     try {
+      const { data: { session: activeSession } } = await supabaseBrowser.auth.getSession()
+      const orderHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (activeSession?.access_token) {
+        orderHeaders['Authorization'] = `Bearer ${activeSession.access_token}`
+      }
+
       const res = await fetch('/api/orders/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: orderHeaders,
         body: JSON.stringify({
           bookId,
           bookSnapshot: book,
+          sessionId: localStorage.getItem('pixia_session_id') ?? '',
           pagesTotal: pricing.pagesTotal,
           customer: { name: form.name, email: form.email, phone: form.phone },
           shipping: {
@@ -187,6 +252,130 @@ export default function CheckoutPage() {
   return (
     <>
       <Script src="https://checkout.wompi.co/widget.js" strategy="afterInteractive" />
+
+      {sessionBanner && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 400,
+          background: 'rgba(34,197,94,0.12)',
+          borderBottom: '1px solid rgba(34,197,94,0.25)',
+          padding: '12px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          fontSize: '14px', color: 'rgba(134,239,172,0.95)',
+        }}>
+          <span>✓</span>
+          <span>Sesión confirmada — puedes continuar con tu pedido</span>
+        </div>
+      )}
+
+      {showLoginModal && (
+        <div
+          onClick={() => setShowLoginModal(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 500,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '40px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#161616',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '420px',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '20px 24px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Acceso seguro
+                </div>
+                <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '20px', color: 'white', marginTop: '2px' }}>
+                  Guarda tu álbum para continuar
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLoginModal(false)}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '22px', cursor: 'pointer', lineHeight: 1, padding: '4px 8px' }}
+              >×</button>
+            </div>
+
+            {/* Cuerpo */}
+            <div style={{ padding: '28px 24px' }}>
+              {!otpSent ? (
+                <>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
+                    Te enviamos un enlace de acceso a <strong style={{ color: '#fff' }}>{form.email}</strong>.
+                    Haz clic en él para confirmar y continuar con tu pedido.
+                  </p>
+
+                  {otpError && (
+                    <div style={{ padding: '10px 14px', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.25)', borderRadius: '6px', color: '#ff8080', fontSize: '13px', marginBottom: '16px' }}>
+                      {otpError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={sendMagicLink}
+                    disabled={otpSending}
+                    style={{
+                      width: '100%', padding: '13px',
+                      background: otpSending ? 'rgba(255,255,255,0.15)' : '#fff',
+                      color: otpSending ? 'rgba(255,255,255,0.4)' : '#000',
+                      border: 'none', borderRadius: '8px',
+                      fontSize: '15px', fontWeight: 600,
+                      cursor: otpSending ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {otpSending ? 'Enviando...' : 'Enviar enlace'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '36px', marginBottom: '12px' }}>📬</div>
+                    <p style={{ color: '#fff', fontSize: '15px', fontWeight: 500, marginBottom: '8px' }}>
+                      Revisa tu correo
+                    </p>
+                    <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', lineHeight: 1.6 }}>
+                      Te enviamos el enlace a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>{form.email}</strong>.
+                      Haz clic en él para continuar con tu pedido.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => { setOtpSent(false); setOtpError(null) }}
+                    style={{
+                      width: '100%', padding: '10px',
+                      background: 'transparent',
+                      color: 'rgba(255,255,255,0.5)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '8px', fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ¿No llegó? Reenviar enlace
+                  </button>
+                  <p style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '10px' }}>
+                    Revisa también la carpeta de spam
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ minHeight: '100vh', background: '#0f0f0f', color: '#fff', padding: '40px 20px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>

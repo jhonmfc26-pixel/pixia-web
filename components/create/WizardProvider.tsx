@@ -15,6 +15,8 @@ export type PhotoItem = {
   id: string;
   file: File;
   priority: boolean;
+  /** SHA-256 del contenido del archivo — usado para deduplicar uploads. */
+  contentHash?: string;
 };
 
 type WizardState = {

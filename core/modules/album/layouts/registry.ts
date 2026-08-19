@@ -135,6 +135,57 @@ const LAYOUT_REGISTRY = [
     slots: ['a'],
     disableMargin: true,
   },
+
+  // ── Layouts con aire (celdas '.' = margen de papel, fondo crema) ─────────────
+  // El área vacía crea márgenes deliberados que evitan recortar fotos con AR muy
+  // distinto al de la página. Se usa solo cuando ahorra >12 pp de pérdida
+  // (ver AIR_PENALTY en layoutFit.ts).
+
+  {
+    id: 'solo-portrait-air',
+    name: 'Vertical con margen',
+    photoCount: 1,
+    hasAir: true,
+    // Slot AR = 0.72/1.0 = 0.72 (encaja fotos portrait, tC=1.0)
+    grid: { columns: '0.14fr 0.72fr 0.14fr', rows: '1fr', areas: '". a ."' },
+    slots: ['a'],
+  },
+  {
+    id: 'solo-landscape-air',
+    name: 'Horizontal con margen',
+    photoCount: 1,
+    hasAir: true,
+    // Slot AR = 1.0/0.714 ≈ 1.40 (encaja fotos landscape, tR=1.0)
+    grid: { columns: '1fr', rows: '0.143fr 0.714fr 0.143fr', areas: '"." "a" "."' },
+    slots: ['a'],
+  },
+  {
+    id: 'duo-portrait-air',
+    name: 'Dos verticales con margen',
+    photoCount: 2,
+    hasAir: true,
+    // Slot AR = 1.0/1.40 ≈ 0.71 (encaja pares de fotos portrait, tR=1.0)
+    grid: { columns: '1fr 1fr', rows: '0.15fr 0.70fr 0.15fr', areas: '". ." "a b" ". ."' },
+    slots: ['a', 'b'],
+  },
+  {
+    id: 'duo-landscape-air',
+    name: 'Dos horizontales con margen',
+    photoCount: 2,
+    hasAir: true,
+    // Slot AR = 0.70/0.50 = 1.40 (encaja pares de fotos landscape, tC=1.0)
+    grid: { columns: '0.15fr 0.70fr 0.15fr', rows: '1fr 1fr', areas: '". a ." ". b ."' },
+    slots: ['a', 'b'],
+  },
+  {
+    id: 'trio-portrait-air',
+    name: 'Trío vertical con margen',
+    photoCount: 3,
+    hasAir: true,
+    // Slot AR = 1.0/1.38 ≈ 0.72 (encaja tríos de fotos portrait, tR=1.0)
+    grid: { columns: '1fr 1fr 1fr', rows: '0.27fr 0.46fr 0.27fr', areas: '". . ." "a b c" ". . ."' },
+    slots: ['a', 'b', 'c'],
+  },
 ] as const satisfies readonly LayoutSchema[]
 
 export type LayoutId = (typeof LAYOUT_REGISTRY)[number]['id']

@@ -48,6 +48,11 @@ function CheckoutSuccessContent() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    localStorage.removeItem('pixia_checkout_form')
+    localStorage.removeItem('pixia_pending_checkout')
+  }, [])
+
+  useEffect(() => {
     if (!reference) {
       setError('Referencia de orden no encontrada')
       setLoading(false)

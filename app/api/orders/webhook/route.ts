@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
   // 5. Buscar la orden en DB
   const { data: existingOrder, error: findError } = await supabaseAdmin
     .from('orders')
-    .select('id, reference, payment_status, total_cop')
+    .select('id, reference, payment_status, total_cop, book_id')
     .eq('reference', verified.reference)
     .single()
 
@@ -125,6 +125,18 @@ export async function POST(req: NextRequest) {
     .from('orders')
     .update(updates)
     .eq('reference', verified.reference)
+
+  if (!updateError && newStatus === 'approved' && existingOrder.book_id) {
+    try {
+      await supabaseAdmin
+        .from('blueprints')
+        .update({ status: 'ordered', updated_at: new Date().toISOString() })
+        .eq('id', existingOrder.book_id)
+    } catch (err) {
+      // La orden ya quedó aprobada — el blueprint se reconcilia manualmente si hace falta
+      console.error('[webhook] No se pudo actualizar blueprint a ordered:', err)
+    }
+  }
 
   if (updateError) {
     console.error('[webhook] Error actualizando orden:', updateError)

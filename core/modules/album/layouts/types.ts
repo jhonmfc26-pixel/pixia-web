@@ -18,6 +18,9 @@ export interface LayoutSchema {
     readonly objectPosition?: string   // override fijo de object-position
     readonly disablePlacement?: boolean // ignora zoom/pan del placement
   }>
+  // true cuando el layout usa celdas vacías ('.') para crear márgenes de papel.
+  // El renderer debe pintar esas celdas con color de papel (crema), nunca negro.
+  readonly hasAir?: boolean
   // Opcional, para futuro autoLayout
   readonly slotOrientations?: ReadonlyArray<ReadonlyArray<LayoutPhotoOrientation>>
 }

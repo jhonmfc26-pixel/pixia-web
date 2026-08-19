@@ -75,6 +75,7 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
             takenAt: photo.takenAt ?? null,
             gps: photo.gps,
             meaningRegions: photo.meaningRegions,
+            contentHash: photo.contentHash,
           }))
         : [],
     }))
@@ -97,6 +98,8 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       placements: Array.isArray(raw.placements) ? new Map(raw.placements as any) : new Map(),
       manualPhotoOrder: Array.isArray(raw.manualPhotoOrder) ? raw.manualPhotoOrder : undefined,
+      // Estructura del editor v2: se preserva tal cual (se valida antes de usar)
+      structure: raw.structure ?? undefined,
       spreads,
     } as AlbumBlueprint
   }
@@ -127,6 +130,7 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
       takenAt: p.takenAt ?? null,
       gps: p.gps,
       meaningRegions: p.meaningRegions,
+      contentHash: p.contentHash,
     })),
   }))
 
@@ -173,5 +177,6 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     placements: Array.isArray(raw.placements) ? new Map(raw.placements as any) : new Map(),
     manualPhotoOrder: Array.isArray(raw.manualPhotoOrder) ? raw.manualPhotoOrder : undefined,
+    structure: raw.structure ?? undefined,
   } as AlbumBlueprint
 }

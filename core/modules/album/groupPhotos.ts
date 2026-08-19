@@ -1,7 +1,8 @@
 import type { ActId, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import { buildChapters } from '@/core/story/buildChapters'
-
-const TEN_MINUTES_MS = 10 * 60 * 1000
+import { segmentChapter } from './segmentChapter'
+import { LAYOUTS } from './layouts/registry'
+import type { LayoutId } from './layouts/registry'
 
 export interface PoolPhoto {
   photo: PhotoAsset
@@ -12,10 +13,10 @@ export interface PhotoGroup {
   photos: PoolPhoto[]
   isChapterOpener: boolean
   chapterId: string
-}
-
-function scoreOf(item: PoolPhoto): number {
-  return item.photo.score?.finalScore ?? 0
+  /** Layout pre-elegido por segmentChapter. Ausente solo en rutas legacy. */
+  layout?: LayoutId
+  /** Pérdida ajustada del layout elegido (para telemetría). */
+  avgLoss?: number
 }
 
 function timestampOf(item: PoolPhoto): number | null {
@@ -32,13 +33,6 @@ function takenAtIso(item: PoolPhoto): string | null {
 
 function chapterIdOf(id: string): string {
   return id === 'chapter-orphan' ? 'huerfano' : id
-}
-
-function isBurstStep(current: PoolPhoto, next: PoolPhoto): boolean {
-  const currentTime = timestampOf(current)
-  const nextTime = timestampOf(next)
-  if (currentTime === null || nextTime === null) return false
-  return nextTime - currentTime < TEN_MINUTES_MS
 }
 
 export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
@@ -60,10 +54,6 @@ export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
   )
 
   const groups: PhotoGroup[] = []
-  let burstCount = 0
-  let pairCount = 0
-  let soloCount = 0
-  let openerCount = 0
 
   for (const chapter of chapters) {
     const chapterId = chapterIdOf(chapter.id)
@@ -73,85 +63,37 @@ export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
 
     if (chapterPhotos.length === 0) continue
 
-    const opener = [...chapterPhotos].sort((a, b) => scoreOf(b) - scoreOf(a))[0]
-    groups.push({
-      photos: [opener],
-      isChapterOpener: true,
-      chapterId,
-    })
-    openerCount += 1
+    const segmented = segmentChapter(chapterPhotos, true)
 
-    const rest = chapterPhotos.filter(item => item.photo.id !== opener.photo.id)
-    let i = 0
+    const capLoss = segmented.length > 0
+      ? segmented.reduce((s, g) => s + g.avgLoss, 0) / segmented.length
+      : 0
 
-    while (i < rest.length) {
-      const burst: PoolPhoto[] = [rest[i]]
-      while (
-        i + burst.length < rest.length &&
-        isBurstStep(rest[i + burst.length - 1], rest[i + burst.length])
-      ) {
-        burst.push(rest[i + burst.length])
-      }
-
-      if (burst.length >= 3) {
-        const size = Math.min(5, burst.length)
-        groups.push({
-          photos: burst.slice(0, size),
-          isChapterOpener: false,
-          chapterId,
-        })
-        burstCount += 1
-        i += size
-        continue
-      }
-
-      if (i + 1 < rest.length) {
-        const curr = rest[i]
-        const nextItem = rest[i + 1]
-        const currOri = curr.photo.orientation || 'landscape'
-        const nextOri = nextItem.photo.orientation || 'landscape'
-
-        if (currOri === nextOri) {
-          // Par homogéneo — el layout de 2 slots siempre encajará
-          groups.push({ photos: [curr, nextItem], isChapterOpener: false, chapterId })
-          pairCount += 1
-          i += 2
-          continue
-        }
-
-        // Orientaciones mixtas: intentar saltar 1 posición para lograr par homogéneo
-        // Máximo 1 salto para no romper la cronología percibida
-        const skipItem = i + 2 < rest.length ? rest[i + 2] : undefined
-        if (skipItem && (skipItem.photo.orientation || 'landscape') === currOri) {
-          groups.push({ photos: [curr, skipItem], isChapterOpener: false, chapterId })
-          pairCount += 1
-          groups.push({ photos: [nextItem], isChapterOpener: false, chapterId })
-          soloCount += 1
-          i += 3
-          continue
-        }
-
-        // Par mixto inevitable → dos solos ('single' + 'portrait')
-        // NUNCA un grupo de 2 con layout de 1 slot
-        groups.push({ photos: [curr], isChapterOpener: false, chapterId })
-        soloCount += 1
-        i += 1
-        continue
-      }
-
+    for (const seg of segmented) {
       groups.push({
-        photos: [rest[i]],
-        isChapterOpener: false,
+        photos: seg.photos,
+        isChapterOpener: seg.isChapterOpener,
         chapterId,
+        layout: seg.layout,
+        avgLoss: seg.avgLoss,
       })
-      soloCount += 1
-      i += 1
     }
+
+    console.log(
+      `[Groups] cap ${chapterId}: ${chapterPhotos.length} fotos → ${segmented.length} grupos` +
+      `  pérd:${(capLoss * 100).toFixed(0)}%`
+    )
   }
 
+  // Resumen global: distribución de tamaños y contraste full-bleed/aire
+  const dist = [1, 2, 3, 4, 5].map(k => groups.filter(g => g.photos.length === k).length)
+  const airCount   = groups.filter(g => g.layout && LAYOUTS.find(l => l.id === g.layout)?.hasAir).length
+  const bleedCount = groups.length - airCount
+
   console.log(
-    `[Groups] ${chapters.length} capítulos, ${groups.length} grupos: ` +
-    `${openerCount} openers, ${burstCount} ráfagas, ${pairCount} pares, ${soloCount} solos`
+    `[Groups] Total: ${chapters.length} cap · ${groups.length} grupos` +
+    `  ×1:${dist[0]} ×2:${dist[1]} ×3:${dist[2]} ×4:${dist[3]} ×5:${dist[4]}` +
+    `  aire:${airCount} bleed:${bleedCount}`
   )
 
   return groups
