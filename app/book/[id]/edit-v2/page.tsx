@@ -4,6 +4,7 @@ export const runtime = 'edge'
 
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import type { AlbumBlueprint, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
@@ -17,33 +18,17 @@ import { Crop, LayoutGrid, Plus, RefreshCw, Star, Trash2, Upload } from 'lucide-
 import { LAYOUTS } from '@/core/modules/album/layouts/registry'
 import FoldStructureViewer from '@/core/modules/foldModel/render/FoldStructureViewer'
 import type { SelState } from '@/core/modules/foldModel/render/selectionTypes'
-import { normalizeFiles } from '@/core/modules/upload/normalizeFiles'
 import { hashFileContent } from '@/core/modules/upload/contentHash'
-import { usePhotoAnalysis } from '@/core/modules/scoring/usePhotoAnalysis'
-import { useUpload } from '@/core/modules/upload/useUpload'
 import { useSession } from '@/core/modules/session/useSession'
+import type { UploadControllerHandle } from './UploadController'
 
-// Mismo chequeo de magic bytes que Step2Upload — el pipeline solo acepta
-// jpeg/png/webp reales, sin confiar en la extensión del archivo.
-type ImageFormat = 'jpeg' | 'png' | 'webp' | 'heic' | 'unknown'
-
-async function detectImageFormat(file: File): Promise<ImageFormat> {
-  try {
-    const buffer = await file.slice(0, 12).arrayBuffer()
-    const b = new Uint8Array(buffer)
-    if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'jpeg'
-    if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'png'
-    if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
-        b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'webp'
-    if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
-      const brand = String.fromCharCode(b[8], b[9], b[10], b[11]).toLowerCase()
-      if (['heic', 'heix', 'hevc', 'mif1', 'msf1', 'avif'].some(t => brand.startsWith(t))) return 'heic'
-    }
-    return 'unknown'
-  } catch {
-    return 'unknown'
-  }
-}
+// normalizeFiles (heic2any ~1.3 MiB + exifr ~72 KiB), usePhotoAnalysis y
+// useUpload viven en UploadController, cargado SOLO en el navegador. edit-v2
+// es runtime='edge': cualquier import estático de ese pipeline —directo o
+// vía import() suelto— termina horneado dentro del .func.js del edge porque
+// Cloudflare Workers no puede pedir un chunk aparte en runtime. ssr:false es
+// el único límite que de verdad lo excluye del render de servidor.
+const UploadController = dynamic(() => import('./UploadController'), { ssr: false })
 
 // ── Popover contextual ────────────────────────────────────────────────────────
 
@@ -469,13 +454,13 @@ export default function EditV2Page() {
     return () => { cancelled = true }
   }, [])
 
-  // ── Subir foto nueva — mismo pipeline que la carga inicial (create flow) ──
-  const { analyzePhotos } = usePhotoAnalysis()
+  // ── Subir foto nueva — pipeline pesado (heic2any/exifr/análisis/R2) vive en
+  // UploadController, montado más abajo vía next/dynamic({ssr:false}) ───────
   const { sessionId } = useSession()
-  const { uploadPhotos } = useUpload(sessionId || '')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [uploadCount, setUploadCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadControllerRef = useRef<UploadControllerHandle>(null)
 
   // Posición compartida con el viewer: portada = 0, primer pliego interior = 1,
   // etc. El editor no tiene vista de portada, así que ?spread=N cae en el
@@ -847,93 +832,18 @@ export default function EditV2Page() {
   }
 
   // ── Subir foto nueva ────────────────────────────────────────────────────────
-  // Mismo pipeline que el upload inicial (Step2Upload): normalizeFiles (HEIC→JPEG,
-  // EXIF preservado) → detección de formato real por magic bytes → análisis
-  // (score/orientación/dimensiones vía usePhotoAnalysis) → subida a R2 (useUpload).
-  // Construye el PhotoAsset resultante y lo agrega al pool de fotos del blueprint
-  // (book.spreads) como un spread de una sola foto — no hay precedente de "agregar
-  // foto" previo a esto, así que photosById (derivado de book.spreads) la recoge
-  // automáticamente en el próximo render.
+  // El pipeline real (normalizeFiles→heic2any/exifr, análisis, subida a R2,
+  // registro en book.spreads) vive en UploadController — este wrapper solo
+  // delega al ref. uploadControllerRef puede tardar un instante en poblarse
+  // (next/dynamic carga el chunk en el navegador la primera vez que se monta);
+  // en la práctica el usuario ya tuvo que abrir el panel y elegir archivo(s)
+  // en el selector del sistema, tiempo de sobra para que cargue.
   const uploadNewPhoto = async (file: File, contentHash: string): Promise<PhotoAsset | null> => {
-    try {
-      const { files: normalized, failed } = await normalizeFiles([file])
-      if (failed.length > 0 || normalized.length === 0) {
-        showToast('No pudimos procesar esa foto', true, 4000)
-        return null
-      }
-      const { file: normFile, heicExif } = normalized[0]
-
-      const fmt = await detectImageFormat(normFile)
-      if (fmt !== 'jpeg' && fmt !== 'png' && fmt !== 'webp') {
-        showToast('Formato no soportado — usa JPG, PNG, WebP o HEIC', true, 4000)
-        return null
-      }
-
-      if (!sessionId) {
-        showToast('Sesión no disponible, reintenta', true, 4000)
-        return null
-      }
-
-      const [analyzed] = await analyzePhotos([normFile])
-      if (!analyzed) {
-        showToast('No pudimos analizar esa foto', true, 4000)
-        return null
-      }
-
-      const photoId = analyzed.id
-      const uploaded = await uploadPhotos([{ file: normFile, photoId }])
-      if (uploaded.length === 0) {
-        showToast('No se pudo subir la foto, reintenta', true, 4000)
-        return null
-      }
-      const up = uploaded[0]
-
-      // La conversión HEIC→JPEG descarta el EXIF — usar el extraído del original.
-      const takenAt = heicExif?.takenAt ?? analyzed.exif.takenAt ?? null
-      const gps =
-        heicExif?.lat != null && heicExif?.lng != null
-          ? { lat: heicExif.lat, lng: heicExif.lng }
-          : analyzed.exif.lat != null && analyzed.exif.lng != null
-            ? { lat: analyzed.exif.lat, lng: analyzed.exif.lng }
-            : undefined
-
-      const newPhoto: PhotoAsset = {
-        id: photoId,
-        r2Key: up.r2Key,
-        url: up.url,
-        thumbnailUrl: up.thumbnailUrl,
-        width: analyzed.width,
-        height: analyzed.height,
-        orientation: analyzed.orientation,
-        // PhotoScore de usePhotoAnalysis no trae uniqueness/emotionalWeight —
-        // mismo default que normalizeBook.ts aplica en el resto del álbum.
-        score: { ...analyzed.score, uniqueness: 100, emotionalWeight: 50 },
-        takenAt,
-        gps,
-        originalName: file.name,
-        meaningRegions: analyzed.meaningRegions,
-        contentHash,
-      }
-
-      setBook(prev => {
-        if (!prev) return prev
-        const newSpread = {
-          id: `spread-upload-${photoId}`,
-          act: 'desarrollo' as const,
-          layout: 'single' as LayoutId,
-          photos: [newPhoto],
-          isLocked: false,
-          pageNumber: prev.spreads.length,
-        }
-        return { ...prev, spreads: [...prev.spreads, newSpread] }
-      })
-
-      return newPhoto
-    } catch (e) {
-      console.error('[EditV2] Error subiendo foto:', e)
-      showToast('No se pudo subir la foto, reintenta', true, 4000)
+    if (!uploadControllerRef.current) {
+      showToast('Un momento, preparando la subida — reintenta', true, 3000)
       return null
     }
+    return uploadControllerRef.current.processOneFile(file, contentHash)
   }
 
   // Dispara el <input type="file"> oculto compartido; al elegir archivo(s),
@@ -1108,6 +1018,9 @@ export default function EditV2Page() {
         onChange={handleFileSelected}
         style={{ display: 'none' }}
       />
+
+      {/* Pipeline de subida — carga solo en el navegador (ssr:false), no renderiza UI */}
+      <UploadController ref={uploadControllerRef} sessionId={sessionId} setBook={setBook} showToast={showToast} />
 
       {/* Barra superior */}
       <div style={{
