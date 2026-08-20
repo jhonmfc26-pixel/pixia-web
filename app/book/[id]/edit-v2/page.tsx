@@ -5,7 +5,8 @@ export const runtime = 'edge'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import type { AlbumBlueprint, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { AlbumBlueprint, CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import CoverEditor from '@/core/modules/cover/CoverEditor'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import type { AlbumStructure, Face } from '@/core/modules/foldModel/types'
@@ -550,6 +551,31 @@ export default function EditV2Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book])
 
+  // ── Portada — inicializada una vez cuando carga el book, mismo patrón que
+  // structure: book.cover es la fuente inicial, después vive en estado local
+  // hasta guardarse junto con structure/spreads en "Listo". ──────────────────
+  const coverInitialized = useRef(false)
+  const [cover, setCoverState] = useState<CoverConfig | null>(null)
+  // Mismo patrón que bookRef/structureRef: handleDone necesita el cover más
+  // reciente, no uno cerrado en un closure viejo.
+  const coverRef = useRef<CoverConfig | null>(null)
+  const setCover = (updater: React.SetStateAction<CoverConfig | null>) => {
+    setCoverState(prev => {
+      const next = typeof updater === 'function'
+        ? (updater as (p: CoverConfig | null) => CoverConfig | null)(prev)
+        : updater
+      coverRef.current = next
+      return next
+    })
+  }
+  const [coverEditorOpen, setCoverEditorOpen] = useState(false)
+
+  useEffect(() => {
+    if (!book || coverInitialized.current) return
+    coverInitialized.current = true
+    setCover(book.cover)
+  }, [book])
+
   // ── Mapa de fotos ───────────────────────────────────────────────────────────
   const photosById = useMemo(() => {
     if (!book) return new Map<string, PhotoAsset>()
@@ -562,6 +588,16 @@ export default function EditV2Page() {
     }
     return map
   }, [book])
+
+  // Fotos candidatas para portada: TODAS las del blueprint, colocadas o no —
+  // el usuario debe poder usar cualquier foto de la bolsa como portada, no
+  // solo las que ya están en alguna cara.
+  const heroPhotos = useMemo(() => [...photosById.values()], [photosById])
+
+  const coverPhotoUrl = useMemo(() => {
+    const photo = (cover?.photoId && photosById.get(cover.photoId)) || heroPhotos[0]
+    return photo?.url
+  }, [cover, photosById, heroPhotos])
 
   // ── Bolsa derivada ──────────────────────────────────────────────────────────
   const [bagOpen, setBagOpen] = useState(false)
@@ -656,6 +692,10 @@ export default function EditV2Page() {
     // structure que referencia una foto que el blueprint enviado no tiene.
     const currentBook = bookRef.current
     const currentStructure = structureRef.current
+    // cover vive en estado local desde que se abre "Editar portada" (igual
+    // que structure) — si nunca se tocó, currentBook.cover ya es el valor
+    // correcto (el que vino cargado), así que el fallback es seguro.
+    const currentCover = coverRef.current ?? currentBook?.cover
     if (!currentStructure || !currentBook || isSaving) return
 
     // Validar antes de persistir — nunca guardar una estructura rota. Se
@@ -702,7 +742,7 @@ export default function EditV2Page() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ blueprint: { ...currentBook, structure: currentStructure }, sessionId: sessionId ?? '' }),
+          body: JSON.stringify({ blueprint: { ...currentBook, structure: currentStructure, cover: currentCover }, sessionId: sessionId ?? '' }),
         })
         if (res.ok) {
           savedOk = true
@@ -721,7 +761,7 @@ export default function EditV2Page() {
         try {
           const raw = localStorage.getItem('pixia_books')
           const books = raw ? JSON.parse(raw) : {}
-          books[id] = { ...books[id], structure: currentStructure, spreads: currentBook.spreads }
+          books[id] = { ...books[id], structure: currentStructure, spreads: currentBook.spreads, cover: currentCover }
           localStorage.setItem('pixia_books', JSON.stringify(books))
           savedOk = true
           console.log('[EditV2] Estructura guardada en localStorage (fallback de emergencia — Supabase falló con sesión válida)')
@@ -1041,23 +1081,61 @@ export default function EditV2Page() {
           Editor v2
         </span>
 
-        {/* Botón "Listo" — guarda y navega */}
-        <button
-          onClick={handleDone}
-          disabled={isSaving}
-          style={{
-            padding: '7px 18px',
-            background: isSaving ? 'rgba(232,85,58,0.5)' : '#E8553A',
-            border: 'none', borderRadius: '8px',
-            color: '#fff', fontSize: '14px', fontWeight: 600,
-            cursor: isSaving ? 'default' : 'pointer',
-            transition: 'background 0.15s',
-            flexShrink: 0,
-          }}
-        >
-          {isSaving ? 'Guardando…' : 'Listo'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Botón "Editar portada" */}
+          <button
+            onClick={() => setCoverEditorOpen(true)}
+            disabled={!cover}
+            style={{
+              padding: '7px 14px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: '8px',
+              color: 'rgba(255,255,255,0.75)',
+              fontSize: '13px', fontWeight: 500,
+              cursor: cover ? 'pointer' : 'default',
+              opacity: cover ? 1 : 0.5,
+              transition: 'background 0.15s, color 0.15s',
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => { if (cover) { e.currentTarget.style.background = 'rgba(232,85,58,0.15)'; e.currentTarget.style.color = '#E8553A' } }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
+          >
+            Editar portada
+          </button>
+
+          {/* Botón "Listo" — guarda y navega */}
+          <button
+            onClick={handleDone}
+            disabled={isSaving}
+            style={{
+              padding: '7px 18px',
+              background: isSaving ? 'rgba(232,85,58,0.5)' : '#E8553A',
+              border: 'none', borderRadius: '8px',
+              color: '#fff', fontSize: '14px', fontWeight: 600,
+              cursor: isSaving ? 'default' : 'pointer',
+              transition: 'background 0.15s',
+              flexShrink: 0,
+            }}
+          >
+            {isSaving ? 'Guardando…' : 'Listo'}
+          </button>
+        </div>
       </div>
+
+      {/* Editor de portada — reusa CoverEditor tal cual, sin tocarlo */}
+      {coverEditorOpen && cover && (
+        <CoverEditor
+          config={cover}
+          occasion={book.occasion}
+          format={book.format || '30x30'}
+          heroPhotos={heroPhotos}
+          photoUrl={coverPhotoUrl}
+          photosById={photosById}
+          onUpdate={setCover}
+          onClose={() => setCoverEditorOpen(false)}
+        />
+      )}
 
       {/* Banner de problemas [DEV] */}
       {problems.length > 0 && (
