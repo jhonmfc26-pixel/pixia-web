@@ -75,6 +75,43 @@ export function slotAreas(layoutId: string): number[] {
   return _slotGeoms(layoutId).map(g => g.area)
 }
 
+// ── Slot dominante ("hero") por geometría ──────────────────────────────────────
+
+const HERO_MIN_RATIO = 1.4
+
+/**
+ * Índice del slot dominante de un layout, calculado por área real (nunca
+ * hardcodeado por nombre) — así layouts futuros heredan el comportamiento
+ * correcto automáticamente.
+ *
+ * Reglas:
+ * - Si un único slot tiene el área máxima Y esa área es > HERO_MIN_RATIO
+ *   veces el promedio de las demás → devuelve su índice (posición dentro de
+ *   photoIds/schema.slots, no necesariamente 0 — ej. hero-3-top tiene el
+ *   slot grande al final).
+ * - Si varios slots empatan en el área máxima (layout simétrico) o no hay
+ *   slots para comparar (1 solo slot) → devuelve null: no hay "destacar"
+ *   con efecto visible en ese layout.
+ */
+export function getHeroSlotIndex(layoutId: string): number | null {
+  const areas = slotAreas(layoutId)
+  if (areas.length < 2) return null
+
+  const maxArea = Math.max(...areas)
+  const EPS = 1e-9
+  const maxIndices: number[] = []
+  areas.forEach((a, i) => { if (Math.abs(a - maxArea) < EPS) maxIndices.push(i) })
+
+  if (maxIndices.length !== 1) return null
+
+  const heroIndex = maxIndices[0]
+  const others = areas.filter((_, i) => i !== heroIndex)
+  const avgOthers = others.reduce((a, b) => a + b, 0) / others.length
+  if (avgOthers <= 0) return null
+
+  return maxArea > HERO_MIN_RATIO * avgOthers ? heroIndex : null
+}
+
 // ── Pérdida de recorte ────────────────────────────────────────────────────────
 
 /**

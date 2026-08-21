@@ -10,8 +10,9 @@ import CoverEditor from '@/core/modules/cover/CoverEditor'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import type { AlbumStructure, Face } from '@/core/modules/foldModel/types'
-import { changeFaceLayout, featurePhoto, removePhoto, addPhotoToFace, replacePhotoFromBag, MAX_FACE_PHOTOS } from '@/core/modules/foldModel/mutations'
+import { changeFaceLayout, featurePhoto, removePhoto, addPhotoToFace, replacePhotoFromBag, reorderWithinFace, MAX_FACE_PHOTOS } from '@/core/modules/foldModel/mutations'
 import { getBag } from '@/core/modules/foldModel/getBag'
+import { getHeroSlotIndex } from '@/core/modules/album/layoutFit'
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import { supabaseBrowser } from '@/lib/supabase-browser'
@@ -64,9 +65,9 @@ function ThumbLayout({ schema, isActive, onClick }: {
   return (
     <button
       onClick={onClick}
+      title={schema.name}
       style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: '4px', padding: '5px 7px', border: 'none', flexShrink: 0,
+        display: 'flex', padding: '6px 7px', border: 'none', flexShrink: 0,
         borderRadius: '7px', cursor: 'pointer',
         background: isActive ? 'rgba(232,85,58,0.12)' : 'transparent',
         boxShadow: isActive ? 'inset 0 0 0 1.5px #E8553A' : 'none',
@@ -88,9 +89,6 @@ function ThumbLayout({ schema, isActive, onClick }: {
           }} />
         ))}
       </div>
-      <span style={{ fontSize: '8px', color: isActive ? '#E8553A' : 'rgba(255,255,255,0.38)', whiteSpace: 'nowrap' }}>
-        {schema.name}
-      </span>
     </button>
   )
 }
@@ -168,12 +166,18 @@ function PhotoActionsPopover({ photoId, anchorRect, photoFace, onAction }: {
   // tiene sentido si aún caben más fotos ahí (misma regla que FaceDesignPanel).
   const canAddToFace = !!photoFace && photoFace.photoIds.length < MAX_FACE_PHOTOS
 
+  // "Destacar" solo tiene efecto visible si el layout tiene un slot dominante
+  // real (por geometría, no por nombre) — en layouts simétricos todos los
+  // slots compiten igual y mover la foto no cambia nada.
+  const canHighlight = !!photoFace && getHeroSlotIndex(photoFace.layout) !== null
+  const visibleActions = PHOTO_ACTIONS.filter(a => a.id !== 'highlight' || canHighlight)
+
   return (
     <div style={{ position: 'fixed', left: `${left}px`, top: `${top}px`, transform: 'translateX(-50%)', zIndex: 120, maxWidth: 'calc(100vw - 32px)' }}>
       <div style={CHROM}>
         <div style={{ display: 'flex', alignItems: 'stretch' }}>
           <div style={{ display: 'flex', padding: '8px 4px' }}>
-            {PHOTO_ACTIONS.map(({ id, label, Icon }) => (
+            {visibleActions.map(({ id, label, Icon }) => (
               <button
                 key={id}
                 onClick={() => onAction(id, photoId)}
@@ -233,6 +237,26 @@ function FaceDesignPanel({ selectedFace, onAction }: {
     l => l.photoCount === selectedFace.photoIds.length && l.scope !== 'spread'
   )
 
+  // Scroll horizontal accesible: arrastre con mouse + rueda vertical (la tira
+  // es horizontal, así que un wheel normal sin shift también debe moverla).
+  // El swipe táctil ya funciona nativo con overflowX:auto, esto no lo pisa.
+  const stripRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ startX: number; startScrollLeft: number } | null>(null)
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const el = stripRef.current
+    if (!el) return
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY
+  }
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    dragRef.current = { startX: e.clientX, startScrollLeft: stripRef.current?.scrollLeft ?? 0 }
+  }
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current || !stripRef.current) return
+    stripRef.current.scrollLeft = dragRef.current.startScrollLeft - (e.clientX - dragRef.current.startX)
+  }
+  const endStripDrag = () => { dragRef.current = null }
+
   return (
     <div style={{
       position: 'fixed',
@@ -281,8 +305,23 @@ function FaceDesignPanel({ selectedFace, onAction }: {
                 </button>
               )}
             </div>
-            {/* Tira scrollable: nunca desborda verticalmente */}
-            <div style={{ display: 'flex', gap: '2px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '2px' }}>
+            {/* Tira scrollable: nunca desborda verticalmente. Arrastre con
+                mouse/rueda + swipe táctil nativo; fade en los bordes como
+                indicador sutil de que hay más layouts. */}
+            <div
+              ref={stripRef}
+              onWheel={handleWheel}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={endStripDrag}
+              onPointerLeave={endStripDrag}
+              style={{
+                display: 'flex', gap: '2px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '2px',
+                cursor: 'grab',
+                WebkitMaskImage: 'linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)',
+                maskImage: 'linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)',
+              }}
+            >
               {faceLayouts.map(schema => (
                 <ThumbLayout
                   key={schema.id}
@@ -795,7 +834,9 @@ export default function EditV2Page() {
     }
     if (action === 'highlight') {
       if (!structure || !photoFace) return
-      if (photoFace.photoIds[0] === targetId) {
+      const heroIndex = getHeroSlotIndex(photoFace.layout)
+      if (heroIndex === null) return // el botón no debería estar visible acá — no-op por seguridad
+      if (photoFace.photoIds[heroIndex] === targetId) {
         showToast('Ya es la foto principal')
         return
       }
@@ -869,6 +910,11 @@ export default function EditV2Page() {
     setSel(null)
     setAnchorRect(null)
     showToast('Foto cambiada')
+  }
+
+  // ── Reordenar fotos dentro de una misma cara (drag) ────────────────────────
+  const handleReorderWithinFace = (faceId: string, fromIndex: number, toIndex: number) => {
+    setStructure(prev => prev ? reorderWithinFace(prev, faceId, fromIndex, toIndex) : prev)
   }
 
   // ── Subir foto nueva ────────────────────────────────────────────────────────
@@ -1157,6 +1203,7 @@ export default function EditV2Page() {
         onSel={handleSel}
         currentFold={currentFold}
         onFoldChange={setCurrentFold}
+        onReorder={handleReorderWithinFace}
       />
 
       {/* Hint: visible cuando no hay selección activa */}

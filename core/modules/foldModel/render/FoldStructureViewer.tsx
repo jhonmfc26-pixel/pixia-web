@@ -1,5 +1,10 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  useDraggable, useDroppable, DragOverlay,
+  type DragStartEvent, type DragOverEvent, type DragEndEvent,
+} from '@dnd-kit/core'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
 import type { AlbumStructure, Face } from '../types'
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
@@ -9,12 +14,107 @@ import type { SelState } from './selectionTypes'
 // Face selection is handled by the parent panel (FoldStructureViewer).
 // FaceReadView only handles photo-level selection inside each slot.
 
-function FaceReadView({ face, photosById, sel, onSel }: {
+/**
+ * Slot de foto dentro de una cara — arrastrable (reordena dentro de la MISMA
+ * cara) y a la vez seleccionable con tap corto. dnd-kit con activation
+ * constraint por distancia distingue ambos gestos: si el puntero no se mueve
+ * más allá del umbral, nunca arranca el drag y el onClick de React llega
+ * normal; si se mueve, dnd-kit toma el gesto y suprime el click posterior.
+ *
+ * No se usa SortableContext/useSortable con su reflow automático a propósito:
+ * los slots viven en celdas de CSS Grid de tamaño HETEROGÉNEO (ej. hero-3-top
+ * tiene un slot 6× más grande que los otros), y el transform de reflow de
+ * useSortable asume una lista de rects más o menos uniforme — se ve raro ahí.
+ * En su lugar: DragOverlay muestra la foto levantada (flota libre, sin
+ * relación con el grid) y el slot bajo el puntero se resalta como indicador
+ * de destino — simple y correcto para cualquier geometría de layout.
+ */
+function DraggableSlot({ slot, photoId, photo, isSelected, hasSel, isDropTarget, isDragged, onSel }: {
+  slot: string
+  photoId: string | undefined
+  photo: PhotoAsset | undefined
+  isSelected: boolean
+  hasSel: boolean
+  isDropTarget: boolean
+  isDragged: boolean
+  onSel: (rect: DOMRect) => void
+}) {
+  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({
+    id: photoId ?? `__empty-${slot}`,
+    disabled: !photoId,
+  })
+  const { setNodeRef: setDropRef } = useDroppable({ id: photoId ?? `__empty-${slot}` })
+  const setRefs = (el: HTMLDivElement | null) => { setDragRef(el); setDropRef(el) }
+
+  return (
+    <div
+      ref={setRefs}
+      {...(photo ? attributes : {})}
+      {...(photo ? listeners : {})}
+      onClick={photo ? (e) => { e.stopPropagation(); onSel(e.currentTarget.getBoundingClientRect()) } : undefined}
+      style={{
+        gridArea: slot,
+        position: 'relative',
+        overflow: 'hidden',
+        background: '#E4E0D8',
+        minWidth: 0, minHeight: 0,
+        cursor: photo ? 'grab' : 'default',
+        touchAction: photo ? 'none' : undefined,
+        // Resaltado: anillo coral inset para selección; anillo más grueso
+        // para indicar dónde caería la foto que se está arrastrando.
+        opacity: isDragged ? 0.25 : (hasSel && !isSelected ? 0.45 : 1),
+        boxShadow: isDropTarget
+          ? 'inset 0 0 0 3px #E8553A'
+          : isSelected ? 'inset 0 0 0 2px #E8553A' : 'none',
+        zIndex: isSelected || isDropTarget ? 1 : 0,
+        transition: 'opacity 0.15s, box-shadow 0.15s',
+      }}
+    >
+      {photo && (
+        <img
+          src={photo.url || photo.thumbnailUrl}
+          alt=""
+          draggable={false}
+          style={{
+            width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center center',
+            display: 'block', userSelect: 'none', pointerEvents: 'none',
+            transform: isSelected ? 'scale(1.03) translateY(-2px)' : 'scale(1)',
+            transition: 'transform 0.15s',
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function FaceReadView({ face, photosById, sel, onSel, onReorder }: {
   face: Face
   photosById: Map<string, PhotoAsset>
   sel: SelState
   onSel: (sel: SelState, rect?: DOMRect) => void
+  onReorder: (faceId: string, fromIndex: number, toIndex: number) => void
 }) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  )
+
+  const handleDragStart = (event: DragStartEvent) => setActiveId(event.active.id as string)
+  const handleDragOver = (event: DragOverEvent) => setOverId(event.over ? (event.over.id as string) : null)
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+    setOverId(null)
+    if (!over || active.id === over.id) return
+    const fromIndex = face.photoIds.indexOf(active.id as string)
+    const toIndex = face.photoIds.indexOf(over.id as string)
+    if (fromIndex === -1 || toIndex === -1) return
+    onReorder(face.id, fromIndex, toIndex)
+  }
+
   // Cara vacía: hueco de edición
   if (face.isEmpty) {
     return (
@@ -51,58 +151,62 @@ function FaceReadView({ face, photosById, sel, onSel }: {
   // Las celdas '.' de layouts con aire deben verse como papel (crema), nunca negro.
   const bgColor = schema.hasAir ? '#F9F6F1' : undefined
   const hasSel = sel !== null
+  const activePhoto = activeId ? photosById.get(activeId) : undefined
 
   return (
-    <div style={{ width: '100%', height: '100%', padding: innerPadding, boxSizing: 'border-box', background: bgColor }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: schema.grid.columns,
-        gridTemplateRows: schema.grid.rows,
-        gridTemplateAreas: schema.grid.areas,
-        gap: '2px', width: '100%', height: '100%',
-      }}>
-        {schema.slots.map((slot, i) => {
-          const photoId = face.photoIds[i]
-          const photo = photoId ? photosById.get(photoId) : undefined
-          const isSelected = !!photoId && sel?.type === 'photo' && sel.id === photoId
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
+      <div style={{ width: '100%', height: '100%', padding: innerPadding, boxSizing: 'border-box', background: bgColor }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: schema.grid.columns,
+          gridTemplateRows: schema.grid.rows,
+          gridTemplateAreas: schema.grid.areas,
+          gap: '2px', width: '100%', height: '100%',
+        }}>
+          {schema.slots.map((slot, i) => {
+            const photoId = face.photoIds[i]
+            const photo = photoId ? photosById.get(photoId) : undefined
+            const isSelected = !!photoId && sel?.type === 'photo' && sel.id === photoId
 
-          return (
-            <div
-              key={slot}
-              onClick={photo ? (e) => { e.stopPropagation(); onSel({ type: 'photo', id: photoId }, e.currentTarget.getBoundingClientRect()) } : undefined}
-              style={{
-                gridArea: slot,
-                position: 'relative',
-                overflow: 'hidden',
-                background: '#E4E0D8',
-                minWidth: 0, minHeight: 0,
-                cursor: photo ? 'pointer' : 'default',
-                // Resaltado: anillo coral inset; otros atenuados
-                opacity: hasSel && !isSelected ? 0.45 : 1,
-                boxShadow: isSelected ? 'inset 0 0 0 2px #E8553A' : 'none',
-                zIndex: isSelected ? 1 : 0,
-                transition: 'opacity 0.15s, box-shadow 0.15s',
-              }}
-            >
-              {photo && (
-                <img
-                  src={photo.url || photo.thumbnailUrl}
-                  alt=""
-                  draggable={false}
-                  style={{
-                    width: '100%', height: '100%',
-                    objectFit: 'cover', objectPosition: 'center center',
-                    display: 'block', userSelect: 'none', pointerEvents: 'none',
-                    transform: isSelected ? 'scale(1.03) translateY(-2px)' : 'scale(1)',
-                    transition: 'transform 0.15s',
-                  }}
-                />
-              )}
-            </div>
-          )
-        })}
+            return (
+              <DraggableSlot
+                key={slot}
+                slot={slot}
+                photoId={photoId}
+                photo={photo}
+                isSelected={isSelected}
+                hasSel={hasSel}
+                isDropTarget={!!photoId && overId === photoId && activeId !== photoId}
+                isDragged={!!photoId && activeId === photoId}
+                onSel={(rect) => onSel({ type: 'photo', id: photoId }, rect)}
+              />
+            )
+          })}
+        </div>
       </div>
-    </div>
+
+      <DragOverlay>
+        {activePhoto ? (
+          <div style={{
+            width: '72px', height: '72px', borderRadius: '4px', overflow: 'hidden',
+            boxShadow: '0 16px 40px rgba(0,0,0,0.5)', transform: 'scale(1.08)',
+            cursor: 'grabbing',
+          }}>
+            <img
+              src={activePhoto.thumbnailUrl || activePhoto.url}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   )
 }
 
@@ -169,11 +273,13 @@ interface FoldStructureViewerProps {
    */
   currentFold: number
   onFoldChange: (idx: number) => void
+  /** Reordena fotos DENTRO de una misma cara (drag) — no cambia el layout. */
+  onReorder: (faceId: string, fromIndex: number, toIndex: number) => void
 }
 
 export default function FoldStructureViewer({
   structure, photosById, sel, onSel, showGutter = true,
-  currentFold, onFoldChange,
+  currentFold, onFoldChange, onReorder,
 }: FoldStructureViewerProps) {
 
   // ── Fit-contain sizing ─────────────────────────────────────────────────────
@@ -245,7 +351,7 @@ export default function FoldStructureViewer({
           : PANEL_SHADOW,
       }}
     >
-      <FaceReadView face={face} photosById={photosById} sel={sel} onSel={onSel} />
+      <FaceReadView face={face} photosById={photosById} sel={sel} onSel={onSel} onReorder={onReorder} />
     </div>
   )
 
