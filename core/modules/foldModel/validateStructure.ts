@@ -67,6 +67,33 @@ export function validateAlbumStructure(
         return { ok: false, reason: `fold[${fi}] face.photoIds no es array` }
       }
 
+      const faceIsDedication = face.kind === 'dedication'
+
+      // Dedicatoria: no usa photoIds (se ignora aunque venga vacío), usa su
+      // propio dedication.photoId — validar esa forma en vez de la de fotos.
+      if (faceIsDedication) {
+        const d = face.dedication
+        if (!d || typeof d !== 'object' || Array.isArray(d)) {
+          return { ok: false, reason: `fold[${fi}] dedication ausente o inválida` }
+        }
+        const ded = d as Record<string, unknown>
+        if (typeof ded.heading !== 'string' || typeof ded.body !== 'string' || typeof ded.signature !== 'string') {
+          return { ok: false, reason: `fold[${fi}] dedication con campos de texto inválidos` }
+        }
+        // Misma regla que isFaceValid (validate.ts): una dedicatoria sin
+        // encabezado NI cuerpo no es un estado guardable, solo de edición.
+        if (!ded.heading.trim() && !ded.body.trim()) {
+          return { ok: false, reason: `fold[${fi}] dedication sin encabezado ni cuerpo` }
+        }
+        if (ded.photoId != null) {
+          if (typeof ded.photoId !== 'string' || !ded.photoId) {
+            return { ok: false, reason: `fold[${fi}] dedication.photoId inválido` }
+          }
+          structurePhotoIds.add(ded.photoId)
+        }
+        continue
+      }
+
       const faceIsEmpty = face.isEmpty === true
       if (!faceIsEmpty && face.photoIds.length === 0) {
         return { ok: false, reason: `fold[${fi}] face.photoIds vacío` }

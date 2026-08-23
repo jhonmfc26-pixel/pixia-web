@@ -1,5 +1,24 @@
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
 
+/** Manuscritas con carácter caligráfico real — deliberadamente pocas opciones. */
+export type DedicationHeadingFontId = 'parisienne' | 'pinyon-script'
+
+/** Serifs clásicas legibles en pantalla e impresión (nunca manuscritas). */
+export type DedicationBodyFontId = 'cormorant' | 'eb-garamond'
+
+/**
+ * Contenido de una cara de dedicatoria (carta). photoId es independiente de
+ * photoIds de Face — una carta no usa el sistema de slots/layout de fotos.
+ */
+export interface DedicationContent {
+  heading: string
+  body: string
+  signature: string
+  headingFont: DedicationHeadingFontId
+  bodyFont: DedicationBodyFontId
+  photoId?: string
+}
+
 /**
  * Una cara (cara física de una hoja): unidad mínima editable del álbum.
  * photoIds está ordenado: photoIds[0] mapea al slot 'a' (hero area en CSS Grid).
@@ -11,6 +30,10 @@ export interface Face {
   photoIds: string[]
   /** true cuando la cara quedó vacía al quitar fotos (estado de edición, no error). */
   isEmpty?: boolean
+  /** 'photos' (default, implícito) o 'dedication' — carta de texto, única por álbum. */
+  kind?: 'photos' | 'dedication'
+  /** Solo presente cuando kind === 'dedication'. photoIds se ignora en ese caso. */
+  dedication?: DedicationContent
 }
 
 /** Pliego normal: dos caras independientes (izquierda + derecha). */
@@ -19,6 +42,8 @@ export interface PairedFold {
   kind: 'paired'
   left: Face
   right: Face
+  /** true si el usuario lo agregó desde el editor (addEmptySpread) — solo esos se pueden eliminar. */
+  userAdded?: boolean
 }
 
 /**
@@ -29,6 +54,8 @@ export interface CompositionFold {
   id: string
   kind: 'composition'
   face: Face
+  /** true si el usuario lo agregó desde el editor — solo esos se pueden eliminar. */
+  userAdded?: boolean
 }
 
 export type Fold = PairedFold | CompositionFold

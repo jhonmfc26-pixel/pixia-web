@@ -38,6 +38,12 @@ export function getSpreadUrls(
 ): string[] {
   const urls: string[] = []
   const addFace = (face: Face) => {
+    if (face.kind === 'dedication') {
+      const p = face.dedication?.photoId ? photosById.get(face.dedication.photoId) : undefined
+      const url = p?.url || p?.thumbnailUrl
+      if (url) urls.push(url)
+      return
+    }
     for (const id of face.photoIds) {
       const p = photosById.get(id)
       const url = p?.url || p?.thumbnailUrl

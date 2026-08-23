@@ -9,6 +9,7 @@ import { getLayoutById } from '@/core/modules/album/layouts/helpers'
 import type { AlbumStructure, Face } from '../types'
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { SelState } from './selectionTypes'
+import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
 
 // ── Render de cara genérica con selección ─────────────────────────────────────
 // Face selection is handled by the parent panel (FoldStructureViewer).
@@ -113,6 +114,26 @@ function FaceReadView({ face, photosById, sel, onSel, onReorder }: {
     const toIndex = face.photoIds.indexOf(over.id as string)
     if (fromIndex === -1 || toIndex === -1) return
     onReorder(face.id, fromIndex, toIndex)
+  }
+
+  // Dedicatoria: no usa el sistema de slots — selección de CARA completa
+  // (abre el panel de dedicatoria), no de foto individual. Mismo componente
+  // de render que el viewer 3D (DedicationCard) — WYSIWYG.
+  if (face.kind === 'dedication' && face.dedication) {
+    const photo = face.dedication.photoId ? photosById.get(face.dedication.photoId) : undefined
+    const isSelected = sel?.type === 'face' && sel.id === face.id
+    return (
+      <div
+        onClick={(e) => { e.stopPropagation(); onSel({ type: 'face', id: face.id }, e.currentTarget.getBoundingClientRect()) }}
+        style={{
+          width: '100%', height: '100%', cursor: 'pointer', position: 'relative',
+          boxShadow: isSelected ? 'inset 0 0 0 2px #E8553A' : 'none',
+          transition: 'box-shadow 0.15s',
+        }}
+      >
+        <DedicationCard dedication={face.dedication} photo={photo} />
+      </div>
+    )
   }
 
   // Cara vacía: hueco de edición

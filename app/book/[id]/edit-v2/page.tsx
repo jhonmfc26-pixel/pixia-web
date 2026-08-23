@@ -9,19 +9,26 @@ import type { AlbumBlueprint, CoverConfig, PhotoAsset } from '@/core/contracts/A
 import CoverEditor from '@/core/modules/cover/CoverEditor'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
-import type { AlbumStructure, Face } from '@/core/modules/foldModel/types'
-import { changeFaceLayout, featurePhoto, removePhoto, addPhotoToFace, replacePhotoFromBag, reorderWithinFace, MAX_FACE_PHOTOS } from '@/core/modules/foldModel/mutations'
+import type { AlbumStructure, DedicationContent, Face } from '@/core/modules/foldModel/types'
+import {
+  changeFaceLayout, featurePhoto, removePhoto, addPhotoToFace, replacePhotoFromBag, reorderWithinFace,
+  addEmptySpread, removeSpread, convertToDedication, revertDedicationToPhotos, updateDedication, MAX_FACE_PHOTOS,
+} from '@/core/modules/foldModel/mutations'
 import { getBag } from '@/core/modules/foldModel/getBag'
 import { getHeroSlotIndex } from '@/core/modules/album/layoutFit'
+import { hasDedication } from '@/core/modules/foldModel/validate'
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import { supabaseBrowser } from '@/lib/supabase-browser'
-import { Crop, LayoutGrid, Plus, RefreshCw, Star, Trash2, Upload } from 'lucide-react'
+import { Crop, LayoutGrid, PenLine, Plus, RefreshCw, Star, Trash2, Upload } from 'lucide-react'
 import { LAYOUTS } from '@/core/modules/album/layouts/registry'
 import FoldStructureViewer from '@/core/modules/foldModel/render/FoldStructureViewer'
 import type { SelState } from '@/core/modules/foldModel/render/selectionTypes'
 import { hashFileContent } from '@/core/modules/upload/contentHash'
 import { useSession } from '@/core/modules/session/useSession'
+import { getDedicationTemplate } from '@/core/modules/dedication/templates'
+import { DEDICATION_HEADING_FONTS, DEDICATION_BODY_FONTS } from '@/core/modules/dedication/fonts'
+import DedicationEditor from '@/core/modules/dedication/DedicationEditor'
 import type { UploadControllerHandle } from './UploadController'
 
 // normalizeFiles (heic2any ~1.3 MiB + exifr ~72 KiB), usePhotoAnalysis y
@@ -229,8 +236,9 @@ function PhotoActionsPopover({ photoId, anchorRect, photoFace, onAction }: {
  * no de foto. Nunca clipea independientemente de dónde esté la foto.
  * La tira de layouts es scrollable horizontalmente si hay muchos.
  */
-function FaceDesignPanel({ selectedFace, onAction }: {
+function FaceDesignPanel({ selectedFace, canConvertToDedication, onAction }: {
   selectedFace: Face
+  canConvertToDedication: boolean
   onAction: (action: string, id: string) => void
 }) {
   const faceLayouts = LAYOUTS.filter(
@@ -287,6 +295,24 @@ function FaceDesignPanel({ selectedFace, onAction }: {
               <LayoutGrid size={13} strokeWidth={1.5} />
               Agregar foto desde bolsa
             </button>
+
+            {/* Solo puede haber UNA dedicatoria por álbum — oculto si ya existe una */}
+            {canConvertToDedication && (
+              <button
+                onClick={() => onAction('convert-to-dedication', selectedFace.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '7px 12px', marginTop: '6px', border: 'none', borderRadius: '7px',
+                  background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)',
+                  fontSize: '12px', cursor: 'pointer', transition: 'background 0.12s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(232,85,58,0.12)'; e.currentTarget.style.color = '#E8553A' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)' }}
+              >
+                <PenLine size={13} strokeWidth={1.5} />
+                Convertir en dedicatoria
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ padding: '10px 10px 8px' }}>
@@ -333,6 +359,57 @@ function FaceDesignPanel({ selectedFace, onAction }: {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Panel fijo cuando la cara seleccionada YA es una dedicatoria — reemplaza a
+ * FaceDesignPanel en ese caso (no tiene sentido mostrarle tiras de layout de
+ * fotos a una carta). Misma posición/estética, dos acciones nada más.
+ */
+function DedicationSelectedPanel({ onEdit, onRevert }: {
+  onEdit: () => void
+  onRevert: () => void
+}) {
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: '72px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 120,
+      maxWidth: 'min(calc(100vw - 32px), 400px)',
+      width: 'max-content',
+    }}>
+      <div style={CHROM}>
+        <div style={{ padding: '10px', display: 'flex', gap: '8px' }}>
+          <button
+            onClick={onEdit}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '8px 14px', border: 'none', borderRadius: '7px',
+              background: 'rgba(232,85,58,0.14)', color: '#E8553A',
+              fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            <PenLine size={13} strokeWidth={1.5} />
+            Editar dedicatoria
+          </button>
+          <button
+            onClick={onRevert}
+            style={{
+              padding: '8px 14px', border: 'none', borderRadius: '7px',
+              background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)',
+              fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background 0.12s, color 0.12s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.6)' }}
+          >
+            Volver a fotos
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -649,6 +726,14 @@ export default function EditV2Page() {
   // ── Cambiar foto (reemplazo en la misma posición, desde la bolsa) ─────────
   const [replaceTarget, setReplaceTarget] = useState<{ faceId: string; oldPhotoId: string } | null>(null)
 
+  // ── Dedicatoria (Brick 2) ────────────────────────────────────────────────
+  // faceId de la dedicatoria abierta en el panel de edición (null = cerrado).
+  const [dedicationEditorFaceId, setDedicationEditorFaceId] = useState<string | null>(null)
+  // faceId de la dedicatoria esperando una foto recién subida — mismo patrón
+  // que replaceTarget/bagTargetFaceId: el input oculto compartido decide qué
+  // hacer con el archivo según cuál de estos tres esté seteado.
+  const [dedicationPhotoTarget, setDedicationPhotoTarget] = useState<string | null>(null)
+
   const bagPhotos = useMemo(() => {
     if (!structure) return []
     return getBag(structure, [...photosById.values()])
@@ -672,6 +757,24 @@ export default function EditV2Page() {
   const bagCapacity = bagTargetFace
     ? (bagTargetFace.isEmpty ? MAX_FACE_PHOTOS : Math.max(0, MAX_FACE_PHOTOS - bagTargetFace.photoIds.length))
     : MAX_FACE_PHOTOS
+
+  // Solo puede haber UNA dedicatoria por álbum — el botón "Convertir" se
+  // oculta en todas las caras vacías en cuanto existe una en cualquier lado.
+  const canConvertToDedication = !!structure && !hasDedication(structure)
+
+  // Cara de la dedicatoria abierta en el panel de edición
+  const dedicationEditorFace = useMemo((): Face | null => {
+    if (!structure || !dedicationEditorFaceId) return null
+    for (const fold of structure.folds) {
+      if (fold.kind === 'paired') {
+        if (fold.left.id  === dedicationEditorFaceId) return fold.left
+        if (fold.right.id === dedicationEditorFaceId) return fold.right
+      } else {
+        if (fold.face.id === dedicationEditorFaceId) return fold.face
+      }
+    }
+    return null
+  }, [structure, dedicationEditorFaceId])
 
   // ── Selección + ancla para popover ──────────────────────────────────────────
   const [sel, setSel] = useState<SelState>(null)
@@ -867,9 +970,54 @@ export default function EditV2Page() {
       setReplaceTarget({ faceId: photoFace.id, oldPhotoId: targetId })
       return
     }
+    if (action === 'convert-to-dedication') {
+      if (!structure || !book) return
+      // Red de seguridad — el botón que dispara esto ya está oculto si
+      // canConvertToDedication es false (solo puede haber una en el álbum).
+      if (hasDedication(structure)) return
+      const seed: DedicationContent = {
+        ...getDedicationTemplate(book.occasion),
+        headingFont: DEDICATION_HEADING_FONTS[0].id as DedicationContent['headingFont'],
+        bodyFont: DEDICATION_BODY_FONTS[0].id as DedicationContent['bodyFont'],
+      }
+      const newStructure = convertToDedication(structure, targetId, seed)
+      setStructure(newStructure)
+      setSel({ type: 'face', id: targetId })
+      setDedicationEditorFaceId(targetId)
+      showToast('Dedicatoria creada')
+      return
+    }
     const msg = `[${action}] ${targetId}`
     console.log('[EditV2 placeholder]', msg)
     showToast(msg)
+  }
+
+  // ── Dedicatoria: editar/revertir/foto ───────────────────────────────────────
+  const handleUpdateDedicationField = (faceId: string, patch: Partial<DedicationContent>) => {
+    setStructure(prev => prev ? updateDedication(prev, faceId, patch) : prev)
+  }
+
+  const handleRevertDedication = (faceId: string) => {
+    if (!structure) return
+    setStructure(revertDedicationToPhotos(structure, faceId))
+    setDedicationEditorFaceId(null)
+    setSel(null)
+    setAnchorRect(null)
+    showToast('Dedicatoria revertida a página de fotos')
+  }
+
+  const handlePickDedicationPhoto = (faceId: string, photoId: string) => {
+    handleUpdateDedicationField(faceId, { photoId })
+  }
+
+  const handleRemoveDedicationPhoto = (faceId: string) => {
+    handleUpdateDedicationField(faceId, { photoId: undefined })
+  }
+
+  const handleUploadNewDedicationPhoto = (faceId: string) => {
+    setDedicationPhotoTarget(faceId)
+    if (fileInputRef.current) fileInputRef.current.multiple = false
+    fileInputRef.current?.click()
   }
 
   // ── Agregar desde bolsa (selección múltiple hasta el cupo) ─────────────────
@@ -915,6 +1063,46 @@ export default function EditV2Page() {
   // ── Reordenar fotos dentro de una misma cara (drag) ────────────────────────
   const handleReorderWithinFace = (faceId: string, fromIndex: number, toIndex: number) => {
     setStructure(prev => prev ? reorderWithinFace(prev, faceId, fromIndex, toIndex) : prev)
+  }
+
+  // ── "+ Página nueva" — pliego completo con 2 huecos al final ───────────────
+  const handleAddSpread = () => {
+    if (!structure) return
+    const newStructure = addEmptySpread(structure)
+    setStructure(newStructure)
+    setCurrentFold(newStructure.folds.length - 1) // navega directo al pliego nuevo
+    setSel(null)
+    setAnchorRect(null)
+    showToast('Pliego nuevo agregado')
+  }
+
+  // Pliego actual — mismo clamp que hace FoldStructureViewer internamente
+  // para leer folds[displayFold] sin salirse de rango.
+  const currentFoldData = structure
+    ? structure.folds[Math.max(0, Math.min(structure.folds.length - 1, currentFold))]
+    : null
+  const canRemoveCurrentSpread = !!currentFoldData?.userAdded
+
+  // ── "Eliminar este pliego" — solo pliegos agregados por el usuario ─────────
+  const handleRemoveSpread = () => {
+    if (!structure || !currentFoldData || !currentFoldData.userAdded) return
+    const photoCount = currentFoldData.kind === 'paired'
+      ? currentFoldData.left.photoIds.length + currentFoldData.right.photoIds.length
+      : currentFoldData.face.photoIds.length
+
+    if (photoCount > 0) {
+      const confirmed = window.confirm(
+        `Este pliego tiene ${photoCount} foto${photoCount !== 1 ? 's' : ''}. ¿Moverlas a la bolsa y eliminar el pliego?`
+      )
+      if (!confirmed) return
+    }
+
+    const newStructure = removeSpread(structure, currentFoldData.id)
+    setStructure(newStructure)
+    setCurrentFold(prev => Math.max(0, Math.min(newStructure.folds.length - 1, prev)))
+    setSel(null)
+    setAnchorRect(null)
+    showToast('Pliego eliminado')
   }
 
   // ── Subir foto nueva ────────────────────────────────────────────────────────
@@ -979,6 +1167,35 @@ export default function EditV2Page() {
         setSel(null)
         setAnchorRect(null)
         showToast(existing ? 'Ya tienes esta foto, no la subimos de nuevo.' : 'Foto cambiada')
+      } finally {
+        setUploadingPhoto(false)
+      }
+      return
+    }
+
+    if (dedicationPhotoTarget) {
+      setUploadingPhoto(true)
+      setUploadCount(1)
+      try {
+        const hash = await hashFileContent(files[0])
+        const existing = albumByHash.get(hash)
+
+        let newPhotoId: string
+        if (existing) {
+          if (!isInBag(existing.id)) {
+            showToast('Esta foto ya está en tu álbum.', false, 3000)
+            return
+          }
+          newPhotoId = existing.id
+          showToast('Ya tienes esta foto, no la subimos de nuevo.')
+        } else {
+          const newPhoto = await uploadNewPhoto(files[0], hash)
+          if (!newPhoto) return
+          newPhotoId = newPhoto.id
+        }
+
+        handleUpdateDedicationField(dedicationPhotoTarget, { photoId: newPhotoId })
+        setDedicationPhotoTarget(null)
       } finally {
         setUploadingPhoto(false)
       }
@@ -1128,6 +1345,51 @@ export default function EditV2Page() {
         </span>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Botón "+ Página nueva" — pliego completo (2 huecos) al final */}
+          <button
+            onClick={handleAddSpread}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '5px',
+              padding: '7px 12px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: '8px',
+              color: 'rgba(255,255,255,0.75)',
+              fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'background 0.15s, color 0.15s',
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(232,85,58,0.15)'; e.currentTarget.style.color = '#E8553A' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
+          >
+            <Plus size={14} strokeWidth={1.5} />
+            Página
+          </button>
+
+          {/* Botón "Eliminar este pliego" — SOLO visible en pliegos agregados por el usuario */}
+          {canRemoveCurrentSpread && (
+            <button
+              onClick={handleRemoveSpread}
+              title="Eliminar este pliego"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '32px', height: '32px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.14)',
+                borderRadius: '8px',
+                color: 'rgba(255,255,255,0.75)',
+                cursor: 'pointer',
+                transition: 'background 0.15s, color 0.15s',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,60,50,0.18)'; e.currentTarget.style.color = '#ff8080' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
+            >
+              <Trash2 size={15} strokeWidth={1.5} />
+            </button>
+          )}
+
           {/* Botón "Editar portada" */}
           <button
             onClick={() => setCoverEditorOpen(true)}
@@ -1183,6 +1445,23 @@ export default function EditV2Page() {
         />
       )}
 
+      {/* Editor de dedicatoria */}
+      {dedicationEditorFaceId && dedicationEditorFace?.dedication && (
+        <DedicationEditor
+          dedication={dedicationEditorFace.dedication}
+          photo={dedicationEditorFace.dedication.photoId ? photosById.get(dedicationEditorFace.dedication.photoId) : undefined}
+          bagPhotos={bagPhotos}
+          uploading={uploadingPhoto}
+          uploadCount={uploadCount}
+          onSave={patch => handleUpdateDedicationField(dedicationEditorFaceId, patch)}
+          onPickPhoto={photoId => handlePickDedicationPhoto(dedicationEditorFaceId, photoId)}
+          onRemovePhoto={() => handleRemoveDedicationPhoto(dedicationEditorFaceId)}
+          onUploadNew={() => handleUploadNewDedicationPhoto(dedicationEditorFaceId)}
+          onRevert={() => handleRevertDedication(dedicationEditorFaceId)}
+          onClose={() => setDedicationEditorFaceId(null)}
+        />
+      )}
+
       {/* Banner de problemas [DEV] */}
       {problems.length > 0 && (
         <div style={{
@@ -1228,12 +1507,21 @@ export default function EditV2Page() {
         />
       )}
 
-      {/* Panel fijo: diseño de cara (bottom-center, nunca clipea) */}
-      {sel?.type === 'face' && selectedFace && !bagOpen && !replaceTarget && (
-        <FaceDesignPanel
-          selectedFace={selectedFace}
-          onAction={handleAction}
-        />
+      {/* Panel fijo: diseño de cara (bottom-center, nunca clipea) — o el panel
+          de dedicatoria si la cara seleccionada ya es una carta */}
+      {sel?.type === 'face' && selectedFace && !bagOpen && !replaceTarget && !dedicationEditorFaceId && (
+        selectedFace.kind === 'dedication' ? (
+          <DedicationSelectedPanel
+            onEdit={() => setDedicationEditorFaceId(selectedFace.id)}
+            onRevert={() => handleRevertDedication(selectedFace.id)}
+          />
+        ) : (
+          <FaceDesignPanel
+            selectedFace={selectedFace}
+            canConvertToDedication={canConvertToDedication}
+            onAction={handleAction}
+          />
+        )
       )}
 
       {/* Panel de bolsa — selección múltiple hasta el cupo de la cara */}

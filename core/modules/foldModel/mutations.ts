@@ -1,7 +1,8 @@
-import type { AlbumStructure, Face, Fold } from './types'
+import type { AlbumStructure, DedicationContent, Face, Fold, PairedFold } from './types'
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
-import { isFaceValid } from './validate'
+import { isFaceValid, hasDedication } from './validate'
 import { rankLayoutsForPhotos, getHeroSlotIndex } from '@/core/modules/album/layoutFit'
+import { newFoldId, newFaceId } from './ids'
 
 // ── changeFaceLayout helpers ──────────────────────────────────────────────────
 
@@ -358,4 +359,161 @@ export function changeFaceLayout(
   }
 
   return { ...structure, folds: structure.folds.map(f => patchFoldFace(f, faceId, newLayout)) }
+}
+
+// ── Pliegos: agregar / eliminar (Brick 1 — "+ Página nueva") ──────────────────
+
+/**
+ * Agrega un PairedFold nuevo al final de structure.folds, con left/right
+ * como caras vacías (mismo "hueco de edición" que deja removePhoto cuando
+ * una cara se queda sin fotos — isEmpty:true, layout de referencia sin
+ * significado visual porque FaceReadView no lo usa en huecos).
+ * Marcado con userAdded:true para que removeSpread solo pueda borrar
+ * pliegos agregados así, nunca los originales del álbum.
+ * Pura e inmutable — nunca falla (las caras vacías son estado válido).
+ */
+export function addEmptySpread(structure: AlbumStructure): AlbumStructure {
+  const emptyFace = (): Face => ({
+    id: newFaceId(),
+    layout: 'single',
+    photoIds: [],
+    isEmpty: true,
+  })
+
+  const newFold: PairedFold = {
+    id: newFoldId(),
+    kind: 'paired',
+    left: emptyFace(),
+    right: emptyFace(),
+    userAdded: true,
+  }
+
+  return { ...structure, folds: [...structure.folds, newFold] }
+}
+
+/**
+ * Elimina un pliego por id — SOLO si fue agregado por el usuario
+ * (userAdded:true); no-op si es un pliego original del álbum, protegiendo
+ * la paridad y el contenido generado. Las fotos que tuviera colocadas no se
+ * pierden: al sacar el fold de structure, esos photoIds dejan de estar
+ * referenciados en cualquier cara y getBag() los recoge automáticamente
+ * como "fotos del blueprint no usadas" — no hace falta moverlas a mano,
+ * el blueprint (book.spreads) no se toca acá, solo structure.
+ * Pura e inmutable.
+ */
+export function removeSpread(structure: AlbumStructure, foldId: string): AlbumStructure {
+  const fold = structure.folds.find(f => f.id === foldId)
+  if (!fold) {
+    console.warn('[removeSpread] foldId no encontrado:', foldId)
+    return structure
+  }
+  if (!fold.userAdded) {
+    console.warn('[removeSpread] no se puede eliminar un pliego original:', foldId)
+    return structure
+  }
+
+  return { ...structure, folds: structure.folds.filter(f => f.id !== foldId) }
+}
+
+// ── Dedicatoria (Brick 2) — UNA sola por álbum, en cualquier cara vacía ────────
+
+function findFace(structure: AlbumStructure, faceId: string): Face | null {
+  for (const fold of structure.folds) {
+    if (fold.kind === 'paired') {
+      if (fold.left.id  === faceId) return fold.left
+      if (fold.right.id === faceId) return fold.right
+    } else {
+      if (fold.face.id === faceId) return fold.face
+    }
+  }
+  return null
+}
+
+/**
+ * Convierte una cara VACÍA en una dedicatoria (carta), sembrada con `seed`
+ * (el caller arma la plantilla según book.occasion — mutations.ts no conoce
+ * de ocasiones, solo de estructura). Restricción dura: solo puede haber una
+ * dedicatoria en todo el álbum — no-op si ya existe una, aunque el botón que
+ * dispara esto ya debería estar oculto en ese caso (red de seguridad).
+ * Pura e inmutable.
+ */
+export function convertToDedication(
+  structure: AlbumStructure,
+  faceId: string,
+  seed: DedicationContent,
+): AlbumStructure {
+  if (hasDedication(structure)) {
+    console.warn('[convertToDedication] ya existe una dedicatoria en el álbum — no-op')
+    return structure
+  }
+
+  const target = findFace(structure, faceId)
+  if (!target) {
+    console.warn('[convertToDedication] faceId no encontrado:', faceId)
+    return structure
+  }
+  if (!target.isEmpty) {
+    console.warn('[convertToDedication] la cara no está vacía:', faceId)
+    return structure
+  }
+
+  const updatedFace: Face = {
+    id: target.id,
+    layout: target.layout,
+    photoIds: [],
+    isEmpty: false,
+    kind: 'dedication',
+    dedication: seed,
+  }
+
+  return { ...structure, folds: structure.folds.map(f => patchFoldFaceWithFace(f, faceId, updatedFace)) }
+}
+
+/**
+ * Revierte una dedicatoria a cara de fotos vacía (mismo hueco de edición que
+ * cualquier otra) — el usuario la llena de nuevo con las herramientas ya
+ * existentes. La foto que tuviera la dedicatoria (si alguna) no se pierde:
+ * al dejar de estar referenciada, getBag() la recoge como bolsa automático.
+ * Libera el cupo de "una sola dedicatoria" para que la opción reaparezca en
+ * otras caras vacías. Pura e inmutable.
+ */
+export function revertDedicationToPhotos(structure: AlbumStructure, faceId: string): AlbumStructure {
+  const target = findFace(structure, faceId)
+  if (!target) {
+    console.warn('[revertDedicationToPhotos] faceId no encontrado:', faceId)
+    return structure
+  }
+  if (target.kind !== 'dedication') {
+    console.warn('[revertDedicationToPhotos] la cara no es una dedicatoria:', faceId)
+    return structure
+  }
+
+  const updatedFace: Face = {
+    id: target.id,
+    layout: target.layout,
+    photoIds: [],
+    isEmpty: true,
+    kind: 'photos',
+  }
+
+  return { ...structure, folds: structure.folds.map(f => patchFoldFaceWithFace(f, faceId, updatedFace)) }
+}
+
+/**
+ * Actualiza campos de una dedicatoria existente (heading/body/signature,
+ * tipografías, foto) — edición en vivo desde el panel. Pura e inmutable.
+ */
+export function updateDedication(
+  structure: AlbumStructure,
+  faceId: string,
+  patch: Partial<DedicationContent>,
+): AlbumStructure {
+  const target = findFace(structure, faceId)
+  if (!target || target.kind !== 'dedication' || !target.dedication) {
+    console.warn('[updateDedication] la cara no es una dedicatoria válida:', faceId)
+    return structure
+  }
+
+  const updatedFace: Face = { ...target, dedication: { ...target.dedication, ...patch } }
+  return { ...structure, folds: structure.folds.map(f => patchFoldFaceWithFace(f, faceId, updatedFace)) }
 }

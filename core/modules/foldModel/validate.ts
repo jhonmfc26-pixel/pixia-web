@@ -7,12 +7,45 @@ export function getLayoutPhotoCount(layout: LayoutId): number {
 }
 
 export function isFaceValid(face: Face): boolean {
+  // Dedicatoria: no usa el sistema de slots/photoIds — válida si tiene
+  // contenido de texto, sin importar photoCount del layout de referencia.
+  if (face.kind === 'dedication') {
+    const d = face.dedication
+    return !!d && (d.heading.trim().length > 0 || d.body.trim().length > 0)
+  }
   if (face.isEmpty) return true  // hueco de edición — válido aunque photoIds esté vacío
   return getLayoutPhotoCount(face.layout) === face.photoIds.length
 }
 
 function facesOf(fold: Fold): Face[] {
   return fold.kind === 'paired' ? [fold.left, fold.right] : [fold.face]
+}
+
+/** true si alguna cara del álbum ya es una dedicatoria — solo puede haber una. */
+export function hasDedication(structure: AlbumStructure): boolean {
+  for (const fold of structure.folds) {
+    for (const face of facesOf(fold)) {
+      if (face.kind === 'dedication') return true
+    }
+  }
+  return false
+}
+
+/**
+ * Cuenta las caras vacías (huecos) del álbum — ej. pliegos agregados con
+ * "+ Página nueva" que el usuario todavía no llenó. Gancho para el aviso de
+ * checkout ("Tienes N páginas sin fotos, ¿comprar así?"); ese aviso en sí es
+ * responsabilidad del flujo de compra, no de este módulo — acá solo se deja
+ * la función pura y reusable para detectarlo.
+ */
+export function countEmptyFaces(structure: AlbumStructure): number {
+  let count = 0
+  for (const fold of structure.folds) {
+    for (const face of facesOf(fold)) {
+      if (face.isEmpty) count++
+    }
+  }
+  return count
 }
 
 /**
@@ -27,6 +60,19 @@ export function validateAlbumStructure(album: AlbumStructure): { ok: boolean; pr
 
   for (const fold of album.folds) {
     for (const face of facesOf(fold)) {
+      if (face.kind === 'dedication') {
+        if (!isFaceValid(face)) {
+          problems.push(`Face "${face.id}" es una dedicatoria sin encabezado ni cuerpo`)
+        }
+        if (face.dedication?.photoId) {
+          if (seen.has(face.dedication.photoId)) {
+            problems.push(`Photo "${face.dedication.photoId}" appears more than once in the album`)
+          }
+          seen.add(face.dedication.photoId)
+        }
+        continue
+      }
+
       if (face.isEmpty) continue  // hueco de edición — no validar conteo ni unicidad
 
       if (!isFaceValid(face)) {

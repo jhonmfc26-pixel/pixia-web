@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { Face } from '@/core/modules/foldModel/types'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
+import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
 
 /**
  * Sombra de lomo pegada al borde interior de la propia página, no un overlay
@@ -34,7 +35,10 @@ export function FacePageView({ face, photosById, side }: {
   side?: 'left' | 'right'
 }) {
   let content: ReactNode
-  if (face.isEmpty) {
+  if (face.kind === 'dedication' && face.dedication) {
+    const photo = face.dedication.photoId ? photosById.get(face.dedication.photoId) : undefined
+    content = <DedicationCard dedication={face.dedication} photo={photo} />
+  } else if (face.isEmpty) {
     content = <div style={{ width: '100%', height: '100%', background: '#F9F6F1' }} />
   } else {
     const schema = getLayoutById(face.layout)
