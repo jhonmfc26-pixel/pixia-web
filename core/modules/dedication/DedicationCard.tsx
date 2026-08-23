@@ -25,6 +25,19 @@ const EARTH_LINE = 'rgba(140,120,90,0.28)'
  * tamaño MUY distinto según el contexto (miniatura del editor vs página
  * completa del viewer) — cqw escala el texto relativo a SU propia caja, no
  * al viewport, así se ve proporcionado en ambos lados sin lógica extra.
+ *
+ * Tamaños en cqw calibrados por conversión física, no a ojo: la carta ocupa
+ * UNA cara = UNA página física de 30×30cm (formato square-30) → 1cqw = 1%
+ * de 300mm = 3mm = 3×(72/25.4) ≈ 8.5pt. Con eso: 1.5cqw de cuerpo ≈ 12.8pt
+ * y 3.9cqw de encabezado ≈ 33.2pt impresos — carta elegante, no póster (el
+ * cqw anterior, 2.3/8.5, imprimía a ~32pt/62pt). El piso (min) de cada
+ * clamp es más grande que el valor cqw puro en anchos de pantalla típicos
+ * (~380-680px del editor) a propósito — mantiene el texto legible mientras
+ * se edita; el techo (max) es generoso a propósito para no recortar el
+ * tamaño correcto a resolución de impresión real (300dpi, ~3543px de
+ * ancho), donde el propio cqw ya gobierna sin tocar el techo. ÚNICO render
+ * hoy (no hay pipeline de impresión aparte y alcanzable — ver limits.ts),
+ * así que esto es WYSIWYG por construcción, no por sincronizar dos sitios.
  */
 export function DedicationCard({ dedication, photo }: {
   dedication: DedicationContent
@@ -48,19 +61,25 @@ export function DedicationCard({ dedication, photo }: {
         pointerEvents: 'none',
       }} />
 
-      {/* Contenido — centrado vertical, con aire generoso arriba y abajo */}
+      {/* Contenido — centrado vertical, con aire generoso arriba y abajo.
+          Padding subido de 15%/14% a 17%/12% (más aire vertical, un poco
+          menos horizontal para que el cuerpo tenga más ancho de línea) y
+          gap bajado de 5.5% a 3% — con justify-content:center, un bloque
+          más alto que el disponible desborda PAREJO por ambos lados (por
+          eso encabezado arriba y cuerpo abajo tocaban el borde a la vez);
+          esto + BODY_MAX más bajo (ver limits.ts) es lo que lo resuelve. */}
       <div style={{
         position: 'relative', width: '100%', height: '100%',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        padding: '15% 14%',
+        padding: '17% 12%',
         boxSizing: 'border-box',
         textAlign: 'center',
-        gap: '5.5%',
+        gap: '3%',
       }}>
         <h2 style={{
           margin: 0,
           fontFamily: getHeadingFontFamily(dedication.headingFont),
-          fontSize: 'clamp(22px, 8.5cqw, 50px)',
+          fontSize: 'clamp(16px, 3.9cqw, 150px)',
           fontWeight: 400,
           color: INK_HEADING,
           lineHeight: 1.2,
@@ -103,7 +122,7 @@ export function DedicationCard({ dedication, photo }: {
           <p style={{
             margin: 0,
             fontFamily: getBodyFontFamily(dedication.bodyFont),
-            fontSize: 'clamp(11px, 2.9cqw, 17px)',
+            fontSize: 'clamp(9px, 1.5cqw, 60px)',
             lineHeight: 1.75,
             letterSpacing: '0.2px',
             color: INK_BODY,
@@ -119,7 +138,7 @@ export function DedicationCard({ dedication, photo }: {
             margin: 0,
             fontFamily: getBodyFontFamily(dedication.bodyFont),
             fontStyle: 'italic',
-            fontSize: 'clamp(13px, 3.2cqw, 19px)',
+            fontSize: 'clamp(8px, 1.4cqw, 55px)',
             color: INK_HEADING,
             textAlign: 'right',
             width: '84%',
