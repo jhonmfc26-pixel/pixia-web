@@ -29,6 +29,7 @@ import { useSession } from '@/core/modules/session/useSession'
 import { getDedicationTemplate } from '@/core/modules/dedication/templates'
 import { DEDICATION_HEADING_FONTS, DEDICATION_BODY_FONTS } from '@/core/modules/dedication/fonts'
 import DedicationEditor from '@/core/modules/dedication/DedicationEditor'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import type { UploadControllerHandle } from './UploadController'
 
 // normalizeFiles (heic2any ~1.3 MiB + exifr ~72 KiB), usePhotoAnalysis y
@@ -1084,6 +1085,21 @@ export default function EditV2Page() {
   const canRemoveCurrentSpread = !!currentFoldData?.userAdded
 
   // ── "Eliminar este pliego" — solo pliegos agregados por el usuario ─────────
+  // Confirmación vía ConfirmDialog (Pixia) en vez de window.confirm nativo —
+  // solo hace falta pedirla si el pliego tiene fotos que se moverían a la
+  // bolsa; un pliego vacío se elimina directo, sin fricción.
+  const [confirmRemoveSpread, setConfirmRemoveSpread] = useState<{ foldId: string; photoCount: number } | null>(null)
+
+  const doRemoveSpread = (foldId: string) => {
+    if (!structure) return
+    const newStructure = removeSpread(structure, foldId)
+    setStructure(newStructure)
+    setCurrentFold(prev => Math.max(0, Math.min(newStructure.folds.length - 1, prev)))
+    setSel(null)
+    setAnchorRect(null)
+    showToast('Pliego eliminado')
+  }
+
   const handleRemoveSpread = () => {
     if (!structure || !currentFoldData || !currentFoldData.userAdded) return
     const photoCount = currentFoldData.kind === 'paired'
@@ -1091,18 +1107,11 @@ export default function EditV2Page() {
       : currentFoldData.face.photoIds.length
 
     if (photoCount > 0) {
-      const confirmed = window.confirm(
-        `Este pliego tiene ${photoCount} foto${photoCount !== 1 ? 's' : ''}. ¿Moverlas a la bolsa y eliminar el pliego?`
-      )
-      if (!confirmed) return
+      setConfirmRemoveSpread({ foldId: currentFoldData.id, photoCount })
+      return
     }
 
-    const newStructure = removeSpread(structure, currentFoldData.id)
-    setStructure(newStructure)
-    setCurrentFold(prev => Math.max(0, Math.min(newStructure.folds.length - 1, prev)))
-    setSel(null)
-    setAnchorRect(null)
-    showToast('Pliego eliminado')
+    doRemoveSpread(currentFoldData.id)
   }
 
   // ── Subir foto nueva ────────────────────────────────────────────────────────
@@ -1461,6 +1470,22 @@ export default function EditV2Page() {
           onClose={() => setDedicationEditorFaceId(null)}
         />
       )}
+
+      {/* Confirmación de "Eliminar pliego" — reemplaza window.confirm nativo */}
+      <ConfirmDialog
+        open={!!confirmRemoveSpread}
+        title="Eliminar pliego"
+        message={`Este pliego tiene ${confirmRemoveSpread?.photoCount ?? 0} foto${confirmRemoveSpread?.photoCount !== 1 ? 's' : ''}. ¿Moverlas a la bolsa y eliminar el pliego?`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        onCancel={() => setConfirmRemoveSpread(null)}
+        onConfirm={() => {
+          const foldId = confirmRemoveSpread?.foldId
+          setConfirmRemoveSpread(null)
+          if (foldId) doRemoveSpread(foldId)
+        }}
+      />
 
       {/* Banner de problemas [DEV] */}
       {problems.length > 0 && (

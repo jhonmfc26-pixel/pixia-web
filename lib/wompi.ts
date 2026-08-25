@@ -110,7 +110,20 @@ export async function fetchTransactionStatus(
 }
 
 /**
- * Calcula el precio total de un álbum.
+ * Modelo de precio oficial — fijo, no configurable por variable de entorno.
+ * (Antes leía de NEXT_PUBLIC_BASE_PRICE_COP/NEXT_PUBLIC_SHIPPING_COP con
+ * defaults desactualizados — un env var mal seteado en producción bastaba
+ * para cobrar mal. Este es el precio real del producto, se cambia en código.)
+ */
+const BASE_PRICE_COP = 280_000     // incluye las primeras 20 páginas
+const PAGES_INCLUDED = 20
+const EXTRA_PAGE_PRICE_COP = 8_000 // por página adicional a las 20 incluidas
+const SHIPPING_COP = 0             // envío gratis, siempre incluido en el precio base
+
+/**
+ * Calcula el precio total de un álbum a partir del número REAL de páginas
+ * (ver countRealPages en foldModel/validate.ts) — nunca de un número que
+ * mande el cliente sin verificar.
  */
 export function calculateOrderTotal(pagesTotal: number): {
   basePriceCop: number
@@ -120,21 +133,16 @@ export function calculateOrderTotal(pagesTotal: number): {
   shippingCop: number
   totalCop: number
 } {
-  const basePriceCop = parseInt(process.env.NEXT_PUBLIC_BASE_PRICE_COP || '250000')
-  const pagesIncluded = parseInt(process.env.NEXT_PUBLIC_PAGES_INCLUDED || '20')
-  const extraPagePriceCop = parseInt(process.env.NEXT_PUBLIC_EXTRA_PAGE_PRICE_COP || '8000')
-  const shippingCop = parseInt(process.env.NEXT_PUBLIC_SHIPPING_COP || '15000')
-
-  const extraPages = Math.max(0, pagesTotal - pagesIncluded)
-  const extraPagesPriceCop = extraPages * extraPagePriceCop
-  const totalCop = basePriceCop + extraPagesPriceCop + shippingCop
+  const extraPages = Math.max(0, pagesTotal - PAGES_INCLUDED)
+  const extraPagesPriceCop = extraPages * EXTRA_PAGE_PRICE_COP
+  const totalCop = BASE_PRICE_COP + extraPagesPriceCop + SHIPPING_COP
 
   return {
-    basePriceCop,
-    pagesIncluded,
+    basePriceCop: BASE_PRICE_COP,
+    pagesIncluded: PAGES_INCLUDED,
     extraPages,
     extraPagesPriceCop,
-    shippingCop,
+    shippingCop: SHIPPING_COP,
     totalCop,
   }
 }

@@ -2,13 +2,18 @@
 
 export const runtime = 'edge'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Script from 'next/script'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
 import { calculateOrderTotal } from '@/lib/wompi'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
+import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
+import { countRealPages, countEmptyFaces } from '@/core/modules/foldModel/validate'
+import type { AlbumStructure } from '@/core/modules/foldModel/types'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
 declare global {
   interface Window {
@@ -66,6 +71,12 @@ export default function CheckoutPage() {
   const [otpError, setOtpError] = useState<string | null>(null)
   const [sessionBanner, setSessionBanner] = useState(false)
 
+  // Aviso de páginas vacías (#6 de la auditoría) — advierte, no bloquea: el
+  // usuario puede confirmar y seguir. Una vez confirmado no se vuelve a
+  // preguntar en este mismo intento de pago.
+  const [showEmptyPagesModal, setShowEmptyPagesModal] = useState(false)
+  const [emptyPagesAck, setEmptyPagesAck] = useState(false)
+
   // Restaurar formulario guardado (sobrevive la redirección del magic link)
   useEffect(() => {
     const saved = localStorage.getItem('pixia_checkout_form')
@@ -74,24 +85,53 @@ export default function CheckoutPage() {
     }
   }, [])
 
+  // Carga del blueprint — mismo camino que edit-v2/viewer: Supabase primero
+  // (así checkout ve las ediciones guardadas ahí, páginas agregadas
+  // incluidas), localStorage solo como red de EMERGENCIA si Supabase falla.
+  // Antes leía SOLO de localStorage, que puede no tener nada si el álbum se
+  // editó en otra sesión/dispositivo, o tener una copia vieja sin los
+  // cambios de edit-v2 (ver auditoría, hallazgo #4).
   useEffect(() => {
     if (!bookId) return
-    try {
-      const allBooks = JSON.parse(localStorage.getItem('pixia_books') || '{}')
-      const raw = allBooks[bookId]
-      if (!raw) {
-        setBookError('No se encontró el álbum. ¿Lo creaste en este navegador?')
-        setLoadingBook(false)
-        return
+
+    async function loadBook() {
+      try {
+        const { data: { session } } = await supabaseBrowser.auth.getSession()
+        if (session) {
+          const { data, error } = await supabaseBrowser
+            .from('blueprints')
+            .select('*')
+            .eq('id', bookId)
+            .single()
+          if (!error && data) {
+            setBook(normalizeBook(data, bookId) as AlbumBlueprint)
+            setLoadingBook(false)
+            return
+          }
+          if (error) console.warn('[checkout] Supabase load:', error.message)
+        }
+      } catch (e) {
+        console.warn('[checkout] No se pudo cargar desde Supabase:', e)
       }
-      const normalized = normalizeBook(raw, bookId)
-      setBook(normalized as AlbumBlueprint)
-      setLoadingBook(false)
-    } catch (err) {
-      console.error('[checkout] Error cargando book:', err)
-      setBookError('Error al cargar el álbum')
-      setLoadingBook(false)
+
+      try {
+        const allBooks = JSON.parse(localStorage.getItem('pixia_books') || '{}')
+        const raw = allBooks[bookId]
+        if (!raw) {
+          setBookError('No se encontró el álbum. ¿Lo creaste en este navegador?')
+          setLoadingBook(false)
+          return
+        }
+        const normalized = normalizeBook(raw, bookId)
+        setBook(normalized as AlbumBlueprint)
+        setLoadingBook(false)
+      } catch (err) {
+        console.error('[checkout] Error cargando book:', err)
+        setBookError('Error al cargar el álbum')
+        setLoadingBook(false)
+      }
     }
+    loadBook()
 
     // Si el usuario acaba de volver del magic link, mostrar banner de confirmación
     supabaseBrowser.auth.getSession().then(({ data: { session } }) => {
@@ -102,11 +142,43 @@ export default function CheckoutPage() {
     })
   }, [bookId])
 
-  const pricing = useMemo(() => {
-    if (!book) return null
-    const pagesTotal = (book as { pageCount?: number }).pageCount || 20
-    return { pagesTotal, ...calculateOrderTotal(pagesTotal) }
+  // ── Structure — misma derivación que edit-v2/viewer: preferir la guardada
+  // por el editor, caer a foldsFromBlueprint si no existe o es inválida. Es
+  // la fuente real del número de páginas (ver countRealPages) — pageCount
+  // del blueprint queda congelado desde que se generó el álbum y no se
+  // actualiza al agregar/quitar pliegos en edit-v2 (auditoría, hallazgo #2).
+  const structureInitialized = useRef(false)
+  const [structure, setStructure] = useState<AlbumStructure | null>(null)
+
+  useEffect(() => {
+    if (!book || structureInitialized.current) return
+    structureInitialized.current = true
+
+    if (book.structure) {
+      const knownIds = new Set<string>()
+      for (const s of book.spreads) for (const p of s.photos) knownIds.add(p.id)
+      const v = validateAlbumStructure(book.structure, knownIds)
+      if (v.ok) { setStructure(book.structure); return }
+      console.warn('[checkout] structure descartada:', v.reason)
+    }
+
+    const { structure: derived } = foldsFromBlueprint(book)
+    setStructure(derived)
   }, [book])
+
+  const realPageCount = useMemo(
+    () => (structure ? countRealPages(structure) : null),
+    [structure],
+  )
+  const emptyFacesCount = useMemo(
+    () => (structure ? countEmptyFaces(structure) : 0),
+    [structure],
+  )
+
+  const pricing = useMemo(() => {
+    if (realPageCount === null) return null
+    return { pagesTotal: realPageCount, ...calculateOrderTotal(realPageCount) }
+  }, [realPageCount])
 
   const handleChange = (field: keyof FormData) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -151,7 +223,25 @@ export default function CheckoutPage() {
     }
   }
 
-  const handleCheckout = async () => {
+  // Punto de entrada del botón "Pagar" — filtra el aviso de páginas vacías
+  // antes de dejar pasar a proceedToCheckout. Si el usuario ya confirmó una
+  // vez en este intento, no se le vuelve a preguntar.
+  const handleCheckout = () => {
+    if (!book || !structure || !pricing || !isFormValid()) return
+    if (emptyFacesCount > 0 && !emptyPagesAck) {
+      setShowEmptyPagesModal(true)
+      return
+    }
+    proceedToCheckout()
+  }
+
+  const confirmEmptyPagesAndContinue = () => {
+    setEmptyPagesAck(true)
+    setShowEmptyPagesModal(false)
+    proceedToCheckout()
+  }
+
+  const proceedToCheckout = async () => {
     if (!book || !pricing || !isFormValid()) return
 
     // Verificar sesión activa. Si no hay, interceptar con magic link.
@@ -228,7 +318,7 @@ export default function CheckoutPage() {
     }
   }
 
-  if (loadingBook) {
+  if (loadingBook || (book && !structure)) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f0f0f', color: '#fff' }}>
         Cargando tu álbum...
@@ -236,7 +326,7 @@ export default function CheckoutPage() {
     )
   }
 
-  if (bookError || !book) {
+  if (bookError || !book || !structure) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0f0f0f', color: '#fff', padding: 20 }}>
         <p style={{ marginBottom: 20 }}>{bookError || 'Error al cargar el álbum'}</p>
@@ -377,6 +467,16 @@ export default function CheckoutPage() {
         </div>
       )}
 
+      <ConfirmDialog
+        open={showEmptyPagesModal}
+        title={`Tienes ${emptyFacesCount} página${emptyFacesCount !== 1 ? 's' : ''} sin fotos`}
+        message="Se imprimirán en blanco tal como están. Puedes volver a editar tu álbum y completarlas, o continuar así."
+        confirmLabel="Comprar de todas formas"
+        cancelLabel="Volver a editar"
+        onConfirm={confirmEmptyPagesAndContinue}
+        onCancel={() => { setShowEmptyPagesModal(false); router.push(`/book/${bookId}/edit-v2`) }}
+      />
+
       <div style={{ minHeight: '100vh', background: '#0f0f0f', color: '#fff', padding: '40px 20px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
 
@@ -459,15 +559,20 @@ export default function CheckoutPage() {
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
                   {pricing?.pagesTotal || 0} páginas · Cuadrado 30×30 cm
                 </p>
+                {emptyFacesCount > 0 && (
+                  <p style={{ fontSize: 12, color: '#fbbf24', marginTop: 8 }}>
+                    ⚠ {emptyFacesCount} página{emptyFacesCount !== 1 ? 's' : ''} sin fotos
+                  </p>
+                )}
               </div>
 
               {pricing && (
                 <>
-                  <Row label="Precio base" value={pricing.basePriceCop} />
+                  <Row label="Precio base (20 páginas)" value={pricing.basePriceCop} />
                   {pricing.extraPages > 0 && (
                     <Row label={`Páginas extra (${pricing.extraPages})`} value={pricing.extraPagesPriceCop} />
                   )}
-                  <Row label="Envío" value={pricing.shippingCop} />
+                  <Row label="Envío" value={pricing.shippingCop} valueLabel="Gratis" />
                   <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '16px 0' }} />
                   <Row label="Total" value={pricing.totalCop} bold />
                 </>
@@ -504,11 +609,11 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 6, color: '#fff', fontSize: 14, boxSizing: 'border-box',
 }
 
-function Row({ label, value, bold = false }: { label: string; value: number; bold?: boolean }) {
+function Row({ label, value, bold = false, valueLabel }: { label: string; value: number; bold?: boolean; valueLabel?: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: bold ? 16 : 14, fontWeight: bold ? 600 : 400 }}>
       <span style={{ color: bold ? '#fff' : 'rgba(255,255,255,0.7)' }}>{label}</span>
-      <span style={{ color: bold ? '#fff' : 'rgba(255,255,255,0.85)' }}>{formatCop(value)}</span>
+      <span style={{ color: bold ? '#fff' : 'rgba(255,255,255,0.85)' }}>{valueLabel ?? formatCop(value)}</span>
     </div>
   )
 }

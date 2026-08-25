@@ -49,6 +49,22 @@ export function countEmptyFaces(structure: AlbumStructure): number {
 }
 
 /**
+ * Cuenta las páginas físicas INTERIORES reales del álbum (sin portada) —
+ * cada Fold (paired o composition/hero-spread) es un pliego de 2 páginas
+ * impresas, sin importar cómo esté distribuido su contenido. Coincide con
+ * la definición comercial ("20 páginas incluidas (10 spreads)" — ver
+ * components/home/Pricing.tsx): 10 folds × 2 = 20 páginas.
+ *
+ * Es la fuente de verdad para cobrar — a diferencia de AlbumBlueprint.pageCount
+ * (fijado una sola vez al generar el álbum con IA y nunca actualizado cuando
+ * el usuario agrega/quita pliegos en edit-v2), esto se deriva en vivo de la
+ * structure editada.
+ */
+export function countRealPages(structure: AlbumStructure): number {
+  return structure.folds.length * 2
+}
+
+/**
  * Valida dos invariantes de producto:
  *   1. Toda Face tiene el número de fotos exacto que exige su layout.
  *   2. Ningún photoId se repite en todo el álbum.

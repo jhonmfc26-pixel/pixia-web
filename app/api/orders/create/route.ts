@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { generateIntegrityHash, calculateOrderTotal, generateOrderReference } from '@/lib/wompi'
 import { rateLimit } from '@/core/middleware/rateLimiter'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
+import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
+import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
+import { countRealPages } from '@/core/modules/foldModel/validate'
+import type { AlbumStructure } from '@/core/modules/foldModel/types'
 
 export const runtime = 'edge'
 
@@ -54,8 +58,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
     }
 
-    // Calcular precio en el servidor (NO confiar en cliente)
-    const pricing = calculateOrderTotal(body.pagesTotal)
+    // Calcular precio en el servidor (NO confiar en cliente) — y NO confiar
+    // tampoco en body.pagesTotal, que es un entero suelto que cualquiera
+    // puede cambiar con un solo campo del body. El número de páginas real
+    // se deriva de una AlbumStructure válida, nunca de un número.
+    //
+    // 1. Preferir la structure YA PERSISTIDA en Supabase — no viaja en este
+    //    request, quien llama al endpoint no puede falsificarla.
+    let realStructure: AlbumStructure | null = null
+    try {
+      const { data: existingBp } = await supabaseAdmin
+        .from('blueprints')
+        .select('structure')
+        .eq('id', body.bookId)
+        .single()
+      if (existingBp?.structure && validateAlbumStructure(existingBp.structure).ok) {
+        realStructure = existingBp.structure as AlbumStructure
+      }
+    } catch (e) {
+      console.warn('[orders/create] No se pudo leer blueprint existente para calcular páginas:', e)
+    }
+
+    // 2. Si todavía no hay nada persistido (álbum recién creado, primer
+    //    checkout sin pasar por edit-v2 ni por el sync de auth/callback),
+    //    derivarla del snapshot que manda el cliente — sigue siendo mucho
+    //    más difícil de falsificar barato que un entero: tiene que ser una
+    //    structure consistente (folds/faces bien formados).
+    if (!realStructure) {
+      const blueprintFromSnapshot = normalizeBook(body.bookSnapshot, body.bookId)
+      realStructure = blueprintFromSnapshot.structure && validateAlbumStructure(blueprintFromSnapshot.structure).ok
+        ? blueprintFromSnapshot.structure
+        : foldsFromBlueprint(blueprintFromSnapshot).structure
+    }
+
+    const realPageCount = countRealPages(realStructure)
+    const pricing = calculateOrderTotal(realPageCount)
 
     const reference = generateOrderReference(body.bookId)
 
@@ -76,7 +113,7 @@ export async function POST(req: NextRequest) {
         shipping_notes: body.shipping.notes || null,
         base_price_cop: pricing.basePriceCop,
         pages_included: pricing.pagesIncluded,
-        pages_total: body.pagesTotal,
+        pages_total: realPageCount,
         extra_pages_price_cop: pricing.extraPagesPriceCop,
         shipping_cop: pricing.shippingCop,
         total_cop: pricing.totalCop,
