@@ -730,10 +730,28 @@ export default function EditV2Page() {
   // ── Dedicatoria (Brick 2) ────────────────────────────────────────────────
   // faceId de la dedicatoria abierta en el panel de edición (null = cerrado).
   const [dedicationEditorFaceId, setDedicationEditorFaceId] = useState<string | null>(null)
-  // faceId de la dedicatoria esperando una foto recién subida — mismo patrón
-  // que replaceTarget/bagTargetFaceId: el input oculto compartido decide qué
-  // hacer con el archivo según cuál de estos tres esté seteado.
-  const [dedicationPhotoTarget, setDedicationPhotoTarget] = useState<string | null>(null)
+
+  // ── Intención explícita de subida ───────────────────────────────────────
+  // El input <input type="file"> oculto es compartido por 3 flujos (Cambiar,
+  // Agregar a cara, Foto de dedicatoria). ANTES, handleFileSelected decidía
+  // el destino mirando cuál de replaceTarget/dedicationPhotoTarget/
+  // bagTargetFaceId estaba "no-null", por orden de prioridad — si alguno
+  // quedaba colgado (ej. el usuario abre el selector nativo y lo cancela,
+  // o cierra un panel sin limpiar su target), una subida de OTRO flujo
+  // terminaba enrutada al target viejo, sin ningún error visible.
+  // Ahora cada flujo marca uploadIntent EXPLÍCITAMENTE justo antes de abrir
+  // el selector de archivos, y handleFileSelected usa SOLO esa intención —
+  // nunca "el primer target que encuentre". Un target colgado de otro
+  // estado (replaceTarget/bagTargetFaceId, que siguen existiendo para la UI
+  // de sus paneles) ya no puede desviar nada: se sobreescribe siempre al
+  // arrancar un flujo nuevo, y se limpia al terminar cada subida (pase lo
+  // que pase) y al cerrar el panel correspondiente.
+  const [uploadIntent, setUploadIntent] = useState<
+    | { kind: 'replace'; faceId: string; oldPhotoId: string }
+    | { kind: 'dedication'; faceId: string }
+    | { kind: 'bag'; faceId: string }
+    | null
+  >(null)
 
   const bagPhotos = useMemo(() => {
     if (!structure) return []
@@ -841,11 +859,16 @@ export default function EditV2Page() {
     const currentCover = coverRef.current ?? currentBook?.cover
     if (!currentStructure || !currentBook || isSaving) return
 
-    // Validar antes de persistir — nunca guardar una estructura rota. Se
-    // mantiene sin relajar: sigue siendo la garantía de que nunca se persiste
-    // una foto en structure que no exista en el blueprint.
-    const validation = validateAlbumStructure(currentStructure)
+    // Validar antes de persistir — nunca guardar una estructura rota. Mismo
+    // knownPhotoIds que en la carga (collectBlueprintPhotoIds sobre el book
+    // más reciente, vía ref): sin esto, la integridad referencial (ninguna
+    // foto en structure que no exista en el blueprint) solo se comprobaba al
+    // CARGAR, no al GUARDAR — un ID espurio introducido por un bug futuro en
+    // algún mutator se habría persistido sin detectarse.
+    const knownPhotoIds = collectBlueprintPhotoIds(currentBook)
+    const validation = validateAlbumStructure(currentStructure, knownPhotoIds)
     if (!validation.ok) {
+      console.error('[EditV2] Guardado bloqueado — integridad referencial rota:', validation.reason)
       showToast(`No se puede guardar: ${validation.reason}`, true, 4000)
       return
     }
@@ -1016,7 +1039,7 @@ export default function EditV2Page() {
   }
 
   const handleUploadNewDedicationPhoto = (faceId: string) => {
-    setDedicationPhotoTarget(faceId)
+    setUploadIntent({ kind: 'dedication', faceId })
     if (fileInputRef.current) fileInputRef.current.multiple = false
     fileInputRef.current?.click()
   }
@@ -1130,14 +1153,27 @@ export default function EditV2Page() {
   }
 
   // Dispara el <input type="file"> oculto compartido; al elegir archivo(s),
-  // el destino (Cambiar vs Agregar) se decide según qué panel esté abierto.
-  // Cambiar es siempre 1:1 (cupo=1 por definición) — el input se abre sin
-  // `multiple` en ese caso, así que files[] nunca trae más de uno ahí.
-  // Agregar acepta varios a la vez, acotados al cupo actual de la cara.
+  // el destino se decide por uploadIntent (seteado explícitamente por cada
+  // botón justo antes del click — ver declaración de uploadIntent), no por
+  // qué panel esté abierto. Cambiar es siempre 1:1 (cupo=1 por definición) —
+  // el input se abre sin `multiple` en ese caso, así que files[] nunca trae
+  // más de uno ahí. Agregar acepta varios a la vez, acotados al cupo actual
+  // de la cara.
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
     e.target.value = '' // permite re-elegir el/los mismo(s) archivo(s) más tarde
     if (files.length === 0) return
+
+    // Intención capturada al momento de disparar el input — ver comentario
+    // en la declaración de uploadIntent. Si por lo que sea no hay ninguna
+    // (no debería pasar: el input está oculto, solo lo abren estos 3
+    // botones y todos setean intent antes de hacer click), no hay a dónde
+    // enrutar la foto — no-op explícito, mejor que adivinar un destino.
+    const intent = uploadIntent
+    if (!intent) {
+      console.warn('[EditV2] handleFileSelected sin uploadIntent — ignorando selección')
+      return
+    }
 
     // Deduplicar por contenido (SHA-256) contra el álbum completo (caras + bolsa)
     // y dentro del propio lote elegido — regla: cero fotos repetidas.
@@ -1145,7 +1181,7 @@ export default function EditV2Page() {
     for (const p of photosById.values()) if (p.contentHash) albumByHash.set(p.contentHash, p)
     const isInBag = (photoId: string) => bagPhotos.some(p => p.id === photoId)
 
-    if (replaceTarget) {
+    if (intent.kind === 'replace') {
       setUploadingPhoto(true)
       setUploadCount(1)
       try {
@@ -1154,7 +1190,7 @@ export default function EditV2Page() {
 
         let newPhotoId: string
         if (existing) {
-          if (existing.id === replaceTarget.oldPhotoId) {
+          if (existing.id === intent.oldPhotoId) {
             showToast('Ya tienes esta foto, no la subimos de nuevo.')
             return
           }
@@ -1170,7 +1206,7 @@ export default function EditV2Page() {
         }
 
         if (!structure) return
-        const newStructure = replacePhotoFromBag(structure, replaceTarget.faceId, replaceTarget.oldPhotoId, newPhotoId)
+        const newStructure = replacePhotoFromBag(structure, intent.faceId, intent.oldPhotoId, newPhotoId)
         setStructure(newStructure)
         setReplaceTarget(null)
         setSel(null)
@@ -1178,11 +1214,12 @@ export default function EditV2Page() {
         showToast(existing ? 'Ya tienes esta foto, no la subimos de nuevo.' : 'Foto cambiada')
       } finally {
         setUploadingPhoto(false)
+        setUploadIntent(null)
       }
       return
     }
 
-    if (dedicationPhotoTarget) {
+    if (intent.kind === 'dedication') {
       setUploadingPhoto(true)
       setUploadCount(1)
       try {
@@ -1203,15 +1240,16 @@ export default function EditV2Page() {
           newPhotoId = newPhoto.id
         }
 
-        handleUpdateDedicationField(dedicationPhotoTarget, { photoId: newPhotoId })
-        setDedicationPhotoTarget(null)
+        handleUpdateDedicationField(intent.faceId, { photoId: newPhotoId })
       } finally {
         setUploadingPhoto(false)
+        setUploadIntent(null)
       }
       return
     }
 
-    if (bagTargetFaceId) {
+    // intent.kind === 'bag'
+    {
       setUploadingPhoto(true)
       setUploadCount(files.length)
       try {
@@ -1253,7 +1291,7 @@ export default function EditV2Page() {
           return p && p.width && p.height ? p.width / p.height : 1.0
         }
         const newStructure = toAssign.reduce(
-          (acc, photo) => addPhotoToFace(acc, bagTargetFaceId, photo.id, getAR),
+          (acc, photo) => addPhotoToFace(acc, intent.faceId, photo.id, getAR),
           structure,
         )
         setStructure(newStructure)
@@ -1277,6 +1315,7 @@ export default function EditV2Page() {
         setBagOpen(false)
       } finally {
         setUploadingPhoto(false)
+        setUploadIntent(null)
       }
     }
   }
@@ -1467,7 +1506,7 @@ export default function EditV2Page() {
           onRemovePhoto={() => handleRemoveDedicationPhoto(dedicationEditorFaceId)}
           onUploadNew={() => handleUploadNewDedicationPhoto(dedicationEditorFaceId)}
           onRevert={() => handleRevertDedication(dedicationEditorFaceId)}
-          onClose={() => setDedicationEditorFaceId(null)}
+          onClose={() => { setDedicationEditorFaceId(null); setUploadIntent(null) }}
         />
       )}
 
@@ -1572,7 +1611,7 @@ export default function EditV2Page() {
               )}
             </span>
             <button
-              onClick={() => { setBagOpen(false); setBagSelected([]) }}
+              onClick={() => { setBagOpen(false); setBagSelected([]); setBagTargetFaceId(null); setUploadIntent(null) }}
               style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)', fontSize: '22px', lineHeight: 1, cursor: 'pointer', padding: '4px' }}
             >
               ✕
@@ -1584,7 +1623,12 @@ export default function EditV2Page() {
             <UploadNewPhotoButton
               uploading={uploadingPhoto}
               uploadCount={uploadCount}
-              onClick={() => { if (fileInputRef.current) fileInputRef.current.multiple = true; fileInputRef.current?.click() }}
+              onClick={() => {
+                if (!bagTargetFaceId) return
+                setUploadIntent({ kind: 'bag', faceId: bagTargetFaceId })
+                if (fileInputRef.current) fileInputRef.current.multiple = true
+                fileInputRef.current?.click()
+              }}
             />
 
             <div style={{
@@ -1698,7 +1742,7 @@ export default function EditV2Page() {
               Cambiar foto
             </span>
             <button
-              onClick={() => setReplaceTarget(null)}
+              onClick={() => { setReplaceTarget(null); setUploadIntent(null) }}
               style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)', fontSize: '22px', lineHeight: 1, cursor: 'pointer', padding: '4px' }}
             >
               ✕
@@ -1711,7 +1755,12 @@ export default function EditV2Page() {
             <UploadNewPhotoButton
               uploading={uploadingPhoto}
               uploadCount={uploadCount}
-              onClick={() => { if (fileInputRef.current) fileInputRef.current.multiple = false; fileInputRef.current?.click() }}
+              onClick={() => {
+                if (!replaceTarget) return
+                setUploadIntent({ kind: 'replace', faceId: replaceTarget.faceId, oldPhotoId: replaceTarget.oldPhotoId })
+                if (fileInputRef.current) fileInputRef.current.multiple = false
+                fileInputRef.current?.click()
+              }}
             />
 
             <div style={{

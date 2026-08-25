@@ -32,6 +32,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
   }
 
+  // Ownership: quien llama debe ser dueño del blueprint que intenta
+  // escribir. supabaseAdmin bypassa RLS (por diseño, para poder escribir),
+  // así que esta comprobación es la ÚNICA barrera contra que un usuario
+  // autenticado sobrescriba/tome posesión del álbum de otro conociendo su
+  // UUID (viaja en la URL, no es secreto). user_id se toma SIEMPRE del
+  // token (user.id) — el body nunca decide de quién es un blueprint.
+  const { data: existing, error: ownershipError } = await supabaseAdmin
+    .from('blueprints')
+    .select('user_id')
+    .eq('id', blueprint.id)
+    .maybeSingle()
+
+  if (ownershipError) {
+    console.error('[persist] Error verificando ownership:', ownershipError)
+    return NextResponse.json({ error: 'No se pudo verificar el álbum' }, { status: 500 })
+  }
+
+  if (existing?.user_id && existing.user_id !== user.id) {
+    console.warn('[persist] Intento de escritura sobre blueprint ajeno — solicitante:', user.id)
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
+  // Sin existing → primer guardado (creación legítima).
+  // Con existing.user_id nulo → fila huérfana (nunca reclamada); se permite
+  // reclamarla, no habilita nada que no fuera ya posible (nadie más era dueño).
+
   const insertPayload: Record<string, unknown> = {
     id: blueprint.id,
     user_id: user.id,

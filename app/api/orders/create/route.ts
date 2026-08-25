@@ -58,6 +58,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
     }
 
+    // Leer el blueprint existente UNA vez — sirve tanto para el chequeo de
+    // ownership como para la structure real de precio (ver abajo). Falla
+    // cerrado: si la consulta misma revienta, no se sigue adelante — mejor
+    // un 500 que crear una orden sin poder verificar de quién es el álbum.
+    let existingBp: { structure: unknown; user_id: string | null } | null = null
+    try {
+      const { data, error: existingErr } = await supabaseAdmin
+        .from('blueprints')
+        .select('structure, user_id')
+        .eq('id', body.bookId)
+        .maybeSingle()
+      if (existingErr) throw existingErr
+      existingBp = data
+    } catch (e) {
+      console.error('[orders/create] Error verificando el blueprint:', e)
+      return NextResponse.json({ error: 'No se pudo verificar el álbum' }, { status: 500 })
+    }
+
+    // Ownership: solo se puede crear una orden sobre un blueprint propio (o
+    // uno que todavía no tiene dueño — primer checkout, ver caso c en
+    // persist). userId sale SIEMPRE del token, nunca del body — mismo
+    // chequeo que /api/blueprints/persist, misma razón: bookId viaja en la
+    // URL, no es secreto, y supabaseAdmin bypassa RLS.
+    if (existingBp?.user_id && existingBp.user_id !== userId) {
+      console.warn('[orders/create] Intento de crear orden sobre blueprint ajeno — solicitante:', userId)
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
     // Calcular precio en el servidor (NO confiar en cliente) — y NO confiar
     // tampoco en body.pagesTotal, que es un entero suelto que cualquiera
     // puede cambiar con un solo campo del body. El número de páginas real
@@ -66,17 +94,8 @@ export async function POST(req: NextRequest) {
     // 1. Preferir la structure YA PERSISTIDA en Supabase — no viaja en este
     //    request, quien llama al endpoint no puede falsificarla.
     let realStructure: AlbumStructure | null = null
-    try {
-      const { data: existingBp } = await supabaseAdmin
-        .from('blueprints')
-        .select('structure')
-        .eq('id', body.bookId)
-        .single()
-      if (existingBp?.structure && validateAlbumStructure(existingBp.structure).ok) {
-        realStructure = existingBp.structure as AlbumStructure
-      }
-    } catch (e) {
-      console.warn('[orders/create] No se pudo leer blueprint existente para calcular páginas:', e)
+    if (existingBp?.structure && validateAlbumStructure(existingBp.structure).ok) {
+      realStructure = existingBp.structure as AlbumStructure
     }
 
     // 2. Si todavía no hay nada persistido (álbum recién creado, primer

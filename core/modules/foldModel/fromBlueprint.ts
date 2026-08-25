@@ -15,7 +15,7 @@ import type { AlbumStructure } from './types'
  */
 export function foldsFromBlueprint(
   // manualPhotoOrder vive en el blueprint serializado pero no en el tipo —
-  // mismo patrón que EditorView (book as any).manualPhotoOrder
+  // mismo patrón que usaba el editor viejo (ya eliminado) para leerlo.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   book: AlbumBlueprint & { manualPhotoOrder?: string[] },
 ): { structure: AlbumStructure; problems: string[] } {
