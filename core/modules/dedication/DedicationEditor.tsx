@@ -6,6 +6,7 @@ import type { DedicationContent } from '@/core/modules/foldModel/types'
 import { DEDICATION_HEADING_FONTS, DEDICATION_BODY_FONTS } from './fonts'
 import { HEADING_MAX, BODY_MAX, SIGNATURE_MAX } from './limits'
 import { DedicationCard } from './DedicationCard'
+import PixiaImage from '@/components/ui/PixiaImage'
 
 const FIELD_LABEL: React.CSSProperties = {
   fontSize: '10px', color: 'rgba(255,255,255,0.32)',
@@ -211,7 +212,7 @@ export default function DedicationEditor({
           {photo ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
-                <img src={photo.thumbnailUrl || photo.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <PixiaImage src={photo.thumbnailUrl || photo.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
               <button
                 onClick={onRemovePhoto}
@@ -251,7 +252,7 @@ export default function DedicationEditor({
                         onClick={() => onPickPhoto(p.id)}
                         style={{ aspectRatio: '1', padding: 0, border: 'none', borderRadius: '6px', overflow: 'hidden', cursor: 'pointer', background: '#1a1a1a' }}
                       >
-                        <img src={p.thumbnailUrl || p.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <PixiaImage src={p.thumbnailUrl || p.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       </button>
                     ))}
                   </div>

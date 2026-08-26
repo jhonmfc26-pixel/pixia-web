@@ -1,6 +1,7 @@
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { DedicationContent } from '@/core/modules/foldModel/types'
 import { getHeadingFontFamily, getBodyFontFamily } from './fonts'
+import PixiaImage from '@/components/ui/PixiaImage'
 
 // Textura de papel MUY sutil vía SVG de ruido inline (data-URI) — no es una
 // imagen real, pesa unos bytes de texto, sin requests ni assets externos.
@@ -98,7 +99,7 @@ export function DedicationCard({ dedication, photo }: {
             border: '1px solid ' + EARTH_LINE,
             flexShrink: 0,
           }}>
-            <img
+            <PixiaImage
               src={photo.thumbnailUrl || photo.url}
               alt=""
               draggable={false}

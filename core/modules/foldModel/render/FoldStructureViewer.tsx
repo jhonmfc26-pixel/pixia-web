@@ -10,6 +10,7 @@ import type { AlbumStructure, Face } from '../types'
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { SelState } from './selectionTypes'
 import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
+import PixiaImage from '@/components/ui/PixiaImage'
 
 // ── Render de cara genérica con selección ─────────────────────────────────────
 // Face selection is handled by the parent panel (FoldStructureViewer).
@@ -72,7 +73,7 @@ function DraggableSlot({ slot, photoId, photo, isSelected, hasSel, isDropTarget,
       }}
     >
       {photo && (
-        <img
+        <PixiaImage
           src={photo.url || photo.thumbnailUrl}
           alt=""
           draggable={false}
@@ -219,7 +220,7 @@ function FaceReadView({ face, photosById, sel, onSel, onReorder }: {
             boxShadow: '0 16px 40px rgba(0,0,0,0.5)', transform: 'scale(1.08)',
             cursor: 'grabbing',
           }}>
-            <img
+            <PixiaImage
               src={activePhoto.thumbnailUrl || activePhoto.url}
               alt=""
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -245,7 +246,7 @@ function HeroSpreadHalf({ photo, half }: {
         width: '200%', height: '100%',
       }}>
         {photo && (
-          <img
+          <PixiaImage
             src={photo.url || photo.thumbnailUrl}
             alt=""
             draggable={false}

@@ -3,6 +3,7 @@ import { buildChapters } from '@/core/story/buildChapters'
 import { segmentChapter } from './segmentChapter'
 import { LAYOUTS } from './layouts/registry'
 import type { LayoutId } from './layouts/registry'
+import { devLog } from '@/lib/devLog'
 
 export interface PoolPhoto {
   photo: PhotoAsset
@@ -79,7 +80,7 @@ export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
       })
     }
 
-    console.log(
+    devLog(
       `[Groups] cap ${chapterId}: ${chapterPhotos.length} fotos → ${segmented.length} grupos` +
       `  pérd:${(capLoss * 100).toFixed(0)}%`
     )
@@ -90,7 +91,7 @@ export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
   const airCount   = groups.filter(g => g.layout && LAYOUTS.find(l => l.id === g.layout)?.hasAir).length
   const bleedCount = groups.length - airCount
 
-  console.log(
+  devLog(
     `[Groups] Total: ${chapters.length} cap · ${groups.length} grupos` +
     `  ×1:${dist[0]} ×2:${dist[1]} ×3:${dist[2]} ×4:${dist[3]} ×5:${dist[4]}` +
     `  aire:${airCount} bleed:${bleedCount}`

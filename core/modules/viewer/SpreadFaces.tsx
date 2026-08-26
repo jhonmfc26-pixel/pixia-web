@@ -5,6 +5,7 @@ import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { Face } from '@/core/modules/foldModel/types'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
 import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
+import PixiaImage from '@/components/ui/PixiaImage'
 
 /**
  * Sombra de lomo pegada al borde interior de la propia página, no un overlay
@@ -67,7 +68,7 @@ export function FacePageView({ face, photosById, side }: {
                   style={{ gridArea: slot, position: 'relative', overflow: 'hidden', background: '#E4E0D8', minWidth: 0, minHeight: 0 }}
                 >
                   {photo && (
-                    <img
+                    <PixiaImage
                       src={photo.url || photo.thumbnailUrl}
                       alt=""
                       draggable={false}
@@ -113,7 +114,7 @@ export function HeroSpreadPageView({ face, photosById, half }: {
         width: '200%', height: '100%',
       }}>
         {photo && (
-          <img
+          <PixiaImage
             src={photo.url || photo.thumbnailUrl}
             alt=""
             draggable={false}

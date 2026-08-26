@@ -2,6 +2,7 @@ import type { Page, PageLayout, LayoutConfig, AlbumPages } from './types'
 import { getLayoutById, getLayoutsByPhotoCount } from './layouts/helpers'
 import { groupPhotos, type PhotoGroup, type PoolPhoto } from './groupPhotos'
 import { rankLayoutsForPhotos, bestAssignment, slotAspectRatios, slotAreas, cropLoss } from './layoutFit'
+import { devLog } from '@/lib/devLog'
 
 function scoreOf(item: PoolPhoto): number {
   return item.photo.score?.finalScore ?? 0
@@ -81,7 +82,7 @@ function selectGroupLayout(group: PhotoGroup): PageLayout {
     return 'single' as PageLayout
   }
   const { layoutId: chosen, avgLoss } = ranked[0]
-  console.log(`[LayoutFit] fallback: grupo de ${count} → ${chosen} (${(avgLoss * 100).toFixed(0)}%)`)
+  devLog(`[LayoutFit] fallback: grupo de ${count} → ${chosen} (${(avgLoss * 100).toFixed(0)}%)`)
   return chosen as PageLayout
 }
 
@@ -147,7 +148,7 @@ function splitPageForParity(page: Page, poolById: Map<string, PoolPhoto>): Page[
   const leftIds  = page.photoIds.slice(0, leftCount)
   const rightIds = page.photoIds.slice(leftCount)
 
-  console.log(`[PageEngine] Paridad: dividiendo ${page.id} (${total} fotos) → ${leftCount}+${rightCount}`)
+  devLog(`[PageEngine] Paridad: dividiendo ${page.id} (${total} fotos) → ${leftCount}+${rightCount}`)
   return [
     { id: `${page.id}-a`, layout: selectMergeLayout(leftCount,  leftIds,  poolById), photoIds: leftIds,  act: page.act, isExtra: false },
     { id: `${page.id}-b`, layout: selectMergeLayout(rightCount, rightIds, poolById), photoIds: rightIds, act: page.act, isExtra: false },
@@ -270,7 +271,7 @@ function absorbOrphansAcrossSpreads(pages: Page[], poolById: Map<string, PoolPho
           isExtra: false,
         }
         segs[neighborIdx] = { ...neighbor, pages: newNeighborPages }
-        console.log(`[PageEngine] Paridad: foto huérfana fusionada en vecino (${combinedCount} fotos) [DEV]`)
+        devLog(`[PageEngine] Paridad: foto huérfana fusionada en vecino (${combinedCount} fotos) [DEV]`)
       } else {
         // MOVER: insertar la huérfana como página propia en el tramo vecino.
         // Si vecino era impar (caso habitual), +1 lo hace par sin re-normalizar.
@@ -284,7 +285,7 @@ function absorbOrphansAcrossSpreads(pages: Page[], poolById: Map<string, PoolPho
           ? mergeOnceParity(newNeighborPages, poolById)
           : newNeighborPages
         segs[neighborIdx] = { ...neighbor, pages: reNorm }
-        console.log(`[PageEngine] Paridad: foto huérfana movida al tramo vecino (${reNorm.length} págs) [DEV]`)
+        devLog(`[PageEngine] Paridad: foto huérfana movida al tramo vecino (${reNorm.length} págs) [DEV]`)
       }
 
       segs.splice(s, 1)
@@ -337,7 +338,7 @@ export function buildPages(
   const groups = groupPhotos(photos)
   const poolById = new Map(photos.map(p => [p.photo.id, p]))
 
-  console.log('[PageEngine] Fotos con orientación:',
+  devLog('[PageEngine] Fotos con orientación:',
     photos.map(p => p.photo.orientation || 'sin-orientacion').join(', ')
   )
 

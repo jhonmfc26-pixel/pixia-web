@@ -30,6 +30,7 @@ import { getDedicationTemplate } from '@/core/modules/dedication/templates'
 import { DEDICATION_HEADING_FONTS, DEDICATION_BODY_FONTS } from '@/core/modules/dedication/fonts'
 import DedicationEditor from '@/core/modules/dedication/DedicationEditor'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import PixiaImage from '@/components/ui/PixiaImage'
 import type { UploadControllerHandle } from './UploadController'
 
 // normalizeFiles (heic2any ~1.3 MiB + exifr ~72 KiB), usePhotoAnalysis y
@@ -148,6 +149,22 @@ function PhotoActionsPopover({ photoId, anchorRect, photoFace, onAction }: {
   photoFace: Face | null
   onAction: (action: string, id: string) => void
 }) {
+  // La posición se calcula con window.innerWidth/innerHeight en cada render —
+  // sin este listener, un resize u orientationchange (rotar el celular) no
+  // dispara ningún re-render y el popover queda clampeado contra el tamaño
+  // de viewport viejo. No recalcula anchorRect en sí (lo captura el padre al
+  // seleccionar la foto), solo los límites de pantalla contra los que se clampea.
+  const [, forceRecalc] = useState(0)
+  useEffect(() => {
+    const onViewportChange = () => forceRecalc(n => n + 1)
+    window.addEventListener('resize', onViewportChange)
+    window.addEventListener('orientationchange', onViewportChange)
+    return () => {
+      window.removeEventListener('resize', onViewportChange)
+      window.removeEventListener('orientationchange', onViewportChange)
+    }
+  }, [])
+
   const TOP_BAR = 56
   const H = 64   // altura fija (icon + gap + label + padding × 2 = ~64px)
   const GAP = 8
@@ -269,7 +286,10 @@ function FaceDesignPanel({ selectedFace, canConvertToDedication, onAction }: {
   return (
     <div style={{
       position: 'fixed',
-      bottom: '72px',    // encima de la barra de navegación (64px) + 8px gap
+      // 64px de barra de navegación + 8px de gap, más el inset de área segura
+      // (notch/home indicator/barra de gestos) — sin el env(), en un celular
+      // con esos elementos el panel puede quedar tapado o pegado al borde.
+      bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
       left: '50%',
       transform: 'translateX(-50%)',
       zIndex: 120,
@@ -377,7 +397,8 @@ function DedicationSelectedPanel({ onEdit, onRevert }: {
   return (
     <div style={{
       position: 'fixed',
-      bottom: '72px',
+      // Mismo ajuste que FaceDesignPanel — ver comentario ahí.
+      bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
       left: '50%',
       transform: 'translateX(-50%)',
       zIndex: 120,
@@ -1526,8 +1547,8 @@ export default function EditV2Page() {
         }}
       />
 
-      {/* Banner de problemas [DEV] */}
-      {problems.length > 0 && (
+      {/* Banner de problemas [DEV] — nunca visible para un cliente en producción */}
+      {process.env.NODE_ENV !== 'production' && problems.length > 0 && (
         <div style={{
           background: 'rgba(220,150,0,0.12)',
           borderBottom: '1px solid rgba(220,150,0,0.25)',
@@ -1674,7 +1695,7 @@ export default function EditV2Page() {
                       onMouseEnter={e => { if (!isDisabled && !isSelected) e.currentTarget.style.opacity = '0.75' }}
                       onMouseLeave={e => { e.currentTarget.style.opacity = isDisabled ? '0.35' : '1' }}
                     >
-                      <img
+                      <PixiaImage
                         src={photo.thumbnailUrl || photo.url}
                         alt=""
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -1798,7 +1819,7 @@ export default function EditV2Page() {
                     onMouseEnter={e => { e.currentTarget.style.opacity = '0.75' }}
                     onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
                   >
-                    <img
+                    <PixiaImage
                       src={photo.thumbnailUrl || photo.url}
                       alt=""
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
