@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDropzone } from "react-dropzone";
 import {
   motion,
@@ -75,6 +76,50 @@ async function detectImageFormat(file: File): Promise<ImageFormat> {
   }
 }
 
+// Shimmer sutil — inyectado una sola vez, no por celda.
+const SHIMMER_CSS = `
+  @keyframes pixia-thumb-shimmer {
+    0% { background-position: -150% 0; }
+    100% { background-position: 150% 0; }
+  }
+`
+
+/**
+ * Celda de la grilla — NUNCA carga el archivo original a resolución
+ * completa (esa era la causa del lag/salto con 35-100 fotos). Mientras no
+ * hay miniatura lista todavía, muestra un skeleton con shimmer coherente
+ * con el papel/oscuro de Pixia — nunca una celda en blanco. Cuando la
+ * miniatura llega, hace fade-in (no aparece de golpe). loading="lazy":
+ * el navegador solo decodifica las celdas cerca del viewport visible.
+ */
+function PhotoThumb({ src }: { src: string | undefined }) {
+  const [loaded, setLoaded] = useState(false)
+
+  return (
+    <div style={{ position: 'absolute', inset: 0 }}>
+      {!loaded && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'pixia-thumb-shimmer 1.6s ease-in-out infinite',
+        }} />
+      )}
+      {src && (
+        <img
+          src={src}
+          alt="preview"
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+          className="object-cover w-full h-full"
+          style={{ position: 'relative', opacity: loaded ? 1 : 0, transition: 'opacity 0.35s ease' }}
+        />
+      )}
+    </div>
+  )
+}
+
 export default function Step2Upload() {
   const { state, dispatch } = useWizard();
   const photos = state.photos;
@@ -86,6 +131,23 @@ export default function Step2Upload() {
   const [minPhotosError, setMinPhotosError] = useState<string | null>(null);
   const [heicWarning, setHeicWarning] = useState<string | null>(null);
   const [dupWarning, setDupWarning] = useState<string | null>(null);
+
+  // Miniaturas livianas (~150px, ver generateThumbnail) para la grilla —
+  // NUNCA el archivo original a resolución completa. Por File (no por id):
+  // es la misma clave que ya usa el resto del pipeline (thumbnailsByFile más
+  // abajo, photoCache) para sobrevivir el re-sort sin depender de qué id le
+  // tocó a cada foto en cada rama del análisis.
+  const [thumbUrls, setThumbUrls] = useState<Map<File, string>>(new Map());
+  const mergeThumbUrls = useCallback((entries: Map<File, string | null | undefined>) => {
+    setThumbUrls(prev => {
+      const next = new Map(prev);
+      let changed = false;
+      for (const [file, url] of entries) {
+        if (url && next.get(file) !== url) { next.set(file, url); changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
 
   const count = useMotionValue(0);
   const rounded = useTransform(count, (latest) => Math.round(latest));
@@ -207,6 +269,20 @@ export default function Step2Upload() {
           payload: [...photos, ...newPhotos].slice(0, MAX_PHOTOS),
         });
 
+        // Generar miniaturas livianas YA, en paralelo con el análisis de
+        // abajo (que también las genera, pero solo al final del pipeline —
+        // para 35-100 fotos eso tarda varios segundos). No se espera
+        // (sin await): cada una llega a la grilla apenas está lista, así
+        // el fade-in de cada celda ocurre bien antes de que termine el
+        // análisis, en vez de que todas aparezcan de golpe al final.
+        for (const file of dedupedFiles) {
+          const cachedThumb = getPhotoCacheEntry(file)?.thumbnail
+          if (cachedThumb) { mergeThumbUrls(new Map([[file, cachedThumb]])); continue }
+          generateThumbnail(file).then(url => {
+            if (url) mergeThumbUrls(new Map([[file, url]]))
+          })
+        }
+
         // Separar files con análisis cacheado de los nuevos
         const cachedItems: Array<{
           file: File
@@ -290,6 +366,11 @@ export default function Step2Upload() {
           })
         )
         console.log('[Step2] Thumbnails listos:', [...thumbnailsByFile.values()].filter(Boolean).length)
+        // Refuerzo/fallback: si alguna no llegó a tiempo con la generación
+        // temprana de arriba (ej. quedó justo detrás en el for sin await),
+        // acá queda cubierta igual — mergeThumbUrls no hace nada si ya
+        // estaba seteada con el mismo valor.
+        mergeThumbUrls(thumbnailsByFile)
 
         // Re-ordenar cronológicamente (HEIC sin EXIF se habrían ido al final en analyzePhotos)
         patched.sort((a, b) => {
@@ -345,7 +426,7 @@ export default function Step2Upload() {
         setIsProcessing(false)
       }
     },
-    [dispatch, photos, analyzePhotos, sessionId, uploadPhotos]
+    [dispatch, photos, analyzePhotos, sessionId, uploadPhotos, mergeThumbUrls]
   );
 
   const removePhoto = (id: string) => {
@@ -385,6 +466,57 @@ export default function Step2Upload() {
 
   const unlocked = photos.length >= MIN_PHOTOS;
   const priorityCount = photos.filter((p) => p.priority).length;
+
+  // ── Progreso SIEMPRE visible mientras se procesan fotos ────────────────────
+  // Antes cada fase (normalizar HEIC / analizar / subir) tenía su propio
+  // bloque en el flujo normal del documento — al hacer scroll para ver las
+  // fotos ya cargadas, esos bloques quedaban fuera de vista y daba la
+  // sensación de que la subida se había trabado.
+  //
+  // Un primer intento usó position:sticky dentro del flujo normal — no
+  // funcionó: CreatePage (app/create/page.tsx) envuelve cada step en un
+  // motion.div de Framer Motion que anima con transform (el fade/slide entre
+  // pasos), y un ancestro con transform rompe position:sticky/fixed de sus
+  // descendientes (cambia el "containing block" contra el que se calculan).
+  // Se ve bien al montar, pero deja de pegarse en cuanto se scrollea.
+  // Fix: portal a document.body — así el elemento vive FUERA del árbol
+  // animado, y position:fixed queda relativo al viewport real, no al
+  // motion.div. mounted evita intentar el portal durante el render de
+  // servidor (document no existe ahí).
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  const isNormalizing = !!normalizingMsg
+  const isAnalyzing = progress.isAnalyzing
+  const isUploading = uploadProgress.isUploading
+  const isBusy = isNormalizing || isAnalyzing || isUploading
+
+  const [showDoneBanner, setShowDoneBanner] = useState(false)
+  const wasBusyRef = useRef(false)
+  const doneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (wasBusyRef.current && !isBusy) {
+      setShowDoneBanner(true)
+      if (doneTimerRef.current) clearTimeout(doneTimerRef.current)
+      doneTimerRef.current = setTimeout(() => setShowDoneBanner(false), 2600)
+    }
+    wasBusyRef.current = isBusy
+  }, [isBusy])
+
+  useEffect(() => () => { if (doneTimerRef.current) clearTimeout(doneTimerRef.current) }, [])
+
+  const progressLabel = isNormalizing ? normalizingMsg!
+    : isAnalyzing ? 'Analizando fotos...'
+    : isUploading ? 'Guardando en la nube...'
+    : ''
+
+  const progressCurrent = isAnalyzing ? progress.completed : isUploading ? uploadProgress.completed : 0
+  const progressTotal = isAnalyzing ? progress.total : isUploading ? uploadProgress.total : 0
+  const progressPct = progressTotal > 0 ? Math.round((progressCurrent / progressTotal) * 100) : 0
+  const latestInsight = isAnalyzing && progress.insights.length > 0
+    ? progress.insights[progress.insights.length - 1]
+    : null
 
   const handleContinue = () => {
     if (photos.length < MIN_PHOTOS) {
@@ -481,87 +613,74 @@ export default function Step2Upload() {
         </div>
       )}
 
-      {normalizingMsg && (
+      {mounted && (isBusy || showDoneBanner) && createPortal(
         <div style={{
-          padding: '12px 16px', marginTop: '16px',
-          background: 'rgba(255,255,255,0.04)',
-          borderRadius: '8px',
-          display: 'flex', alignItems: 'center', gap: '10px',
-        }}>
-          <div style={{
-            width: '14px', height: '14px', flexShrink: 0,
-            border: '2px solid rgba(255,255,255,0.12)',
-            borderTopColor: 'rgba(255,255,255,0.6)',
-            borderRadius: '50%',
-            animation: 'spin 0.7s linear infinite',
-          }} />
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{normalizingMsg}</span>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      )}
-
-      {progress.isAnalyzing && (
-        <div style={{
-          padding: '12px 16px', marginTop: '16px',
-          background: 'rgba(255,255,255,0.04)',
-          borderRadius: '8px',
+          position: 'fixed', zIndex: 200,
+          left: '50%', transform: 'translateX(-50%)',
+          bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
+          width: 'min(calc(100vw - 32px), 480px)',
+          padding: '12px 16px',
+          background: 'rgba(15,15,15,0.94)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '10px',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
           display: 'flex', flexDirection: 'column', gap: '8px',
         }}>
           <div style={{
-            display: 'flex', justifyContent: 'space-between',
-            fontSize: '12px', color: 'rgba(255,255,255,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            fontSize: '12px', color: 'rgba(255,255,255,0.7)',
           }}>
-            <span>Analizando fotos...</span>
-            <span>{progress.completed} / {progress.total}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isBusy && (
+                <span style={{
+                  width: '12px', height: '12px', flexShrink: 0,
+                  border: '2px solid rgba(232,85,58,0.25)',
+                  borderTopColor: '#E8553A',
+                  borderRadius: '50%',
+                  animation: 'pixia-spin 0.7s linear infinite',
+                }} />
+              )}
+              {!isBusy && showDoneBanner && <span style={{ color: '#E8553A' }}>✓</span>}
+              <span>
+                {isBusy
+                  ? progressLabel
+                  : `${photos.length} foto${photos.length !== 1 ? 's' : ''} lista${photos.length !== 1 ? 's' : ''}`}
+              </span>
+            </span>
+            {progressTotal > 0 && (
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {progressCurrent} / {progressTotal} · {progressPct}%
+              </span>
+            )}
           </div>
-          <div style={{
-            height: '2px', background: 'rgba(255,255,255,0.08)',
-            borderRadius: '1px', overflow: 'hidden',
-          }}>
+
+          {progressTotal > 0 && (
             <div style={{
-              height: '100%', background: '#E8553A',
-              width: `${(progress.completed / progress.total) * 100}%`,
-              transition: 'width 0.3s ease', borderRadius: '1px',
-            }} />
-          </div>
-          {progress.insights.length > 0 && (
-            <span style={{
-              fontSize: '11px', color: 'rgba(232,85,58,0.8)', fontStyle: 'italic',
+              height: '3px', background: 'rgba(255,255,255,0.08)',
+              borderRadius: '2px', overflow: 'hidden',
             }}>
-              {progress.insights[progress.insights.length - 1]}
+              <div style={{
+                height: '100%', background: '#E8553A',
+                width: `${isBusy ? progressPct : 100}%`,
+                transition: 'width 0.3s ease', borderRadius: '2px',
+              }} />
+            </div>
+          )}
+
+          {latestInsight && (
+            <span style={{ fontSize: '11px', color: 'rgba(232,85,58,0.8)', fontStyle: 'italic' }}>
+              {latestInsight}
             </span>
           )}
-        </div>
+        </div>,
+        document.body
       )}
-
-      {uploadProgress.isUploading && (
-        <div style={{
-          padding: '12px 16px', marginTop: '8px',
-          background: 'rgba(255,255,255,0.04)',
-          borderRadius: '8px',
-          display: 'flex', flexDirection: 'column', gap: '8px',
-        }}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between',
-            fontSize: '12px', color: 'rgba(255,255,255,0.5)',
-          }}>
-            <span>Guardando en la nube...</span>
-            <span>{uploadProgress.completed} / {uploadProgress.total}</span>
-          </div>
-          <div style={{
-            height: '2px', background: 'rgba(255,255,255,0.08)',
-            borderRadius: '1px', overflow: 'hidden',
-          }}>
-            <div style={{
-              height: '100%', background: '#E8553A',
-              width: `${(uploadProgress.completed / uploadProgress.total) * 100}%`,
-              transition: 'width 0.3s ease', borderRadius: '1px',
-            }} />
-          </div>
-        </div>
-      )}
+      <style>{`@keyframes pixia-spin { to { transform: rotate(360deg); } }`}</style>
 
       {photos.length > 0 && (
+        <>
+        <style>{SHIMMER_CSS}</style>
         <Reorder.Group
           axis="x"
           values={photos}
@@ -583,11 +702,7 @@ export default function Step2Upload() {
                       : ""
                   }`}
               >
-                <img
-                  src={URL.createObjectURL(item.file)}
-                  alt="preview"
-                  className="object-cover w-full h-full"
-                />
+                <PhotoThumb src={thumbUrls.get(item.file)} />
 
                 <div className="absolute top-1.5 left-1.5 text-white/60 opacity-0 group-hover:opacity-100 transition">
                   <Move className="w-4 h-4" />
@@ -623,6 +738,7 @@ export default function Step2Upload() {
             ))}
           </AnimatePresence>
         </Reorder.Group>
+        </>
       )}
 
       {minPhotosError && (

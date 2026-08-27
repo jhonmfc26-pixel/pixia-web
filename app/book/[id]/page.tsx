@@ -17,6 +17,8 @@ import { FacePageView, HeroSpreadPageView } from '@/core/modules/viewer/SpreadFa
 import { buildSpreads, isSingleSpread, getSpreadUrls, type ViewerSpread } from '@/core/modules/viewer/spreadModel'
 import PixiaFlipBook, { type PixiaFlipBookHandle } from '@/core/modules/viewer/PixiaFlipBook'
 import { FlipBookErrorBoundary } from '@/core/modules/viewer/FlipBookErrorBoundary'
+import { FaceThumbnail, HeroSpreadThumbnail } from '@/core/modules/viewer/FaceThumbnail'
+import PageThumbnailStrip, { type ThumbnailItem } from '@/components/ui/PageThumbnailStrip'
 
 // ── Keyframes CSS del fallback estático — inyectados una sola vez ──────────────
 
@@ -117,6 +119,40 @@ export default function BookPage() {
 
   // ── Pliegos derivados ──────────────────────────────────────────────────────
   const spreads = useMemo<ViewerSpread[]>(() => buildSpreads(structure), [structure])
+
+  // ── Tira de miniaturas ──────────────────────────────────────────────────────
+  // Un ThumbnailItem por posición navegable (mismo índice que spreadIdx/goTo).
+  // Portada y contraportada reusan CoverPage/BackCoverPage tal cual (una sola
+  // foto cada una, sin costo real); los pliegos usan FaceThumbnail —liviano,
+  // thumbnailUrl en vez de url— para no bajar 50+ fotos a resolución completa
+  // en un álbum grande.
+  const thumbItems = useMemo<ThumbnailItem[]>(() => {
+    if (!book) return []
+    return spreads.map((s, i): ThumbnailItem => {
+      if (s.kind === 'cover') {
+        return {
+          key: 'cover', label: `${i + 1}`, aspectRatio: 1,
+          render: <CoverPage photo={coverPhoto} cover={book.cover} style={book.style || 'con-margen'} format={book.format || '30x30'} />,
+        }
+      }
+      if (s.kind === 'back') {
+        return { key: 'back', label: `${i + 1}`, aspectRatio: 1, render: <BackCoverPage /> }
+      }
+      if (s.kind === 'paired') {
+        return {
+          key: `${s.left.id}-${s.right.id}`, label: `${i + 1}`, aspectRatio: 2,
+          render: (
+            <div style={{ display: 'flex', width: '100%', height: '100%', gap: '1px' }}>
+              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={s.left} photosById={photosById} /></div>
+              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={s.right} photosById={photosById} /></div>
+            </div>
+          ),
+        }
+      }
+      // composition (hero-spread)
+      return { key: s.face.id, label: `${i + 1}`, aspectRatio: 2, render: <HeroSpreadThumbnail face={s.face} photosById={photosById} /> }
+    })
+  }, [spreads, photosById, coverPhoto, book])
 
   // ── Fit-contain sizing — grande, aprovechando la pantalla ──────────────────
   const areaRef = useRef<HTMLDivElement>(null)
@@ -505,6 +541,14 @@ export default function BookPage() {
           </span>
         </div>
       </div>
+
+      {/* Tira de miniaturas — navegación rápida entre páginas */}
+      <PageThumbnailStrip
+        items={thumbItems}
+        currentIndex={displayIdx}
+        onSelect={goTo}
+        bottomBarHeight={48}
+      />
 
     </div>
   )

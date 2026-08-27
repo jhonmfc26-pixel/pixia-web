@@ -31,6 +31,8 @@ import { DEDICATION_HEADING_FONTS, DEDICATION_BODY_FONTS } from '@/core/modules/
 import DedicationEditor from '@/core/modules/dedication/DedicationEditor'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import PixiaImage from '@/components/ui/PixiaImage'
+import { FaceThumbnail, HeroSpreadThumbnail } from '@/core/modules/viewer/FaceThumbnail'
+import PageThumbnailStrip, { type ThumbnailItem } from '@/components/ui/PageThumbnailStrip'
 import type { UploadControllerHandle } from './UploadController'
 
 // normalizeFiles (heic2any ~1.3 MiB + exifr ~72 KiB), usePhotoAnalysis y
@@ -66,13 +68,26 @@ const BTN_ICON: React.CSSProperties = {
   cursor: 'pointer', flexShrink: 0, transition: 'color 0.12s, background 0.12s',
 }
 
-function ThumbLayout({ schema, isActive, onClick }: {
+// :focus-visible no se puede expresar con style inline — una sola regla
+// global, coherente con el resto del CHROM. Coral, igual que el anillo de
+// "activo" — no compiten porque activo es boxShadow inset y esto es outline.
+const THUMB_LAYOUT_FOCUS_CSS = `
+  .pixia-thumb-layout:focus-visible {
+    outline: 2px solid #E8553A;
+    outline-offset: 2px;
+  }
+`
+
+function ThumbLayout({ schema, isActive, onClick, buttonRef }: {
   schema: typeof LAYOUTS[number]
   isActive: boolean
   onClick: () => void
+  buttonRef?: (el: HTMLButtonElement | null) => void
 }) {
   return (
     <button
+      ref={buttonRef}
+      className="pixia-thumb-layout"
       onClick={onClick}
       title={schema.name}
       style={{
@@ -254,10 +269,12 @@ function PhotoActionsPopover({ photoId, anchorRect, photoFace, onAction }: {
  * no de foto. Nunca clipea independientemente de dónde esté la foto.
  * La tira de layouts es scrollable horizontalmente si hay muchos.
  */
-function FaceDesignPanel({ selectedFace, canConvertToDedication, onAction }: {
+function FaceDesignPanel({ selectedFace, canConvertToDedication, onAction, onClose }: {
   selectedFace: Face
   canConvertToDedication: boolean
   onAction: (action: string, id: string) => void
+  /** Cierra el panel — hoy solo lo dispara Escape con foco en la tira. */
+  onClose: () => void
 }) {
   const faceLayouts = LAYOUTS.filter(
     l => l.photoCount === selectedFace.photoIds.length && l.scope !== 'spread'
@@ -282,6 +299,43 @@ function FaceDesignPanel({ selectedFace, canConvertToDedication, onAction }: {
     stripRef.current.scrollLeft = dragRef.current.startScrollLeft - (e.clientX - dragRef.current.startX)
   }
   const endStripDrag = () => { dragRef.current = null }
+
+  // ── Navegación por teclado ─────────────────────────────────────────────
+  // faceLayouts ya viene ordenado (filter sobre LAYOUTS) — el índice acá
+  // es estable entre renders mientras selectedFace.photoIds.length no cambie.
+  const activeIndex = faceLayouts.findIndex(l => l.id === selectedFace.layout)
+  const thumbRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+
+  // Foco automático al abrirse el panel (o al cambiar de cara con el panel
+  // ya abierto) — sin esto, las flechas no llegan a ningún lado porque el
+  // foco nunca se movió del elemento que se clickeó para seleccionar la cara.
+  useEffect(() => {
+    stripRef.current?.focus()
+  }, [selectedFace.id])
+
+  const selectLayoutAt = (index: number) => {
+    // Clamp, no wrap — no pasar del primero/último.
+    const clamped = Math.max(0, Math.min(faceLayouts.length - 1, index))
+    if (clamped === activeIndex) return
+    const layout = faceLayouts[clamped]
+    if (!layout) return
+    // Misma acción que dispara el clic — no duplicar la lógica de aplicar layout.
+    onAction('change-layout', layout.id)
+    thumbRefs.current.get(layout.id)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }
+
+  const handleStripKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault() // no dejar que un handler de pliego/spread la reciba también
+      selectLayoutAt(activeIndex - 1)
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      selectLayoutAt(activeIndex + 1)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      onClose()
+    }
+  }
 
   return (
     <div style={{
@@ -337,26 +391,22 @@ function FaceDesignPanel({ selectedFace, canConvertToDedication, onAction }: {
           </div>
         ) : (
           <div style={{ padding: '10px 10px 8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: '12px' }}>
+            {/* "+ Agregar" vivía acá antes — se sacó: agregar foto ya está en
+                el popover de la foto seleccionada (PhotoActionsPopover, botón
+                "Agregar" cuando canAddToFace), no hace falta duplicarlo acá. */}
+            <div style={{ marginBottom: '8px' }}>
               <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.32)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
                 Diseño · {selectedFace.photoIds.length} foto{selectedFace.photoIds.length !== 1 ? 's' : ''}
               </span>
-              {selectedFace.photoIds.length < 5 && (
-                <button
-                  onClick={() => onAction('open-bag', selectedFace.id)}
-                  style={{ background: 'none', border: 'none', padding: '0', color: 'rgba(255,255,255,0.38)', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = '#E8553A' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.38)' }}
-                >
-                  + Agregar
-                </button>
-              )}
             </div>
             {/* Tira scrollable: nunca desborda verticalmente. Arrastre con
                 mouse/rueda + swipe táctil nativo; fade en los bordes como
                 indicador sutil de que hay más layouts. */}
             <div
               ref={stripRef}
+              className="pixia-thumb-strip"
+              tabIndex={0}
+              onKeyDown={handleStripKeyDown}
               onWheel={handleWheel}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
@@ -375,12 +425,24 @@ function FaceDesignPanel({ selectedFace, canConvertToDedication, onAction }: {
                   schema={schema}
                   isActive={schema.id === selectedFace.layout}
                   onClick={() => onAction('change-layout', schema.id)}
+                  buttonRef={el => {
+                    if (el) thumbRefs.current.set(schema.id, el)
+                    else thumbRefs.current.delete(schema.id)
+                  }}
                 />
               ))}
             </div>
           </div>
         )}
       </div>
+      <style>{THUMB_LAYOUT_FOCUS_CSS}</style>
+      <style>{`
+        .pixia-thumb-strip:focus-visible {
+          outline: none;
+          box-shadow: inset 0 0 0 1.5px rgba(232,85,58,0.55);
+          border-radius: 6px;
+        }
+      `}</style>
     </div>
   )
 }
@@ -726,6 +788,38 @@ export default function EditV2Page() {
     }
     return map
   }, [book])
+
+  // ── Tira de miniaturas ──────────────────────────────────────────────────────
+  // Un ThumbnailItem por pliego de structure.folds — mismo índice que
+  // currentFold. El editor no tiene "posición de portada" en esta numeración
+  // (la portada se edita aparte, con "Editar portada"), a diferencia del
+  // viewer que sí incluye cover/back en su propia tira.
+  const thumbItems = useMemo<ThumbnailItem[]>(() => {
+    if (!structure) return []
+    return structure.folds.map((fold, i): ThumbnailItem => {
+      if (fold.kind === 'paired') {
+        return {
+          key: fold.id, label: `${i + 1}`, aspectRatio: 2,
+          render: (
+            <div style={{ display: 'flex', width: '100%', height: '100%', gap: '1px' }}>
+              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={fold.left} photosById={photosById} /></div>
+              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={fold.right} photosById={photosById} /></div>
+            </div>
+          ),
+        }
+      }
+      // composition (hero-spread)
+      return { key: fold.id, label: `${i + 1}`, aspectRatio: 2, render: <HeroSpreadThumbnail face={fold.face} photosById={photosById} /> }
+    })
+  }, [structure, photosById])
+
+  // Saltar a un pliego desde la tira — mismo reset de selección que usan
+  // los botones ‹/› de FoldStructureViewer al navegar.
+  const handleJumpToFold = (i: number) => {
+    setSel(null)
+    setAnchorRect(null)
+    setCurrentFold(i)
+  }
 
   // Fotos candidatas para portada: TODAS las del blueprint, colocadas o no —
   // el usuario debe poder usar cualquier foto de la bolsa como portada, no
@@ -1547,6 +1641,16 @@ export default function EditV2Page() {
         }}
       />
 
+      {/* Tira de miniaturas — navegación rápida entre pliegos */}
+      {structure && (
+        <PageThumbnailStrip
+          items={thumbItems}
+          currentIndex={Math.max(0, Math.min(structure.folds.length - 1, currentFold))}
+          onSelect={handleJumpToFold}
+          bottomBarHeight={64}
+        />
+      )}
+
       {/* Banner de problemas [DEV] — nunca visible para un cliente en producción */}
       {process.env.NODE_ENV !== 'production' && problems.length > 0 && (
         <div style={{
@@ -1605,6 +1709,7 @@ export default function EditV2Page() {
             selectedFace={selectedFace}
             canConvertToDedication={canConvertToDedication}
             onAction={handleAction}
+            onClose={() => { setSel(null); setAnchorRect(null) }}
           />
         )
       )}
