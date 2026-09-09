@@ -4,7 +4,9 @@ import type { ReactNode } from 'react'
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { Face } from '@/core/modules/foldModel/types'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
+import { slotAspectRatios } from '@/core/modules/album/layoutFit'
 import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
+import { manualCoverStyle, aspectOf } from '@/core/modules/viewer/manualCover'
 import PixiaImage from '@/components/ui/PixiaImage'
 
 /**
@@ -46,6 +48,12 @@ export function FacePageView({ face, photosById, side }: {
     if (!schema) {
       content = <div style={{ width: '100%', height: '100%', background: '#111' }} />
     } else {
+      // Proporción de cada slot — asume página cuadrada (30x30/20x20, los
+      // formatos confirmados/en uso real hoy; ver el mismo supuesto en
+      // layoutFit.ts). Se usa para el cálculo manual de "cover" en vez de
+      // object-fit:cover (ver manualCover.ts — evita que Chromium rasterice
+      // la foto al exportar a PDF).
+      const slotArs = slotAspectRatios(face.layout)
       content = (
         <div style={{
           width: '100%', height: '100%',
@@ -73,9 +81,8 @@ export function FacePageView({ face, photosById, side }: {
                       alt=""
                       draggable={false}
                       style={{
-                        width: '100%', height: '100%',
-                        objectFit: 'cover', objectPosition: 'center center',
-                        display: 'block', userSelect: 'none', pointerEvents: 'none',
+                        ...manualCoverStyle(aspectOf(photo.width, photo.height), slotArs[i] ?? 1, 'center center'),
+                        userSelect: 'none', pointerEvents: 'none',
                       }}
                     />
                   )}
@@ -119,9 +126,13 @@ export function HeroSpreadPageView({ face, photosById, half }: {
             alt=""
             draggable={false}
             style={{
-              width: '100%', height: '100%',
-              objectFit: 'cover', objectPosition: 'center center',
-              display: 'block', userSelect: 'none', pointerEvents: 'none',
+              // El div padre (este "window") YA representa el área completa
+              // del spread a 2 páginas (width:200% de una página cuadrada =
+              // aspecto 2:1) — la foto cubre ESE contenedor, no la mitad
+              // visible; containerAspect=2 matchea lo que object-fit:cover
+              // llenaba antes acá. Ver manualCover.ts.
+              ...manualCoverStyle(aspectOf(photo.width, photo.height), 2, 'center center'),
+              userSelect: 'none', pointerEvents: 'none',
             }}
           />
         )}

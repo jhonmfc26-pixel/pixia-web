@@ -1,16 +1,27 @@
 'use client'
 import type { CoverConfig } from '@/core/contracts/AlbumBlueprint'
 import { getTemplateById } from './coverTemplates'
+import { manualCoverStyle, aspectOf } from '@/core/modules/viewer/manualCover'
 
 interface CoverRendererProps {
   config: CoverConfig
   photoUrl?: string
+  /**
+   * Dimensiones reales de la foto — opcionales, solo para calcular el
+   * recorte manual (ver manualCover.ts) y evitar el bloat de Chromium al
+   * exportar a PDF. Sin esto (ej. CoverEditor, que no las pasa) cae de
+   * vuelta a object-fit:cover normal — mismo visual, sin el fix de peso
+   * (no importa en el editor, no se exporta a PDF).
+   */
+  photoWidth?: number
+  photoHeight?: number
   scale?: number
   format?: '20x20' | '30x30' | 'a4'
 }
 
-export default function CoverRenderer({ config, photoUrl, scale = 1, format = '30x30' }: CoverRendererProps) {
+export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeight, scale = 1, format = '30x30' }: CoverRendererProps) {
   const aspectRatio = format === 'a4' ? '3 / 4' : '1 / 1'
+  const containerAspect = format === 'a4' ? 3 / 4 : 1
   const template = getTemplateById(config.templateId)
   if (!template) return null
 
@@ -55,13 +66,7 @@ export default function CoverRenderer({ config, photoUrl, scale = 1, format = '3
         <img
           src={photoUrl}
           alt=""
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          }}
+          style={manualCoverStyle(aspectOf(photoWidth, photoHeight), containerAspect, 'center center')}
         />
       )}
 

@@ -1,0 +1,25 @@
+{
+  "name": "pixia-pdf-render",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Worker de Cloudflare Browser Rendering — renderiza HTML (mismos componentes que el viewer de pixia-web) a PDF a resolución de impresión. Servicio aparte, NO corre dentro del Worker de Next.js de pixia-web.",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "^1.1.0",
+    "@supabase/supabase-js": "^2.106.2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260827.1",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.0.0"
+  }
+}

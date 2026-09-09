@@ -1,0 +1,65 @@
+name = "pixia-pdf-render"
+# Bundle propio (ver build.mjs) — no src/index.ts directo. `npm run deploy`
+# corre el build antes de `wrangler deploy` (ver package.json).
+main = "dist/worker.js"
+compatibility_date = "2026-08-27"
+compatibility_flags = ["nodejs_compat"]
+
+# Browser Rendering — requiere plan Workers Paid habilitado en el account.
+# No hace falta crear nada más: el binding se activa solo con esto.
+# MYBROWSER (no "BROWSER" a secas) — mismo nombre que espera env.MYBROWSER
+# en src/index.ts. Si se renombra acá, hay que renombrar ahí también.
+[browser]
+binding = "MYBROWSER"
+# Permite `wrangler dev` contra el browser real de Cloudflare en vez de
+# intentar emularlo local (no hay forma de emular Browser Rendering local —
+# no existe un Chromium gestionado corriendo en la máquina del dev). Si esta
+# sintaxis de "remote binding" no la reconoce la versión de wrangler
+# instalada, el fallback es correr el worker ENTERO en remoto:
+# `npx wrangler dev --remote` (sin esta línea).
+remote = true
+
+# Secreto compartido para autenticar llamadas desde pixia-web — setear con:
+#   wrangler secret put PDF_RENDER_SECRET
+# (mismo valor que PDF_RENDER_SECRET en el .env de pixia-web)
+
+# Cron Trigger = el motor real de la generación por lotes (ver comentario
+# largo en src/index.ts): cada minuto recorre pdf_generation_jobs activos y
+# les hace avanzar un lote. Se eligió el cron en vez de self-continuation por
+# HTTP+ctx.waitUntil porque ESO se probó en vivo y falló: waitUntil() solo
+# se extiende ~30s después de responder, insuficiente incluso para una sola
+# página (launch de browser + render + upload) — un scheduled() en cambio
+# tiene su propio presupuesto de hasta 15 min de wall time, confirmado por
+# la documentación de Cloudflare. Cada minuto es el grano más fino que
+# soportan los Cron Triggers. No cuesta extra: gratis en Workers Paid.
+[triggers]
+crons = ["* * * * *"]
+
+# CPU por invocación — default 30s, insuficiente para un lote de varias
+# páginas (launch de browser + N renders + N uploads + a veces el merge
+# final). 5 min es el máximo permitido en Paid. Aplica a todas las
+# invocaciones del script (HTTP y scheduled), no solo al cron — no molesta,
+# las rutas HTTP ahora son livianas (solo registran el job).
+[limits]
+cpu_ms = 300_000
+
+# Credenciales de Supabase para el worker — setear con:
+#   wrangler secret put SUPABASE_URL
+#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# (mismos valores que NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
+# en el .env de pixia-web — el worker los necesita propios porque corre
+# aparte, no puede leer el .env.local de la app). Usados SOLO para
+# pdf_generation_jobs (estado/progreso) — ver supabase/pdf_jobs.sql. Los
+# ARCHIVOS (páginas + PDF final) viven en R2, no en Supabase Storage (Brick 3
+# — el plan Free de Supabase tiene un tope de 50MB por archivo, un álbum de
+# 36 páginas mergea a 100MB+; R2 no tiene ese tope).
+
+# Bucket R2 PRIVADO para los PDFs generados — creado con
+# `wrangler r2 bucket create pixia-pdfs-private`. Nunca se le habilita
+# dominio público ni r2.dev público — el binding es la ÚNICA forma de
+# acceder, y solo desde este Worker. Distinto del bucket de fotos (público,
+# assets.pixiaa.com, ver app/api/upload/route.ts) — ese sigue como está, acá
+# no se toca.
+[[r2_buckets]]
+binding = "PDF_BUCKET"
+bucket_name = "pixia-pdfs-private"

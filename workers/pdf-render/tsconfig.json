@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    // dom SOLO para que tipos como HTMLImageElement (usados en props/tipos
+    // de los componentes reusados del viewer, ej. PixiaImage) resuelvan —
+    // el runtime real del Worker NO tiene DOM, pero esos componentes nunca
+    // ejecutan una API de DOM de verdad en este contexto (solo se usan a
+    // través de renderToStaticMarkup, nunca montan/corren efectos).
+    "lib": ["ES2021", "dom"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["@cloudflare/workers-types"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["../../*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

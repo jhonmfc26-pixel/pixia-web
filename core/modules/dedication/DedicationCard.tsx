@@ -1,6 +1,7 @@
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { DedicationContent } from '@/core/modules/foldModel/types'
 import { getHeadingFontFamily, getBodyFontFamily } from './fonts'
+import { manualCoverStyle, aspectOf } from '@/core/modules/viewer/manualCover'
 import PixiaImage from '@/components/ui/PixiaImage'
 
 // Textura de papel MUY sutil vía SVG de ruido inline (data-URI) — no es una
@@ -93,6 +94,7 @@ export function DedicationCard({ dedication, photo }: {
         {photo && (
           <div style={{
             width: '30%', aspectRatio: '1',
+            position: 'relative', // necesario para el position:absolute de manualCoverStyle
             borderRadius: '2px',
             overflow: 'hidden',
             boxShadow: '0 4px 14px rgba(74,64,50,0.18)',
@@ -103,7 +105,7 @@ export function DedicationCard({ dedication, photo }: {
               src={photo.thumbnailUrl || photo.url}
               alt=""
               draggable={false}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              style={manualCoverStyle(aspectOf(photo.width, photo.height), 1, 'center center')}
             />
           </div>
         )}

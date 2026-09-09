@@ -1,0 +1,13 @@
+# Repo-root .dockerignore — usado por el build de services/pdf-render-container/
+# (build context = raíz del repo, ver el comentario en su Dockerfile). Sin
+# esto, Docker manda TODO el repo (node_modules de la app, .next, .git) al
+# daemon antes de aplicar los COPY selectivos del Dockerfile — lento y
+# pesado sin necesidad, aunque el Dockerfile solo copie core/ y
+# services/pdf-render-container/.
+node_modules
+**/node_modules
+.next
+.git
+**/dist
+**/*.log
+.env*

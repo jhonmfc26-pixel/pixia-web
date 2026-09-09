@@ -14,6 +14,8 @@ export default function CoverPage({ photo, cover, format }: CoverPageProps) {
     <CoverRenderer
       config={cover}
       photoUrl={photo?.url}
+      photoWidth={photo?.width}
+      photoHeight={photo?.height}
       scale={1}
       format={format}
     />

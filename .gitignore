@@ -45,3 +45,5 @@ node_modules
 .env
 .env.local
 .DS_Store
+Millos10@/
+google-cloud-sdk/

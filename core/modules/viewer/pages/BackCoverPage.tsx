@@ -6,13 +6,16 @@ export default function BackCoverPage({ style: _ }: BackCoverPageProps) {
       width: '100%', height: '100%', position: 'relative', background: '#111111',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
     }}>
+      {/* URL absoluta a propósito (no /logo-pixia.png): este componente también
+          se renderiza vía PrintCoverWrap dentro del pipeline PDF del contenedor
+          (Puppeteer + <base href> apuntando a localhost en Cloud Run) — una ruta
+          relativa ahí resuelve contra un origen inalcanzable y el logo sale roto.
+          Misma URL pública de R2 que usan los correos Resend. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/logo-pixia.png"
+        src="https://assets.pixiaa.com/logo-pixia.png"
         alt="Pixia"
-        width={32}
-        height={32}
-        style={{ opacity: 0.5 }}
+        style={{ width: '24mm', height: 'auto', opacity: 0.5 }}
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
       />
       <span style={{

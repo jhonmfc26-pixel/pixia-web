@@ -1,0 +1,20 @@
+# Config de Cloud Build — build de la imagen sin necesitar Docker local.
+# Correr desde la RAÍZ del repo (el build context tiene que alcanzar core/):
+#   gcloud builds submit --tag gcr.io/PROJECT_ID/pdf-render-container \
+#     --config services/pdf-render-container/cloudbuild.yaml .
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'services/pdf-render-container/Dockerfile'
+      - '-t'
+      - '$_IMAGE_TAG'
+      - '.'
+images:
+  - '$_IMAGE_TAG'
+substitutions:
+  _IMAGE_TAG: 'gcr.io/${PROJECT_ID}/pdf-render-container'
+options:
+  # Imagen de Playwright es grande — máquina con más CPU acelera el build.
+  machineType: 'E2_HIGHCPU_8'
