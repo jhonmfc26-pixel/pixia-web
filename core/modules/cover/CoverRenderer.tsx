@@ -15,11 +15,10 @@ interface CoverRendererProps {
    */
   photoWidth?: number
   photoHeight?: number
-  scale?: number
   format?: '20x20' | '30x30' | 'a4'
 }
 
-export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeight, scale = 1, format = '30x30' }: CoverRendererProps) {
+export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeight, format = '30x30' }: CoverRendererProps) {
   const aspectRatio = format === 'a4' ? '3 / 4' : '1 / 1'
   const containerAspect = format === 'a4' ? 3 / 4 : 1
   const template = getTemplateById(config.templateId)
@@ -61,6 +60,14 @@ export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeigh
       position: 'relative',
       overflow: 'hidden',
       background: '#1a1a1a',
+      // Container query: todo el texto de acá abajo usa unidades `cqw` (% del
+      // ancho de ESTE div) en vez de px fijos — así el tamaño es proporcional
+      // a la página tanto en el viewer (~500-700px en pantalla) como en el
+      // PDF (~300mm físicos vía Puppeteer/Playwright) sin necesitar un prop
+      // `scale` manual por caller (lo que había antes, y por lo que portada
+      // se veía más chica en el PDF: cada caller pasaba —o no— un scale
+      // distinto sin relación real con su tamaño físico).
+      containerType: 'inline-size',
     }}>
       {photoUrl && (
         <img
@@ -85,41 +92,52 @@ export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeigh
         flexDirection: 'column',
         justifyContent,
         alignItems,
-        padding: `${28 * scale}px ${24 * scale}px`,
+        padding: '6cqw 5cqw',
         textAlign: config.textAlign,
       }}>
         <h1 style={{
           fontFamily: `'${template.titleFont}', serif`,
-          fontSize: `${template.titleSize * scale}px`,
+          fontSize: `${template.titleSize}cqw`,
           fontWeight: template.titleWeight,
           color: textColor,
           letterSpacing: template.letterSpacing,
           margin: 0,
-          lineHeight: 1.1,
+          lineHeight: 1.05,
           textShadow: `0 2px 12px ${shadowColor}`,
+          // Sin esto, con align-items != 'stretch' (siempre acá, ver arriba)
+          // el h1 se ajusta a su ancho de contenido en vez del de la página —
+          // un título largo puede desbordar el overflow:hidden del contenedor
+          // en vez de partir en líneas. Con el tamaño más grande de este fix
+          // es más fácil de gatillar, así que se cubre explícito.
+          width: '100%',
+          maxWidth: '100%',
+          overflowWrap: 'break-word',
         }}>
           {config.title}
         </h1>
 
         {template.showDivider && config.subtitle && (
           <div style={{
-            width: `${40 * scale}px`,
+            width: '10cqw',
             height: '1px',
             background: textColor,
             opacity: 0.5,
-            margin: `${10 * scale}px 0`,
+            margin: '2cqw 0',
           }} />
         )}
 
         {config.subtitle && (
           <p style={{
             fontFamily: "'Inter', sans-serif",
-            fontSize: `${template.subtitleSize * scale}px`,
+            fontSize: `${template.subtitleSize}cqw`,
             color: textColor,
             opacity: 0.85,
-            margin: `${6 * scale}px 0 0 0`,
+            margin: '1.4cqw 0 0 0',
             fontWeight: 300,
             letterSpacing: '0.05em',
+            width: '100%',
+            maxWidth: '100%',
+            overflowWrap: 'break-word',
           }}>
             {config.subtitle}
           </p>
@@ -128,12 +146,15 @@ export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeigh
         {config.date && (
           <p style={{
             fontFamily: "'Inter', sans-serif",
-            fontSize: `${(template.subtitleSize - 1) * scale}px`,
+            fontSize: `${template.subtitleSize - 0.4}cqw`,
             color: textColor,
             opacity: 0.6,
-            margin: `${4 * scale}px 0 0 0`,
+            margin: '0.9cqw 0 0 0',
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
+            width: '100%',
+            maxWidth: '100%',
+            overflowWrap: 'break-word',
           }}>
             {config.date}
           </p>

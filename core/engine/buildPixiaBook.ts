@@ -1,5 +1,6 @@
 import { ActId, NarrativeTone, PixiaBook } from '../domain/PixiaBook'
 import type { PhotoOrientation, MeaningRegion } from '../contracts/AlbumBlueprint'
+import { classifyOrientation } from '../modules/album/photoGeometry'
 
 export interface AlbumDraft {
   title?: string
@@ -53,10 +54,7 @@ function detectOrientation(src: string): Promise<'landscape' | 'portrait' | 'squ
     }
     const img = new window.Image()
     img.onload = () => {
-      const ratio = img.width / img.height
-      if (ratio > 1.2) resolve('landscape')
-      else if (ratio < 0.85) resolve('portrait')
-      else resolve('square')
+      resolve(classifyOrientation(img.width / img.height))
     }
     img.onerror = () => resolve('landscape')
     img.src = src

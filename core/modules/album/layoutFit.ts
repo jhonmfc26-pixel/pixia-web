@@ -21,6 +21,18 @@ function parseAreas(areas: string): string[][] {
   return rows
 }
 
+/**
+ * Fracción [0,1] de innerPadding de un layout ('15%' → 0.15). 0 si no declara.
+ * Solo soporta el formato que usa el registry (porcentaje simple, mismo valor
+ * en los 4 lados vía el shorthand CSS `padding: X%`) — no hay ningún layout
+ * hoy con otra sintaxis.
+ */
+function _innerPaddingFraction(innerPadding: string | undefined): number {
+  if (!innerPadding) return 0
+  const m = /^([\d.]+)%$/.exec(innerPadding.trim())
+  return m ? parseFloat(m[1]) / 100 : 0
+}
+
 // ── Geometría de slots (cacheada por layoutId) ────────────────────────────────
 
 interface SlotGeom {
@@ -43,6 +55,18 @@ function _slotGeoms(layoutId: string): SlotGeom[] {
   const tC = colF.reduce((a, b) => a + b, 0)
   const tR = rowF.reduce((a, b) => a + b, 0)
 
+  // innerPadding envuelve el grid ENTERO (ver SpreadFaces.tsx/LayoutRenderer.tsx:
+  // `padding: schema.innerPadding` en el contenedor que rodea el <div grid>) —
+  // por eso resta área por igual a TODOS los slots, no cambia sus proporciones
+  // relativas entre sí. Con página cuadrada, `padding: X%` (shorthand CSS, los
+  // 4 lados al mismo % — y top/bottom también resuelven contra el ANCHO del
+  // contenedor, no la altura, quirk de CSS) reduce el lado visible del grid en
+  // igual proporción en ambos ejes → el AR de cada slot no cambia (el recorte
+  // es simétrico), pero el área que ese slot representa DEL TOTAL DE LA PÁGINA
+  // sí baja, al cuadrado del factor de encogimiento lineal.
+  const p = _innerPaddingFraction(schema.innerPadding)
+  const areaShrink = p > 0 ? (1 - 2 * p) ** 2 : 1
+
   const out = (schema.slots as readonly string[]).map(s => {
     let cMin = Infinity, cMax = -Infinity, rMin = Infinity, rMax = -Infinity
     for (let r = 0; r < grid.length; r++) {
@@ -56,8 +80,8 @@ function _slotGeoms(layoutId: string): SlotGeom[] {
     const cSpan = colF.slice(cMin, cMax + 1).reduce((a, b) => a + b, 0)
     const rSpan = rowF.slice(rMin, rMax + 1).reduce((a, b) => a + b, 0)
     return {
-      ar:   (cSpan * tR) / (rSpan * tC),         // AR = (col%) / (row%) con página cuadrada
-      area: (cSpan / tC) * (rSpan / tR),          // fracción de área de página
+      ar:   (cSpan * tR) / (rSpan * tC),                    // AR = (col%) / (row%) con página cuadrada — innerPadding no lo distorsiona (encogimiento simétrico)
+      area: (cSpan / tC) * (rSpan / tR) * areaShrink,        // fracción de área de página, ya neta del innerPadding
     }
   })
 

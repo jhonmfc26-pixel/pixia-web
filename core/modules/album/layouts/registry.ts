@@ -42,11 +42,24 @@ const LAYOUT_REGISTRY = [
   },
   {
     id: 'portrait',
-    name: 'Vertical con aire',
+    name: 'Vertical con aire suave',
     photoCount: 1,
-    grid: { columns: '1fr', rows: '1fr', areas: '"a"' },
+    hasAir: true,
+    // Rediseñado — antes tenía innerPadding:'15%' (padding CSS simétrico),
+    // geométricamente indistinguible de 'single' para el motor: un padding
+    // simétrico sobre página cuadrada no cambia el AR del slot (se achica
+    // igual en ancho y alto), solo el área — y el algoritmo de selección
+    // (bestAssignment/rankLayoutsForPhotos) solo mira AR, nunca área. Con eso
+    // 'single' le ganaba el desempate siempre, 0% de selección real (ver
+    // auditoría "Inventario y uso del sistema de layouts").
+    // Ahora usa el mismo mecanismo que solo-portrait-air (celdas '.' que
+    // rompen la simetría) pero con margen más angosto — AR de slot 0.84
+    // (frente al 0.72 de solo-portrait-air) — para ocupar un punto propio en
+    // el espectro "aire" en vez de duplicarlo: aire suave para fotos casi
+    // cuadradas que igual quieren un respiro, no el ajuste ceñido de
+    // solo-portrait-air.
+    grid: { columns: '0.08fr 0.84fr 0.08fr', rows: '1fr', areas: '". a ."' },
     slots: ['a'],
-    innerPadding: '15%',
   },
   {
     id: 'hero-3-top',
@@ -69,13 +82,11 @@ const LAYOUT_REGISTRY = [
     grid: { columns: '2fr 1fr', rows: '1fr 1fr 1fr', areas: '"a b" "a c" "a d"' },
     slots: ['a', 'b', 'c', 'd'],
   },
-  {
-    id: 'hero-3-right',
-    name: '3 izq + Hero der',
-    photoCount: 4,
-    grid: { columns: '1fr 2fr', rows: '1fr 1fr 1fr', areas: '"b a" "c a" "d a"' },
-    slots: ['a', 'b', 'c', 'd'],
-  },
+  // hero-3-right (3 izq + Hero der) se borró: era geométricamente idéntico a
+  // hero-3-left (mismas áreas/AR de slot, solo el nombre sugería una imagen
+  // especular distinta) — el motor nunca lo elegía, perdía el desempate por
+  // orden de array siempre. Ver auditoría "Inventario y uso del sistema de
+  // layouts" (layouts muertos).
   {
     id: 'trio-row',
     name: 'Trío horizontal',
@@ -113,11 +124,14 @@ const LAYOUT_REGISTRY = [
   },
   {
     id: 'portrait-pair',
-    name: 'Par vertical con aire',
+    name: 'Par vertical con aire suave',
     photoCount: 2,
-    grid: { columns: '1fr 1fr', rows: '1fr', areas: '"a b"' },
+    hasAir: true,
+    // Mismo rediseño que 'portrait' — ver ese comentario. AR de slot 0.833
+    // (frente al 0.714 de duo-portrait-air): margen suave, no el ajuste
+    // ceñido.
+    grid: { columns: '1fr 1fr', rows: '0.2fr 0.6fr 0.2fr', areas: '". ." "a b" ". ."' },
     slots: ['a', 'b'],
-    innerPadding: '10%',
   },
   {
     id: 'quad-mixed',

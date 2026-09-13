@@ -1,13 +1,24 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { PhotoAsset, AlbumStyle } from '@/core/contracts/AlbumBlueprint'
 import type { Face } from '@/core/modules/foldModel/types'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
 import { slotAspectRatios } from '@/core/modules/album/layoutFit'
 import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
 import { manualCoverStyle, aspectOf } from '@/core/modules/viewer/manualCover'
 import PixiaImage from '@/components/ui/PixiaImage'
+
+// Margen de página para el estilo 'con-margen' — valor de diseño elegido acá:
+// no hay ninguna convención previa que reutilizar (CoverPage.tsx declara la
+// prop `style` pero nunca la usa — la portada tampoco implementaba con-margen
+// hoy). Porcentual, no px fijo, para que se comporte igual en el viewer (DOM,
+// px) y si algún día se cablea al pipeline de impresión (documento en mm) —
+// mismo criterio que innerPadding/los layouts *-air, que ya usan % en vez de
+// valores fijos. Mismo crema que el resto del "papel" del álbum (PAPER_BG en
+// PixiaFlipBook.tsx, el fondo de los layouts hasAir) — no un color nuevo.
+const PAGE_MARGIN_PERCENT = 5
+const PAGE_MARGIN_BG = '#F9F6F1'
 
 /**
  * Sombra de lomo pegada al borde interior de la propia página, no un overlay
@@ -31,13 +42,21 @@ function GutterEdge({ side }: { side: 'left' | 'right' }) {
 }
 
 /** Cara solo-lectura (una mitad de pliego "paired"). */
-export function FacePageView({ face, photosById, side }: {
+export function FacePageView({ face, photosById, side, style = 'sin-margen' }: {
   face: Face
   photosById: Map<string, PhotoAsset>
   /** Si se da, dibuja la sombra de lomo en el borde interior de esta cara. */
   side?: 'left' | 'right'
+  /** con-margen dibuja un marco de página alrededor del contenido; default sin-margen (full-bleed, el comportamiento de siempre). */
+  style?: AlbumStyle
 }) {
   let content: ReactNode
+  // disableMargin (hoy solo hero-spread, ver registry.ts) es la señal
+  // autoritativa de "esto nunca lleva margen de página" — acá nunca se
+  // consulta directo porque hero-spread es scope:'spread' y usa
+  // HeroSpreadPageView, no FacePageView; queda documentado por si algún día
+  // un layout scope:'page' necesita el mismo escape.
+  let disableMargin = false
   if (face.kind === 'dedication' && face.dedication) {
     const photo = face.dedication.photoId ? photosById.get(face.dedication.photoId) : undefined
     content = <DedicationCard dedication={face.dedication} photo={photo} />
@@ -45,6 +64,7 @@ export function FacePageView({ face, photosById, side }: {
     content = <div style={{ width: '100%', height: '100%', background: '#F9F6F1' }} />
   } else {
     const schema = getLayoutById(face.layout)
+    disableMargin = schema?.disableMargin ?? false
     if (!schema) {
       content = <div style={{ width: '100%', height: '100%', background: '#111' }} />
     } else {
@@ -95,9 +115,25 @@ export function FacePageView({ face, photosById, side }: {
     }
   }
 
+  // El margen de página envuelve `content` (que puede a su vez tener SU
+  // PROPIO aire — innerPadding o hasAir, ver arriba); son dos marcos
+  // independientes que se apilan, no se fusionan. Para un layout *-air en
+  // con-margen, eso suma el margen de página + el aire propio del layout —
+  // visualmente correcto (nunca rompe nada), pero puede verse con MUCHO aire
+  // total en layouts que ya eran generosos (ej. trio-portrait-air, ~54% del
+  // área ya es aire propio). Vale una revisión visual del equipo, no se
+  // intentó compensar acá.
+  const showPageMargin = style === 'con-margen' && !disableMargin
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      {content}
+      <div style={{
+        width: '100%', height: '100%', boxSizing: 'border-box',
+        padding: showPageMargin ? `${PAGE_MARGIN_PERCENT}%` : 0,
+        background: showPageMargin ? PAGE_MARGIN_BG : undefined,
+      }}>
+        {content}
+      </div>
       {side && <GutterEdge side={side} />}
     </div>
   )

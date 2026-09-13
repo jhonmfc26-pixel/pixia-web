@@ -112,15 +112,14 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
       } else if (s.kind === 'back') {
         items.push(wrapPage(<BackCoverPage />, 'back'))
       } else if (s.kind === 'paired') {
-        items.push(wrapPage(<FacePageView face={s.left} photosById={photosById} side="left" />, s.left.id))
-        items.push(wrapPage(<FacePageView face={s.right} photosById={photosById} side="right" />, s.right.id))
+        items.push(wrapPage(<FacePageView face={s.left} photosById={photosById} side="left" style={style} />, s.left.id))
+        items.push(wrapPage(<FacePageView face={s.right} photosById={photosById} side="right" style={style} />, s.right.id))
       } else {
         items.push(wrapPage(<HeroSpreadPageView face={s.face} photosById={photosById} half="left" />, `${s.face.id}-l`))
         items.push(wrapPage(<HeroSpreadPageView face={s.face} photosById={photosById} half="right" />, `${s.face.id}-r`))
       }
     }
     return items
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spreads, photosById, coverPhoto, cover, style, format])
 
   const flipbookKey = spreads.map(s => {

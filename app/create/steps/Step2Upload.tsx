@@ -399,6 +399,8 @@ export default function Step2Upload() {
             'pixia_photo_analysis',
             JSON.stringify(patched.map((p, index) => ({
               id: p.id,
+              width: p.width ?? 0,
+              height: p.height ?? 0,
               orientation: p.orientation,
               score: p.score,
               takenAt: p.exif.takenAt || null,

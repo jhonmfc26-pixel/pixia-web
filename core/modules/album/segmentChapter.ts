@@ -7,6 +7,7 @@
  */
 import type { PoolPhoto } from './groupPhotos'
 import { rankLayoutsForPhotos } from './layoutFit'
+import { photoAR } from './photoGeometry'
 import { LAYOUTS } from './layouts/registry'
 import type { LayoutId } from './layouts/registry'
 
@@ -39,15 +40,6 @@ export interface SegmentedGroup {
 
 function scoreOf(p: PoolPhoto): number {
   return p.photo.score?.finalScore ?? 0
-}
-
-function photoAR(p: PoolPhoto): number {
-  const ph = p.photo
-  const w = ph.width ?? 0
-  const h = ph.height ?? 0
-  if (w > 0 && h > 0) return w / h
-  const ori = ph.orientation ?? 'landscape'
-  return ori === 'portrait' ? 0.72 : ori === 'square' ? 1.0 : 1.4
 }
 
 type Density = 'solo' | 'light' | 'mid' | 'dense'

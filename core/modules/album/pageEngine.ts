@@ -1,28 +1,23 @@
 import type { Page, PageLayout, LayoutConfig, AlbumPages } from './types'
 import { getLayoutById, getLayoutsByPhotoCount } from './layouts/helpers'
 import { groupPhotos, type PhotoGroup, type PoolPhoto } from './groupPhotos'
-import { rankLayoutsForPhotos, bestAssignment, slotAspectRatios, slotAreas, cropLoss } from './layoutFit'
+import { rankLayoutsForPhotos, bestAssignment, slotAspectRatios, getHeroSlotIndex, cropLoss } from './layoutFit'
+import { photoAR } from './photoGeometry'
 import { devLog } from '@/lib/devLog'
 
 function scoreOf(item: PoolPhoto): number {
   return item.photo.score?.finalScore ?? 0
 }
 
-/** AR real de una foto. Fallback a constantes por orientación si faltan dimensiones. */
-function photoAR(photo: PoolPhoto): number {
-  const p = photo.photo
-  if (p.width > 0 && p.height > 0) return p.width / p.height
-  const ori = p.orientation ?? 'landscape'
-  return ori === 'portrait' ? 0.72 : ori === 'square' ? 1.0 : 1.4
-}
-
 /**
  * Ordena fotos para los slots del layout elegido.
  *
  * Base: asignación geométrica óptima (menor pérdida de cover-crop total).
- * Override para slot dominante: si el slot 0 ocupa ≥2× el área media del resto,
- * se pone en él la foto de mayor score entre las que encajan bien (pérdida < 0.25).
- * Si ninguna encaja bien en el slot dominante, la geometría manda.
+ * Override para slot dominante: getHeroSlotIndex ubica el slot grande por área
+ * real (no asume índice 0 — ej. hero-3-top lo tiene en el índice 3). Si lo hay,
+ * se pone en él la foto de mayor score entre las que encajan bien (pérdida <
+ * 0.25). Si ninguna encaja bien, o el layout no tiene slot dominante
+ * (getHeroSlotIndex → null, layout simétrico), la geometría manda.
  */
 function orderPhotosForLayout(
   photos: PoolPhoto[],
@@ -33,32 +28,31 @@ function orderPhotosForLayout(
   // order[slotIdx] = índice de foto → geometricOrder[slotIdx] = la foto para ese slot
   const geometricOrder = order.map(i => photos[i])
 
-  const areas = slotAreas(layout)
-  const n = areas.length
-  if (n < 2) return geometricOrder
+  const heroIdx = getHeroSlotIndex(layout)
+  if (heroIdx === null) return geometricOrder   // sin slot dominante
 
-  const avgOthers = areas.slice(1).reduce((a, b) => a + b, 0) / (n - 1)
-  if (areas[0] < avgOthers * 2) return geometricOrder   // sin slot dominante
-
-  // Slot 0 dominante: candidatos con buena geometría (pérdida < 0.25)
-  const slot0AR = slotAspectRatios(layout)[0]
+  // Slot dominante: candidatos con buena geometría (pérdida < 0.25)
+  const heroAR = slotAspectRatios(layout)[heroIdx]
   const LOSS_THR = 0.25
   const candidates = photos
-    .map((p, i) => ({ i, score: scoreOf(p), loss: cropLoss(ars[i], slot0AR) }))
+    .map((p, i) => ({ i, score: scoreOf(p), loss: cropLoss(ars[i], heroAR) }))
     .filter(c => c.loss < LOSS_THR)
 
   if (candidates.length === 0) return geometricOrder
 
   const best = candidates.reduce((a, c) => c.score > a.score ? c : a)
-  if (photos[best.i].photo.id === geometricOrder[0].photo.id) return geometricOrder
+  if (photos[best.i].photo.id === geometricOrder[heroIdx].photo.id) return geometricOrder
 
-  // Poner la foto de mayor score en slot 0; resto en orden geométrico
+  // Poner la foto de mayor score en el slot dominante; resto en orden geométrico
+  const n = geometricOrder.length
   const result: PoolPhoto[] = new Array(n)
-  result[0] = photos[best.i]
-  const chosenId = result[0].photo.id
-  let slot = 1
+  result[heroIdx] = photos[best.i]
+  const chosenId = result[heroIdx].photo.id
+  let slot = 0
   for (const p of geometricOrder) {
-    if (p.photo.id !== chosenId) result[slot++] = p
+    if (p.photo.id === chosenId) continue
+    while (slot === heroIdx) slot++
+    result[slot++] = p
   }
   return result
 }

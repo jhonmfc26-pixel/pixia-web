@@ -71,7 +71,7 @@ export default function CoverEditor({
             overflow: 'hidden',
             boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
           }}>
-            <CoverRenderer config={config} photoUrl={currentPhotoUrl} scale={0.75} format={format} />
+            <CoverRenderer config={config} photoUrl={currentPhotoUrl} format={format} />
           </div>
         </div>
 
@@ -180,7 +180,6 @@ export default function CoverEditor({
                           textAlign: t.defaultAlign,
                         }}
                         photoUrl={currentPhotoUrl}
-                        scale={0.35}
                         format={format}
                       />
                     </div>

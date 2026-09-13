@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react'
 import { readExif, type ExifData } from './exifReader'
 import { scorePhoto, type PhotoScore } from './photoScorer'
 import { MAX_PHOTOS } from '@/core/modules/upload/limits'
+import { classifyOrientation } from '@/core/modules/album/photoGeometry'
 import type { MeaningRegion } from '@/core/contracts/AlbumBlueprint'
 
 // FaceDetector es una API experimental — solo Chrome. TypeScript no la conoce.
@@ -65,9 +66,7 @@ export function usePhotoAnalysis() {
           const dims = await getImageDimensions(src)
 
           const ratio = dims.width / dims.height
-          const orientation: 'landscape' | 'portrait' | 'square' =
-            ratio > 1.15 ? 'landscape' :
-            ratio < 0.87 ? 'portrait' : 'square'
+          const orientation = classifyOrientation(ratio)
 
           const score = await scorePhoto(src)
           // TODO: reemplazar por face-api.js/MediaPipe cuando esté integrado.
