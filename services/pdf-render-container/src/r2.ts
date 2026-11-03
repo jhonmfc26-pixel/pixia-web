@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import crypto from 'node:crypto'
 
 /**
@@ -12,8 +13,11 @@ import crypto from 'node:crypto'
  * Signed URLs: mismo esquema HMAC-SHA256 propio que r2Storage.ts del Worker
  * CF (no presigned URLs de S3 — así la app puede seguir firmando la URL
  * localmente con el mismo PDF_CONTAINER_SECRET compartido, sin necesitar
- * también las credenciales S3 del bucket). El download real pasa por
- * GET /download acá, que valida el token y streamea desde R2.
+ * también las credenciales S3 del bucket). GET /download acá valida ese
+ * token y REDIRIGE (302) a una presigned URL nativa de R2 de vida corta —
+ * el archivo baja directo de R2, nunca pasa por Cloud Run. Antes se
+ * proxeaban los bytes y el interior (>100MB) daba 500: Cloud Run rechaza
+ * respuestas no-streaming de más de 32MB.
  */
 export function createR2Client(config: { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string }) {
   const s3 = new S3Client({
@@ -26,6 +30,17 @@ export function createR2Client(config: { endpoint: string; bucket: string; acces
     async upload(key: string, bytes: Uint8Array, contentType: string): Promise<string> {
       await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: bytes, ContentType: contentType }))
       return key
+    },
+
+    /** URL presigned nativa de R2 que fuerza descarga con el nombre dado. */
+    async presignedDownloadUrl(key: string, filename: string, expiresInSeconds: number): Promise<string> {
+      const command = new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        ResponseContentType: 'application/pdf',
+        ResponseContentDisposition: `attachment; filename="${filename.replace(/"/g, '')}"`,
+      })
+      return getSignedUrl(s3, command, { expiresIn: expiresInSeconds })
     },
 
     async download(key: string): Promise<Uint8Array> {

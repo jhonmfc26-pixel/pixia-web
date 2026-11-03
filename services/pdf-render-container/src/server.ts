@@ -45,14 +45,14 @@ app.get('/download', async (req, res) => {
   if (!key) return res.status(400).send('Falta ?key=')
   if (!verifyDownloadToken(CONTAINER_SECRET, key, exp, sig)) return res.status(403).send('Token inválido o expirado')
   try {
-    const bytes = await r2.download(key)
-    const filename = key.split('/').pop() ?? 'archivo.pdf'
-    res.setHeader('content-type', 'application/pdf')
-    res.setHeader('content-disposition', `attachment; filename="${filename}"`)
-    res.status(200).send(Buffer.from(bytes))
+    // Redirección a R2 en vez de proxear los bytes (ver r2.ts). La presigned
+    // vive 15 min: el navegador la usa al instante, solo cubre un clic lento.
+    const filename = key.split('/').filter(Boolean).slice(-3).join('-') || 'archivo.pdf' // <album>-interior-final.pdf
+    const url = await r2.presignedDownloadUrl(key, filename, 15 * 60)
+    res.redirect(302, url)
   } catch (err) {
     console.error(`[pdf-render-container] /download falló (${key}):`, err)
-    res.status(404).send('No encontrado')
+    res.status(500).send('No se pudo generar el link de descarga')
   }
 })
 
