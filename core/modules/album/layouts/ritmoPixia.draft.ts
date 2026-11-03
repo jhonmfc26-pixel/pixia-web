@@ -1,4 +1,10 @@
-import type { LayoutSchema } from './types'
+import type { LayoutSchema, DensityTier } from './types'
+
+// Re-exportado para que /dev/ritmo (y cualquier otro consumidor existente de
+// este draft) no tenga que cambiar su import — DensityTier ahora vive en
+// types.ts porque desde Fase B1 también es parte del schema de producción
+// (ver LayoutSchema.tier), no solo de este draft de revisión visual.
+export type { DensityTier }
 
 /**
  * DRAFT — catálogo "Ritmo Pixia" (Fase A de diseño, documento aprobado
@@ -21,8 +27,6 @@ import type { LayoutSchema } from './types'
  * `slotArs` es lo que /dev/ritmo usa para elegir la foto de muestra IDEAL
  * de cada slot (AR de la foto ≈ AR del slot) — mismo orden que `slots`.
  */
-
-export type DensityTier = 'full-bleed' | 'equilibrado' | 'aire'
 
 export interface DraftLayoutSchema extends LayoutSchema {
   /** Densidad — para el motor de ritmo de Fase B (alternar tiers). */

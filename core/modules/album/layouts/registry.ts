@@ -1,8 +1,17 @@
 import type { LayoutSchema } from './types'
+import { HERO_SPREAD_LAYOUT } from './heroSpread'
+import { RITMO_LAYOUTS_ENABLED } from './ritmoFlag'
+import { RITMO_PIXIA_LAYOUTS } from './ritmoPixiaRegistry'
 
 /**
  * Registry de layouts. Para agregar uno nuevo, solo añade un objeto aquí.
  * El LayoutRenderer lo pinta automáticamente con CSS Grid.
+ *
+ * Esta es la base — el comportamiento de hoy, sin cambios. Con
+ * NEXT_PUBLIC_RITMO_LAYOUTS=true el motor usa RITMO_PIXIA_LAYOUTS en su
+ * lugar (ver el export LAYOUTS más abajo) — este array no se toca ni se
+ * referencia desde ahí salvo por hero-spread, que ambos comparten vía
+ * heroSpread.ts para no duplicarlo.
  */
 const LAYOUT_REGISTRY = [
   {
@@ -140,15 +149,7 @@ const LAYOUT_REGISTRY = [
     grid: { columns: '1fr 1fr', rows: '1fr 1fr', areas: '"a a" "b c"' },
     slots: ['a', 'b', 'c'],
   },
-  {
-    id: 'hero-spread',
-    name: 'Foto heroica a doble página',
-    photoCount: 1,
-    scope: 'spread',
-    grid: { columns: '1fr', rows: '1fr', areas: '"a"' },
-    slots: ['a'],
-    disableMargin: true,
-  },
+  HERO_SPREAD_LAYOUT,
 
   // ── Layouts con aire (celdas '.' = margen de papel, fondo crema) ─────────────
   // El área vacía crea márgenes deliberados que evitan recortar fotos con AR muy
@@ -202,6 +203,16 @@ const LAYOUT_REGISTRY = [
   },
 ] as const satisfies readonly LayoutSchema[]
 
-export type LayoutId = (typeof LAYOUT_REGISTRY)[number]['id']
+// Unión de los ids base + los ids nuevos que solo existen en el catálogo
+// Ritmo Pixia (flag ON) — el tipo tiene que cubrir ambos estados del flag
+// porque TS se resuelve en build time, antes de que exista el env var en
+// runtime. Los 5 ids nuevos que no están ya en LAYOUT_REGISTRY (los demás
+// del catálogo Ritmo reusan un id existente, aunque cambien de geometría):
+// trio-air, quad-soft, hero-banner-5, grid-5, quintet-air.
+type RitmoOnlyLayoutId = 'trio-air' | 'quad-soft' | 'hero-banner-5' | 'grid-5' | 'quintet-air'
 
-export const LAYOUTS: readonly LayoutSchema[] = LAYOUT_REGISTRY
+export type LayoutId = (typeof LAYOUT_REGISTRY)[number]['id'] | RitmoOnlyLayoutId
+
+export const LAYOUTS: readonly LayoutSchema[] = RITMO_LAYOUTS_ENABLED
+  ? RITMO_PIXIA_LAYOUTS
+  : LAYOUT_REGISTRY
