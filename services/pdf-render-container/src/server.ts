@@ -2,6 +2,7 @@ import express from 'express'
 import { renderInteriorPdf, renderCoverPdf } from './renderAlbum'
 import { createR2Client, signDownloadUrl, verifyDownloadToken } from './r2'
 import { createJobsClient } from './jobs'
+import { runSweep } from './queue'
 import type { AlbumStructure } from '@/core/modules/foldModel/types'
 import type { CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 
@@ -127,6 +128,37 @@ app.post('/render-cover', async (req, res) => {
     console.error(`[pdf-render-container] ${albumId} cubierta falló:`, message)
     await jobs.markError(albumId, message)
     res.status(502).json({ error: message })
+  }
+})
+
+// Cola de producción pagado → PDF (ver queue.ts). La llama Cloud Scheduler
+// cada 5 min con el mismo Bearer que el resto. Responde 200 aunque algún
+// job falle (el detalle va en el body): los fallos se gestionan con los
+// reintentos de la cola, no con reintentos del Scheduler.
+//
+// Las imágenes y fuentes del HTML ya son URLs absolutas (R2 público, Google
+// Fonts); el <base href> solo cubre rutas relativas residuales. No puede ser
+// pixiaa.com: está detrás de Cloudflare Access y Cloud Run no pasa.
+const PRINT_BASE_URL = process.env.PRINT_BASE_URL || 'https://assets.pixiaa.com/'
+let sweepRunning = false
+
+app.post('/process-pending', async (req, res) => {
+  if (!checkAuth(req)) return res.status(401).send('No autorizado')
+  if (sweepRunning) return res.status(200).json({ skipped: 'ya hay un barrido corriendo en esta instancia' })
+  sweepRunning = true
+  try {
+    const result = await runSweep({
+      jobs,
+      engine: { renderInterior: renderInteriorPdf, renderCover: renderCoverPdf, upload: (k, b, t) => r2.upload(k, b, t) },
+      baseUrl: PRINT_BASE_URL,
+    })
+    console.log('[pdf-render-container] barrido:', JSON.stringify(result))
+    res.status(200).json(result)
+  } catch (err) {
+    console.error('[pdf-render-container] barrido falló:', err)
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
+  } finally {
+    sweepRunning = false
   }
 })
 

@@ -32,8 +32,11 @@ remote = true
 # tiene su propio presupuesto de hasta 15 min de wall time, confirmado por
 # la documentación de Cloudflare. Cada minuto es el grano más fino que
 # soportan los Cron Triggers. No cuesta extra: gratis en Workers Paid.
+# RETIRADO (nov 2026): el motor real ahora es el contenedor de Cloud Run
+# (services/pdf-render-container, cola pagado→PDF). El cron se borró en vivo;
+# se deja vacío acá para que un `wrangler deploy` accidental NO lo reviva.
 [triggers]
-crons = ["* * * * *"]
+crons = []
 
 # CPU por invocación — default 30s, insuficiente para un lote de varias
 # páginas (launch de browser + N renders + N uploads + a veces el merge
