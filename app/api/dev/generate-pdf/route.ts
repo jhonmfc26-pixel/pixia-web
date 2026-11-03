@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { normalizeBook } from '@/core/modules/album/normalizeBook'
-import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
-import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
-import type { AlbumStructure } from '@/core/modules/foldModel/types'
-import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import { buildPrintJobInput, type BuildPrintJobInputResult } from '@/core/modules/print/buildPrintJobInput'
 
 export const runtime = 'edge'
 
@@ -220,38 +216,23 @@ html,body { width:${PAGE_MM}mm; height:${PAGE_MM}mm; }
     return NextResponse.json({ error: `Falta configurar ${varNames} en el entorno.` }, { status: 500 })
   }
 
-  let book
+  // Mismo armado que usa la cola de producción (ver buildPrintJobInput).
+  let built: BuildPrintJobInputResult
   try {
     const { data, error } = await supabaseAdmin.from('blueprints').select('*').eq('id', albumId).single()
     if (error || !data) {
       return NextResponse.json({ error: `Álbum "${albumId}" no encontrado en Supabase: ${error?.message ?? 'sin datos'}` }, { status: 404 })
     }
-    book = normalizeBook(data, albumId)
+    built = buildPrintJobInput(data, albumId)
   } catch (err) {
     return NextResponse.json({ error: `Error cargando el álbum desde Supabase: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 })
   }
-
-  let structure: AlbumStructure
-  if (book.structure) {
-    const knownIds = new Set<string>()
-    for (const s of book.spreads) for (const p of s.photos) knownIds.add(p.id)
-    const validation = validateAlbumStructure(book.structure, knownIds)
-    structure = validation.ok ? book.structure : foldsFromBlueprint(book).structure
-    if (!validation.ok) console.warn('[dev/generate-pdf] structure guardada inválida, derivando desde el blueprint:', validation.reason)
-  } else {
-    structure = foldsFromBlueprint(book).structure
+  if (!built.ok) {
+    return NextResponse.json({ error: built.reason }, { status: 422 })
   }
-  if (structure.folds.length === 0) {
-    return NextResponse.json({ error: `El álbum "${albumId}" no tiene pliegos (structure vacía) — no hay nada que generar.` }, { status: 422 })
-  }
-
-  const photosById = new Map<string, PhotoAsset>()
-  for (const spread of book.spreads) {
-    for (const photo of spread.photos) photosById.set(photo.id, photo)
-  }
-  const coverPhoto = (book.cover.photoId && photosById.get(book.cover.photoId)) || [...photosById.values()][0]
+  for (const w of built.warnings) console.warn('[dev/generate-pdf]', w)
+  const { structure, photos, cover, coverPhoto, format } = built.input
   const baseUrl = req.nextUrl.origin
-  const photos = Object.fromEntries(photosById)
 
   const callEngine = async (path: string, payload: unknown) => {
     const res = await fetch(`${engineUrl.replace(/\/$/, '')}${path}`, {
@@ -273,10 +254,10 @@ html,body { width:${PAGE_MM}mm; height:${PAGE_MM}mm; }
     // los dos casos, la diferencia es CUÁNTO tarda esa espera.
     const results: Record<string, unknown> = {}
     if (which === 'interior' || which === 'both') {
-      results.interior = await callEngine('/render-interior', { albumId, structure, photos, format: book.format, baseUrl })
+      results.interior = await callEngine('/render-interior', { albumId, structure, photos, format, baseUrl })
     }
     if (which === 'cover' || which === 'both') {
-      results.cover = await callEngine('/render-cover', { albumId, cover: book.cover, coverPhoto, structure, format: book.format, baseUrl })
+      results.cover = await callEngine('/render-cover', { albumId, cover, coverPhoto, structure, format, baseUrl })
     }
     return NextResponse.json(
       {

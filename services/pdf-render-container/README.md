@@ -206,6 +206,76 @@ curl https://pixia-pdf-render-xxxxx-uc.a.run.app/health
 # → ok
 ```
 
+## Cola de producción pagado → PDF
+
+El webhook de Wompi NO llama a este contenedor: al aprobar una orden solo
+deja el job en `pendiente` en `pdf_generation_jobs` (`lib/pdfQueue.ts`).
+Cloud Scheduler llama cada 5 min a `POST /process-pending`, que hace el
+barrido en `src/queue.ts`:
+
+1. **Reconciliar:** órdenes aprobadas (últimos 30 días) sin job → se encolan.
+   Red de seguridad por si el webhook no pudo encolar.
+2. **Expirar:** jobs que agotaron los 3 intentos → `fallo`.
+3. **Procesar:** reclama jobs de a uno (`claim_next_pdf_job`, atómico con
+   `FOR UPDATE SKIP LOCKED`) y genera interior + cubierta. Hasta 5 jobs o
+   3 min por barrido.
+4. **Alertar:** todo `fallo` sin `alerted_at` → email por Resend a
+   `ALERT_EMAIL`. Si Resend falla, se reintenta en el próximo barrido.
+
+Estados: `pendiente` → `generando_pdf` → `pdf_listo`, o
+`error_generacion` (se reintenta) → `fallo` (agotó intentos, requiere
+intervención). `attempt_count` cuenta reclamos, así que un álbum que tumba el
+contenedor también consume intentos. Un job `generando_pdf` con
+`claimed_at` de más de 15 min se considera colgado y se reintenta.
+
+La cola solo toma jobs con `order_reference` — las pruebas de la ruta dev
+(sin orden) nunca se procesan solas.
+
+Tests de la lógica (sin Chromium ni Supabase), desde la raíz:
+```bash
+npx tsx --test services/pdf-render-container/test/queue.test.ts
+```
+
+### Puesta en marcha (una sola vez)
+
+```bash
+# 1. Supabase → SQL editor: pegar y correr supabase/pdf_jobs_trigger.sql
+#    (idempotente).
+
+# 2. Secretos nuevos
+echo -n "re_..." | gcloud secrets create RESEND_API_KEY --data-file=-
+
+# 3. Build + deploy de la imagen nueva (desde la RAÍZ del repo)
+gcloud builds submit --config services/pdf-render-container/cloudbuild.yaml \
+  --substitutions _IMAGE_TAG=gcr.io/project-d750839b-5664-4e5c-87b/pdf-render-container:v8 .
+gcloud run deploy pixia-pdf-render --region us-central1 \
+  --image gcr.io/project-d750839b-5664-4e5c-87b/pdf-render-container:v8 \
+  --update-env-vars ALERT_EMAIL=<tu correo>,EMAIL_FROM="Pixia <alertas@pixiaa.com>" \
+  --update-secrets RESEND_API_KEY=RESEND_API_KEY:latest
+# (EMAIL_FROM tiene que ser un dominio verificado en Resend — el mismo que
+#  usa la app para la confirmación de pedido.)
+
+# 4. Cloud Scheduler: barrido cada 5 min
+gcloud services enable cloudscheduler.googleapis.com
+gcloud scheduler jobs create http pixia-pdf-sweep \
+  --location us-central1 \
+  --schedule "*/5 * * * *" \
+  --http-method POST \
+  --uri https://pixia-pdf-render-316585315237.us-central1.run.app/process-pending \
+  --headers "Authorization=Bearer $(gcloud secrets versions access latest --secret=PDF_CONTAINER_SECRET)" \
+  --attempt-deadline 300s
+
+# 5. Probar el barrido a mano (no espera al Scheduler)
+gcloud scheduler jobs run pixia-pdf-sweep --location us-central1
+# o con curl + el Bearer → responde JSON con reconciled/expired/processed/alerts
+```
+
+Para reintentar a mano un job en `fallo` después de corregir la causa:
+```sql
+UPDATE pdf_generation_jobs SET status = 'pendiente', attempt_count = 0, alerted_at = NULL
+ WHERE blueprint_id = '<id del álbum>';
+```
+
 ## Qué NO se pudo validar en esta sesión
 
 Sin `gcloud` CLI ni credenciales GCP en este entorno, no se pudo:

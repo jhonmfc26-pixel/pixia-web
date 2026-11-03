@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { validateWebhookSignature, fetchTransactionStatus } from '@/lib/wompi'
 import { sendOrderConfirmation } from '@/lib/email'
+import { enqueuePdfJob } from '@/lib/pdfQueue'
 
 export const runtime = 'edge'
 
@@ -105,6 +106,17 @@ export async function POST(req: NextRequest) {
   // 7. Idempotencia: no actualizar si ya está en el estado final
   const newStatus = mapWompiStatus(verified.status)
   if (existingOrder.payment_status === newStatus) {
+    // Reintento sobre una orden ya aprobada: si la vez anterior no se pudo
+    // encolar el PDF (por eso respondimos 500 y Wompi reintenta), este es
+    // el momento de recuperarlo. Nunca pisa un job ya existente de esta orden.
+    if (newStatus === 'approved' && existingOrder.book_id) {
+      const queued = await enqueuePdfJob({ blueprintId: existingOrder.book_id, orderReference: verified.reference, overwrite: false })
+      if (!queued.ok) {
+        console.error('[webhook] No se pudo encolar el PDF (reintento):', verified.reference, queued.error)
+        return NextResponse.json({ error: 'No se pudo encolar el PDF' }, { status: 500 })
+      }
+      if (queued.enqueued) console.log('[webhook] PDF encolado en reintento:', verified.reference)
+    }
     console.log('[webhook] Orden ya está en estado', newStatus, '- skip')
     return NextResponse.json({ received: true, status: 'already-processed' }, { status: 200 })
   }
@@ -145,6 +157,26 @@ export async function POST(req: NextRequest) {
 
   console.log('[webhook] Orden actualizada:', verified.reference, '→', newStatus)
 
+  // Encolar el PDF de impresión. Solo encola — la generación la hace el
+  // barrido del contenedor (POST /process-pending). Si falla, igual mandamos
+  // el email (el pago es real) pero respondemos 500 para que Wompi
+  // reintente y el bloque de idempotencia de arriba lo encole. El barrido
+  // además reconcilia órdenes aprobadas sin job, como segunda red.
+  let enqueueFailed = false
+  if (newStatus === 'approved') {
+    if (!existingOrder.book_id) {
+      console.error('[webhook] Orden aprobada SIN book_id — no se puede generar PDF:', verified.reference)
+    } else {
+      const queued = await enqueuePdfJob({ blueprintId: existingOrder.book_id, orderReference: verified.reference, overwrite: true })
+      if (queued.ok) {
+        console.log('[webhook] PDF encolado:', verified.reference)
+      } else {
+        enqueueFailed = true
+        console.error('[webhook] No se pudo encolar el PDF:', verified.reference, queued.error)
+      }
+    }
+  }
+
   if (newStatus === 'approved') {
     const { data: fullOrder } = await supabaseAdmin
       .from('orders')
@@ -174,6 +206,10 @@ export async function POST(req: NextRequest) {
     } else {
       console.warn('[webhook] No se pudo cargar orden para email:', verified.reference)
     }
+  }
+
+  if (enqueueFailed) {
+    return NextResponse.json({ error: 'Orden aprobada pero no se pudo encolar el PDF' }, { status: 500 })
   }
 
   return NextResponse.json({ received: true, status: newStatus }, { status: 200 })
