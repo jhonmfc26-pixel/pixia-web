@@ -10,6 +10,8 @@ import { rankLayoutsForPhotos } from './layoutFit'
 import { photoAR } from './photoGeometry'
 import { LAYOUTS } from './layouts/registry'
 import type { LayoutId } from './layouts/registry'
+import { RITMO_LAYOUTS_ENABLED } from './layouts/ritmoFlag'
+import { segmentWithRhythm, nextState, NEUTRAL_STATE, type RhythmState, type RhythmEnd } from './rhythmEngine'
 
 // ── Pesos de penalización de ritmo (calibrables — van al taste dataset) ──────
 
@@ -161,47 +163,66 @@ function dpSegment(
 export function segmentChapter(
   photos: PoolPhoto[],
   isChapterOpener: boolean,
+  /**
+   * Solo Ritmo Pixia (flag ON): estado de ritmo al final del capítulo
+   * anterior, para que el tope de páginas seguidas en el mismo tier no se
+   * rompa en el cambio de capítulo. Con el flag OFF se ignora.
+   */
+  prevRhythm: RhythmState = NEUTRAL_STATE,
+  /** Solo Ritmo Pixia: qué viene después de este capítulo (ver RhythmEnd). */
+  end: RhythmEnd = { mustEndEven: false },
 ): SegmentedGroup[] {
   if (photos.length === 0) return []
 
-  // Opener explícito: solo si el capítulo tiene ≥4 fotos.
-  // Con capítulos pequeños el opener solitario destruye el ritmo.
-  if (isChapterOpener && photos.length >= 4) {
-    const openerIdx = photos.reduce(
-      (best, p, i) => (scoreOf(p) > scoreOf(photos[best]) ? i : best),
-      0,
-    )
-    const opener = photos[openerIdx]
+  const opener = chooseOpener(photos, isChapterOpener)
+  if (opener) {
+    const { index: openerIdx, layout: openerLayout } = opener
     const rest = photos.filter((_, i) => i !== openerIdx)
 
-    const ori = opener.photo.orientation ?? 'landscape'
-    const ar = photoAR(opener)
-    let openerLayout: LayoutId
-
-    if (ori === 'landscape' || ar > 1.0) {
-      openerLayout = 'hero-spread'
-    } else {
-      const ranked = rankLayoutsForPhotos([ar])
-      openerLayout = (ranked[0]?.layoutId ?? 'single') as LayoutId
-    }
-
     const openerGroup: SegmentedGroup = {
-      photos: [opener],
+      photos: [photos[openerIdx]],
       layout: openerLayout,
       isChapterOpener: true,
       avgLoss: 0,
     }
 
-    const restGroups = dpSegment(
-      rest,
-      openerLayout,
-      densityOf(1),
-      layoutHasAir(openerLayout),
-    )
+    const restGroups = RITMO_LAYOUTS_ENABLED
+      ? segmentWithRhythm(rest, nextState(prevRhythm, openerLayout), end).map(asSegmented)
+      : dpSegment(
+        rest,
+        openerLayout,
+        densityOf(1),
+        layoutHasAir(openerLayout),
+      )
 
     return [openerGroup, ...restGroups]
   }
 
   // Capítulo pequeño o sin tratamiento especial: DP desde estado neutro
+  if (RITMO_LAYOUTS_ENABLED) return segmentWithRhythm(photos, prevRhythm, end).map(asSegmented)
   return dpSegment(photos, '', '', false)
+}
+
+/**
+ * Opener del capítulo: la foto de mayor score, sola. Landscape → hero-spread
+ * (doble página); vertical → el mejor layout de 1 foto. Solo con ≥4 fotos:
+ * en capítulos chicos un opener solitario destruye el ritmo. Exportado para
+ * que groupPhotos sepa de antemano cómo ARRANCA el capítulo siguiente.
+ */
+export function chooseOpener(
+  photos: PoolPhoto[],
+  isChapterOpener: boolean,
+): { index: number; layout: LayoutId } | null {
+  if (!isChapterOpener || photos.length < 4) return null
+  const index = photos.reduce((best, p, i) => (scoreOf(p) > scoreOf(photos[best]) ? i : best), 0)
+  const opener = photos[index]
+  const ori = opener.photo.orientation ?? 'landscape'
+  const ar = photoAR(opener)
+  if (ori === 'landscape' || ar > 1.0) return { index, layout: 'hero-spread' as LayoutId }
+  const ranked = rankLayoutsForPhotos([ar])
+  return { index, layout: (ranked[0]?.layoutId ?? 'single') as LayoutId }
+}
+
+function asSegmented(g: { photos: PoolPhoto[]; layout: LayoutId; avgLoss: number }): SegmentedGroup {
+  return { photos: g.photos, layout: g.layout, isChapterOpener: false, avgLoss: g.avgLoss }
 }
