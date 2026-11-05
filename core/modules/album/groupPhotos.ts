@@ -1,6 +1,7 @@
 import type { ActId, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import { buildChapters } from '@/core/story/buildChapters'
-import { segmentChapter } from './segmentChapter'
+import { segmentChapter, chooseOpener } from './segmentChapter'
+import { nextState, NEUTRAL_STATE, type RhythmEnd } from './rhythmEngine'
 import { LAYOUTS } from './layouts/registry'
 import type { LayoutId } from './layouts/registry'
 import { devLog } from '@/lib/devLog'
@@ -55,16 +56,33 @@ export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
   )
 
   const groups: PhotoGroup[] = []
+  // Ritmo entre capítulos (solo lo usa el motor de Ritmo Pixia, flag ON).
+  let rhythm = NEUTRAL_STATE
 
-  for (const chapter of chapters) {
-    const chapterId = chapterIdOf(chapter.id)
-    const chapterPhotos = chapter.photoIds
-      .map(id => byId.get(id))
-      .filter((item): item is PoolPhoto => Boolean(item))
+  const chapterPhotoLists = chapters
+    .map(chapter => ({
+      chapterId: chapterIdOf(chapter.id),
+      photos: chapter.photoIds
+        .map(id => byId.get(id))
+        .filter((item): item is PoolPhoto => Boolean(item)),
+    }))
+    .filter(c => c.photos.length > 0)
 
-    if (chapterPhotos.length === 0) continue
+  for (let c = 0; c < chapterPhotoLists.length; c++) {
+    const { chapterId, photos: chapterPhotos } = chapterPhotoLists[c]
 
-    const segmented = segmentChapter(chapterPhotos, true)
+    // Cómo arranca el capítulo siguiente: el motor de ritmo lo necesita para
+    // no pasarse del tope en el borde y para cerrar el tramo par antes de un
+    // spread (o del final del álbum).
+    const next = chapterPhotoLists[c + 1]
+    const nextOpener = next ? chooseOpener(next.photos, true) : null
+    const end: RhythmEnd = {
+      nextLayout: nextOpener?.layout,
+      mustEndEven: !next || nextOpener?.layout === 'hero-spread',
+    }
+
+    const segmented = segmentChapter(chapterPhotos, true, rhythm, end)
+    for (const seg of segmented) rhythm = nextState(rhythm, seg.layout)
 
     const capLoss = segmented.length > 0
       ? segmented.reduce((s, g) => s + g.avgLoss, 0) / segmented.length
