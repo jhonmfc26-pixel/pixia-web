@@ -1,0 +1,12 @@
+/*
+ * globals.css trae un reset SIN capa (`* { margin: 0; padding: 0 }`). En
+ * Tailwind v4 las utilidades viven en @layer utilities, y cualquier estilo
+ * sin capa les gana — así que p-*, m-*, space-y-* no hacen nada. Acá, solo
+ * dentro del portal, se devuelve el control a las capas (Tailwind) con
+ * revert-layer, sin tocar el resto del sitio.
+ */
+.pixia-admin,
+.pixia-admin * {
+  margin: revert-layer;
+  padding: revert-layer;
+}
