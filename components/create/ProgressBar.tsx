@@ -9,7 +9,7 @@ const steps = [
   { id: 2, label: 'Fotos' },
   { id: 3, label: 'Estilo' },
   { id: 4, label: 'Emoción' },
-  { id: 5, label: 'Preview' },
+  { id: 5, label: 'Vista previa' },
 ]
 
 export function ProgressBar() {
@@ -17,13 +17,13 @@ export function ProgressBar() {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+      <div className="gap-2 sm:gap-5" style={{ display: 'flex', alignItems: 'center' }}>
         {steps.map((step, index) => {
           const isActive = state.step === step.id
           const isCompleted = state.step > step.id
 
           return (
-            <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div key={step.id} className="gap-1.5 sm:gap-2.5" style={{ display: 'flex', alignItems: 'center' }}>
               {/* Círculo */}
               <motion.div
                 layout
@@ -88,7 +88,7 @@ export function ProgressBar() {
               </motion.div>
 
               {/* Label */}
-              <span style={{
+              <span className={isActive ? 'whitespace-nowrap' : 'hidden whitespace-nowrap sm:inline'} style={{
                 fontSize: '12px',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
                 fontWeight: isActive ? 500 : 400,
@@ -99,8 +99,7 @@ export function ProgressBar() {
 
               {/* Línea conectora */}
               {index < steps.length - 1 && (
-                <div style={{
-                  width: '24px',
+                <div className="w-3 sm:w-6" style={{
                   height: '1px',
                   background: 'var(--border-subtle)',
                 }} />

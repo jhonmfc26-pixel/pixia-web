@@ -14,11 +14,10 @@ export default function Header() {
   }, [])
 
   return (
-    <header style={{
+    <header className="px-4 sm:px-8" style={{
       position: 'fixed',
       top: 0, left: 0, right: 0,
       zIndex: 100,
-      padding: '0 32px',
       height: '64px',
       display: 'flex',
       alignItems: 'center',
@@ -56,8 +55,7 @@ export default function Header() {
       </Link>
 
       {/* Nav */}
-      <nav style={{
-        display: 'flex',
+      <nav className="hidden md:flex" style={{
         alignItems: 'center',
         gap: '32px'
       }}>
@@ -87,8 +85,9 @@ export default function Header() {
         fontWeight: 500,
         color: 'var(--text-primary)',
         textDecoration: 'none',
-        padding: '9px 20px',
+        padding: '9px 18px',
         borderRadius: '8px',
+        whiteSpace: 'nowrap',
         background: 'var(--brand-coral)',
         transition: 'opacity 0.2s',
         letterSpacing: '0.01em',

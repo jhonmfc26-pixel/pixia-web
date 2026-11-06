@@ -37,10 +37,14 @@
   --font-body: 'Inter', -apple-system, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* En @layer base (no suelto): un estilo sin capa le gana a TODAS las
+   utilidades de Tailwind v4 (p-*, m-*, gap...) y las anulaba en todo el sitio. */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html {

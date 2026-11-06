@@ -77,7 +77,7 @@ export default function Pricing() {
                 marginBottom: '20px',
                 fontWeight: 300,
               }}>
-                30 × 30 cm · Tapa dura · Lay-flat
+                30 × 30 cm · Tapa dura
               </p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                 <span style={{
