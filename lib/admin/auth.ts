@@ -12,10 +12,10 @@
  *
  * Variables (Cloudflare Pages → Settings → Variables):
  *   CF_ACCESS_TEAM_DOMAIN  p.ej. "miequipo.cloudflareaccess.com"
- *   CF_ACCESS_AUD          "Application Audience (AUD) Tag" de la app de
- *                          Access; varias separadas por coma
+ *   CF_ACCESS_AUD          (opcional) "Application Audience (AUD) Tag" de la
+ *                          app de Access; varias separadas por coma
  *   ADMIN_EMAILS           emails permitidos, separados por coma
- * Si falta cualquiera → nadie entra (en producción).
+ * Si falta CF_ACCESS_TEAM_DOMAIN o ADMIN_EMAILS → nadie entra (en producción).
  *
  * En `next dev` (NODE_ENV !== 'production') se deja pasar sin Access, para
  * poder trabajar local — mismo criterio que la ruta /api/dev/generate-pdf.
@@ -79,6 +79,16 @@ function csv(v: string | undefined): string[] {
   return (v ?? '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
 }
 
+/**
+ * Rechazo con motivo en los logs (Cloudflare Pages → Functions → logs en
+ * tiempo real). Nunca se loguea el token; el AUD y el email del token no son
+ * secretos y son justo lo que hace falta para corregir la configuración.
+ */
+function deny(reason: string): null {
+  console.warn(`[admin] acceso denegado: ${reason}`)
+  return null
+}
+
 export interface AdminAuthConfig {
   teamDomain?: string
   audiences: string[]
@@ -107,39 +117,42 @@ export async function getAdmin(
   const token = headers.get(JWT_HEADER)
 
   if (!token) {
-    return config.allowDevBypass ? { email: 'dev@localhost' } : null
+    return config.allowDevBypass ? { email: 'dev@localhost' } : deny('la request no trae el header de Cloudflare Access — ¿la ruta está cubierta por la app "Pixia Admin" o se entró por *.pages.dev?')
   }
-  if (!config.teamDomain || config.audiences.length === 0 || config.emails.length === 0) {
-    console.error('[admin] Falta CF_ACCESS_TEAM_DOMAIN, CF_ACCESS_AUD o ADMIN_EMAILS — acceso denegado')
+  if (!config.teamDomain || config.emails.length === 0) {
+    console.error('[admin] Falta CF_ACCESS_TEAM_DOMAIN o ADMIN_EMAILS — acceso denegado')
     return null
   }
 
   try {
     const parts = token.split('.')
-    if (parts.length !== 3) return null
+    if (parts.length !== 3) return deny('el token no tiene formato JWT')
     const [h, p, s] = parts
     const header = b64urlToJson<{ alg?: string; kid?: string }>(h)
-    if (header.alg !== 'RS256' || !header.kid) return null
+    if (header.alg !== 'RS256' || !header.kid) return deny(`algoritmo inesperado (${header.alg})`)
 
     const now = deps.now ?? Date.now()
     const key = await keyFor(config.teamDomain, header.kid, deps.fetcher ?? defaultFetcher, now)
-    if (!key) return null
+    if (!key) return deny(`ninguna llave de ${config.teamDomain} coincide con el token — ¿CF_ACCESS_TEAM_DOMAIN es el correcto?`)
 
     const ok = await crypto.subtle.verify(
       'RSASSA-PKCS1-v1_5', key, b64urlToBytes(s), new TextEncoder().encode(`${h}.${p}`),
     )
-    if (!ok) return null
+    if (!ok) return deny('firma inválida')
 
     const claims = b64urlToJson<{ aud?: string | string[]; iss?: string; exp?: number; nbf?: number; email?: string }>(p)
     const nowSec = Math.floor(now / 1000)
-    if (typeof claims.exp !== 'number' || claims.exp < nowSec) return null
-    if (typeof claims.nbf === 'number' && claims.nbf > nowSec + 60) return null
-    if (claims.iss !== `https://${config.teamDomain}`) return null
+    if (typeof claims.exp !== 'number' || claims.exp < nowSec) return deny('token vencido')
+    if (typeof claims.nbf === 'number' && claims.nbf > nowSec + 60) return deny('token todavía no válido')
+    if (claims.iss !== `https://${config.teamDomain}`) return deny(`emisor ${claims.iss} no coincide con CF_ACCESS_TEAM_DOMAIN=${config.teamDomain}`)
     const auds = Array.isArray(claims.aud) ? claims.aud : [claims.aud]
-    if (!auds.some(a => a && config.audiences.includes(a))) return null
+    // CF_ACCESS_AUD es opcional: sin él igual se exige firma del equipo de
+    // Access de Pixia + emisor + email permitido. Con él, además, el token
+    // tiene que ser de la app "Pixia Admin" y no de otra app del equipo.
+    if (config.audiences.length > 0 && !auds.some(a => a && config.audiences.includes(a))) return deny(`el AUD del token (${auds.join(', ')}) no está en CF_ACCESS_AUD — copiar el de la app "Pixia Admin"`)
 
     const email = claims.email?.toLowerCase()
-    if (!email || !config.emails.includes(email)) return null
+    if (!email || !config.emails.includes(email)) return deny(`el email ${email ?? '(vacío)'} no está en ADMIN_EMAILS`)
     return { email }
   } catch (err) {
     console.error('[admin] Error verificando JWT de Access:', err)
