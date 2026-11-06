@@ -172,6 +172,19 @@ export default function BookPage() {
   const areaRef = useRef<HTMLDivElement>(null)
   const [panelSize, setPanelSize] = useState(480)
   const [isMobile, setIsMobile] = useState(false)
+  // Celular en horizontal (pantalla baja): las barras de arriba y abajo se
+  // comían ~1/3 del alto y el libro quedaba chico. En ese caso la barra de
+  // arriba se adelgaza, la de abajo desaparece (el contador y "Portada" pasan
+  // arriba) y se reduce el margen, así el libro crece ~35 %.
+  const [compact, setCompact] = useState(false)
+  useEffect(() => {
+    const check = () => setCompact(window.innerHeight < 500 && window.innerWidth > window.innerHeight)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  const topBarH = compact ? 44 : 56
+  const bottomBarH = compact ? 0 : 48
 
   useEffect(() => {
     const el = areaRef.current
@@ -185,12 +198,12 @@ export default function BookPage() {
       const mobile = width < 640
       setIsMobile(mobile)
       const byWidth = mobile ? width - 24 : (width - 40) / 2
-      const byHeight = height - 24
+      const byHeight = height - (window.innerHeight < 500 ? 10 : 24)
       setPanelSize(Math.floor(Math.max(100, Math.min(byWidth, byHeight))))
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [book, structure])
+  }, [book, structure, compact])
 
   const gutterWidth = Math.round(Math.min(36, Math.max(14, panelSize * 0.05)))
 
@@ -432,11 +445,11 @@ export default function BookPage() {
 
       {/* Barra superior */}
       <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
+        position: 'fixed', top: 0, left: 0, right: 0, height: `${topBarH}px`,
         background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', zIndex: 300,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+        padding: '0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left))', zIndex: 300,
       }}>
         <button
           onClick={() => (ordered ? router.push('/mis-albumes') : window.history.back())}
@@ -445,8 +458,24 @@ export default function BookPage() {
           {ordered ? '← Mis álbumes' : '← Volver'}
         </button>
 
-        <span style={{ fontFamily: 'Playfair Display, serif', fontSize: '16px', color: 'white' }}>
-          {title}
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: '12px', minWidth: 0 }}>
+          <span style={{
+            fontFamily: 'Playfair Display, serif', fontSize: '16px', color: 'white',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {title}
+          </span>
+          {compact && (
+            <>
+              <button onClick={() => goTo(0)} disabled={displayIdx === 0} aria-label="Ir a la portada" style={{
+                background: 'none', border: 'none', padding: 0, fontSize: '13px', cursor: 'pointer',
+                color: displayIdx === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.6)',
+              }}>↺</button>
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                {displayIdx + 1} / {totalSpreads}
+              </span>
+            </>
+          )}
         </span>
 
         {ordered ? (
@@ -488,7 +517,7 @@ export default function BookPage() {
         style={{
           flex: 1,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          paddingTop: '56px', paddingBottom: '48px',
+          paddingTop: `${topBarH}px`, paddingBottom: `${bottomBarH}px`,
           overflow: 'hidden',
         }}
       >
@@ -540,7 +569,8 @@ export default function BookPage() {
 
       {/* Flecha izquierda */}
       <button
-        onClick={() => goTo(displayIdx - 1)}
+        // En celular (una página a la vez) la flecha pasa de a UNA página.
+        onClick={() => (isMobile && !flipFailed ? flipRef.current?.flipPrev() : goTo(displayIdx - 1))}
         disabled={displayIdx === 0}
         style={{
           position: 'fixed', left: '20px', top: '50%', transform: 'translateY(-50%)',
@@ -555,7 +585,8 @@ export default function BookPage() {
 
       {/* Flecha derecha */}
       <button
-        onClick={() => goTo(displayIdx + 1)}
+        // En celular (una página a la vez) la flecha pasa de a UNA página.
+        onClick={() => (isMobile && !flipFailed ? flipRef.current?.flipNext() : goTo(displayIdx + 1))}
         disabled={displayIdx >= totalSpreads - 1}
         style={{
           position: 'fixed', right: '20px', top: '50%', transform: 'translateY(-50%)',
@@ -569,7 +600,7 @@ export default function BookPage() {
       >›</button>
 
       {/* Barra inferior */}
-      <div style={{
+      {!compact && <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, height: '48px',
         background: 'rgba(10,10,10,0.95)', borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 250,
@@ -590,14 +621,14 @@ export default function BookPage() {
             {displayIdx + 1} / {totalSpreads}
           </span>
         </div>
-      </div>
+      </div>}
 
       {/* Tira de miniaturas — navegación rápida entre páginas */}
       <PageThumbnailStrip
         items={thumbItems}
         currentIndex={displayIdx}
         onSelect={goTo}
-        bottomBarHeight={48}
+        bottomBarHeight={bottomBarH}
       />
 
     </div>
