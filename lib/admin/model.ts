@@ -27,6 +27,13 @@ export interface OrderRow {
   wompi_payment_method: string | null
   paid_at: string | null
   created_at: string
+  // Post-venta (supabase/orders_postventa.sql)
+  printing_at?: string | null
+  shipped_at?: string | null
+  delivered_at?: string | null
+  shipping_carrier?: string | null
+  tracking_number?: string | null
+  tracking_url?: string | null
 }
 
 export interface PdfJobRow {
@@ -220,9 +227,7 @@ export function formatShortDateTime(iso: string | null | undefined, now = Date.n
   })
 }
 
-export const PRINT_STATUS_LABEL: Record<string, string> = {
-  paid: 'Pagado — por enviar a imprenta',
-}
+export { PRINT_STATUS_ADMIN_LABEL as PRINT_STATUS_LABEL } from '@/lib/orderStatus'
 
 export function formatDuration(msValue: number | null | undefined): string {
   if (msValue === null || msValue === undefined) return '—'

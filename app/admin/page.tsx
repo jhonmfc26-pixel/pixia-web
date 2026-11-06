@@ -6,7 +6,7 @@ import {
   computeKpis, formatCop, formatDuration, formatShortDateTime, needsAttention, parseFilters, STALE_MS,
   type AdminOrder, type Filters,
 } from '@/lib/admin/model'
-import { PaymentBadge, PdfBadge } from './_components'
+import { PaymentBadge, PdfBadge, ShipBadge } from './_components'
 
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
@@ -126,6 +126,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <PaymentBadge status={o.order.payment_status} />
                 {o.pdf !== 'no-aplica' && <><PdfBadge state={o.pdf} /><PdfTime o={o} /></>}
+                {o.order.payment_status === 'approved' && <ShipBadge status={o.order.print_status} />}
               </div>
             </a>
             {(o.pdf === 'listo' || o.pdf === 'fallo') && <div className="mt-3"><Downloads o={o} /></div>}
@@ -145,11 +146,12 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               <th className="px-4 py-3 font-medium">Pago</th>
               <th className="px-4 py-3 font-medium">PDF</th>
               <th className="px-4 py-3 font-medium">Pago → PDF</th>
+              <th className="px-4 py-3 font-medium">Envío</th>
             </tr>
           </thead>
           <tbody>
             {visible.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--text-secondary)]">No hay pedidos con estos filtros.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-12 text-center text-[var(--text-secondary)]">No hay pedidos con estos filtros.</td></tr>
             )}
             {visible.map(o => {
               const ref = o.order.reference
@@ -173,6 +175,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                     <div><PdfTime o={o} /></div>
                     <div className="mt-1"><Downloads o={o} /></div>
                   </td>
+                  <td className="px-4 py-3">{o.order.payment_status === 'approved' ? <ShipBadge status={o.order.print_status} /> : <span className="text-[var(--text-tertiary)]">—</span>}</td>
                 </tr>
               )
             })}

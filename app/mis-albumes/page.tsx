@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { orderStage, type OrderStage } from '@/core/modules/album/orderLock'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import type { BlueprintStatus, OccasionType } from '@/core/contracts/AlbumBlueprint'
 import type { PhotoAsset, Spread } from '@/core/contracts/AlbumBlueprint'
@@ -44,23 +45,26 @@ function occasionLabel(occasion: OccasionType): string {
   return map[occasion] ?? occasion
 }
 
-type StatusGroup = 'draft' | 'production' | 'delivered'
+type StatusGroup = 'draft' | OrderStage
 
-function statusGroup(s: BlueprintStatus): StatusGroup {
-  if (s === 'shipped' || s === 'delivered') return 'delivered'
+function statusGroup(s: BlueprintStatus | string): StatusGroup {
   if (s === 'draft' || s === 'preview') return 'draft'
-  return 'production'
+  return orderStage(s)
 }
 
 const STATUS_LABEL: Record<StatusGroup, string> = {
   draft: 'Borrador',
-  production: 'En producción',
+  production: 'Preparando',
+  printing: 'En impresión',
+  shipped: 'En camino',
   delivered: 'Entregado',
 }
 
 const STATUS_COLOR: Record<StatusGroup, { bg: string; text: string }> = {
   draft:      { bg: 'rgba(255,255,255,0.08)', text: 'rgba(255,255,255,0.5)' },
   production: { bg: 'rgba(251,191,36,0.12)', text: '#fbbf24' },
+  printing:   { bg: 'rgba(251,191,36,0.12)', text: '#fbbf24' },
+  shipped:    { bg: 'rgba(56,189,248,0.12)', text: '#7dd3fc' },
   delivered:  { bg: 'rgba(34,197,94,0.12)',  text: '#4ade80' },
 }
 
