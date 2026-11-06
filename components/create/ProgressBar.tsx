@@ -2,15 +2,9 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
-import { useWizard } from './WizardProvider'
+import { useWizard, WIZARD_STEPS } from './WizardProvider'
 
-const steps = [
-  { id: 1, label: 'Historia' },
-  { id: 2, label: 'Fotos' },
-  { id: 3, label: 'Estilo' },
-  { id: 4, label: 'Emoción' },
-  { id: 5, label: 'Vista previa' },
-]
+const steps = WIZARD_STEPS
 
 export function ProgressBar() {
   const { state } = useWizard()
@@ -26,7 +20,6 @@ export function ProgressBar() {
             <div key={step.id} className="gap-1.5 sm:gap-2.5" style={{ display: 'flex', alignItems: 'center' }}>
               {/* Círculo */}
               <motion.div
-                layout
                 initial={false}
                 animate={
                   isActive

@@ -5,9 +5,7 @@ import { useWizard } from "@/components/create/WizardProvider";
 
 import Step1Story from "./steps/Step1Story";
 import Step2Upload from "./steps/Step2Upload";
-import Step3Style from "./steps/Step3Style";
-import Step4Emotion from "./steps/Step4Emotion";
-import Step5Preview from "./steps/Step5Preview";
+import Step3Cover from "./steps/Step3Cover";
 
 export default function CreatePage() {
   const { state } = useWizard();
@@ -24,9 +22,7 @@ export default function CreatePage() {
       >
         {state.step === 1 && <Step1Story />}
         {state.step === 2 && <Step2Upload />}
-        {state.step === 3 && <Step3Style />}
-        {state.step === 4 && <Step4Emotion />}
-        {state.step === 5 && <Step5Preview />}
+        {state.step === 3 && <Step3Cover />}
       </motion.div>
     </AnimatePresence>
   );

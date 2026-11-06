@@ -23,12 +23,11 @@ export default function Step1Story() {
     <div className="w-full">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl md:text-4xl font-semibold text-white">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl font-normal text-white md:text-5xl">
           ¿Qué historia quieres contar?
         </h1>
         <p className="text-white/60 mt-2 max-w-xl mx-auto">
-          Elige el tipo de momento que vamos a transformar en una película
-          visual.
+          Elige el momento que vamos a convertir en tu álbum.
         </p>
       </div>
 
