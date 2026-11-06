@@ -20,6 +20,8 @@ import { hasDedication } from '@/core/modules/foldModel/validate'
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import { getLocalBook, updateLocalBook } from '@/core/engine/localBookStorage'
+import { isOrdered } from '@/core/modules/album/orderLock'
 import { Crop, LayoutGrid, PenLine, Plus, RefreshCw, Star, Trash2, Upload } from 'lucide-react'
 import { LAYOUTS } from '@/core/modules/album/layouts/registry'
 import FoldStructureViewer from '@/core/modules/foldModel/render/FoldStructureViewer'
@@ -685,6 +687,8 @@ export default function EditV2Page() {
           .eq('id', id)
           .single()
         if (!error && data) {
+          // Álbum ya pagado: está congelado (es lo que se imprime) — solo se puede ver.
+          if (isOrdered(data.status)) { window.location.replace(`/book/${id}`); return }
           setBook(normalizeBook(data, id))
           return
         }
@@ -697,10 +701,7 @@ export default function EditV2Page() {
       // falló pese a haber sesión (red caída, fila inexistente, etc.) — no
       // sustituye la sesión, que ya está confirmada en este punto.
       try {
-        const raw = localStorage.getItem('pixia_books')
-        if (!raw) return
-        const books = JSON.parse(raw)
-        const b = books[id]
+        const b = await getLocalBook(id)
         if (!b) return
         setBook(normalizeBook(b, id))
       } catch (err) {
@@ -1040,10 +1041,7 @@ export default function EditV2Page() {
       // (Supabase caído, red, etc.) — nunca como sustituto de sesión ausente.
       if (!savedOk) {
         try {
-          const raw = localStorage.getItem('pixia_books')
-          const books = raw ? JSON.parse(raw) : {}
-          books[id] = { ...books[id], structure: currentStructure, spreads: currentBook.spreads, cover: currentCover }
-          localStorage.setItem('pixia_books', JSON.stringify(books))
+          await updateLocalBook(id, { structure: currentStructure, spreads: currentBook.spreads, cover: currentCover })
           savedOk = true
           console.log('[EditV2] Estructura guardada en localStorage (fallback de emergencia — Supabase falló con sesión válida)')
         } catch (e) {

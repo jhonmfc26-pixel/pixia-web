@@ -20,6 +20,7 @@ import { useSession } from "@/core/modules/session/useSession";
 import { MIN_PHOTOS, MAX_PHOTOS } from "@/core/modules/upload/limits";
 import { normalizeFiles, isHeicFile } from "@/core/modules/upload/normalizeFiles";
 import { hashFileContent } from "@/core/modules/upload/contentHash";
+import { mergePhotoAnalysis, mergeR2Photos, type PhotoAnalysisEntry } from "@/core/modules/upload/photoSession";
 
 // Genera thumbnail 150x150 base64 (~8-12KB por foto) para grids rápidos
 async function generateThumbnail(file: File, maxSize = 150): Promise<string | null> {
@@ -395,31 +396,36 @@ export default function Step2Upload() {
         }
 
         if (patched.length > 0) {
-          localStorage.setItem(
-            'pixia_photo_analysis',
-            JSON.stringify(patched.map((p, index) => ({
-              id: p.id,
+          // El análisis se indexa por el id de la foto en el asistente (no por
+          // posición) y se SUMA al de tandas anteriores — ver photoSession.ts.
+          const photoIdByFile = new Map(newPhotos.map(p => [p.file, p.id]))
+          const keepIds = new Set([...photos, ...newPhotos].slice(0, MAX_PHOTOS).map(p => p.id))
+          const entries: PhotoAnalysisEntry[] = patched.flatMap(p => {
+            const id = photoIdByFile.get(p.file) ?? p.id
+            if (!keepIds.has(id)) return []
+            return [{
+              id,
               width: p.width ?? 0,
               height: p.height ?? 0,
               orientation: p.orientation,
               score: p.score,
-              takenAt: p.exif.takenAt || null,
-              gps: (p.exif.lat != null && p.exif.lng != null) ? { lat: p.exif.lat, lng: p.exif.lng } : null,
-              originalIndex: index,
+              takenAt: p.exif?.takenAt || null,
+              gps: (p.exif?.lat != null && p.exif?.lng != null) ? { lat: p.exif.lat, lng: p.exif.lng } : null,
               thumbnail: thumbnailsByFile.get(p.file) || undefined,
-              contentHash: hashByPhotoId.get(p.id),
-            })))
-          );
-          console.log('[Step2] Análisis guardado en localStorage')
+              contentHash: hashByPhotoId.get(id),
+            }]
+          })
+          mergePhotoAnalysis(entries, keepIds)
+          console.log('[Step2] Análisis guardado:', entries.length)
 
           if (sessionId) {
-            const filesToUpload = patched.map(p => ({
-              file: p.file,
-              photoId: p.id,
+            const fileById = new Map(newPhotos.map(p => [p.id, p.file]))
+            const uploaded = await uploadPhotos(entries.flatMap(e => {
+              const file = fileById.get(e.id)
+              return file ? [{ file, photoId: e.id }] : []
             }));
-            const uploaded = await uploadPhotos(filesToUpload);
             if (uploaded.length > 0) {
-              localStorage.setItem('pixia_r2_photos', JSON.stringify(uploaded));
+              mergeR2Photos(uploaded, keepIds);
               console.log('[Step2] Fotos subidas a R2:', uploaded.length);
             }
           }

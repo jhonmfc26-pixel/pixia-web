@@ -10,6 +10,8 @@ import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import { getLocalBook } from '@/core/engine/localBookStorage'
+import { isOrdered, orderStage, ORDER_STAGE_LABEL } from '@/core/modules/album/orderLock'
 import type { AlbumStructure } from '@/core/modules/foldModel/types'
 import CoverPage from '@/core/modules/viewer/pages/CoverPage'
 import BackCoverPage from '@/core/modules/viewer/pages/BackCoverPage'
@@ -53,6 +55,7 @@ export default function BookPage() {
 
   // ── Carga del blueprint ────────────────────────────────────────────────────
   const [book, setBook] = useState<AlbumBlueprint | null>(null)
+  const [missing, setMissing] = useState(false)
   const adminView = searchParams.get('admin') === '1'
 
   useEffect(() => {
@@ -68,20 +71,22 @@ export default function BookPage() {
       } catch (e) { console.warn('[Viewer] Supabase:', e) }
 
       try {
-        const raw = localStorage.getItem('pixia_books')
-        const b = raw ? JSON.parse(raw)[id] : null
+        const b = await getLocalBook(id)
         if (b) { setBook(normalizeBook(b, id)); return }
-      } catch (e) { console.error('[Viewer] localStorage:', e) }
+      } catch (e) { console.error('[Viewer] copia local:', e) }
 
       // Abierto desde el portal admin (/book/[id]?admin=1): el admin no es el
       // dueño, así que carga por la API admin (protegida con Cloudflare Access).
       if (adminView) {
         try {
           const res = await fetch(`/api/admin/blueprint/${encodeURIComponent(id)}`, { cache: 'no-store' })
-          if (res.ok) setBook(normalizeBook(await res.json(), id))
-          else console.warn('[Viewer] admin load:', res.status)
+          if (res.ok) { setBook(normalizeBook(await res.json(), id)); return }
+          console.warn('[Viewer] admin load:', res.status)
         } catch (e) { console.warn('[Viewer] admin load:', e) }
       }
+
+      // Ni en la cuenta ni en este navegador: típicamente otro dispositivo sin sesión.
+      setMissing(true)
     }
     loadBook()
   }, [id, adminView])
@@ -294,6 +299,31 @@ export default function BookPage() {
     return () => clearTimeout(t)
   }, [spreadIdx, spreads, photosById, coverPhoto])
 
+  // ── No encontrado ──────────────────────────────────────────────────────────
+  if (missing && !book) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, background: '#0f0f0f', color: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}>
+        <div style={{ maxWidth: 420, textAlign: 'center' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 400, marginBottom: 12 }}>
+            No encontramos este álbum
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: 28 }}>
+            Si ya lo pediste, entra con tu correo y lo verás en tus álbumes.
+          </p>
+          <a href="/mis-albumes" style={{
+            display: 'inline-block', background: 'var(--brand-coral)', color: '#fff',
+            padding: '12px 24px', borderRadius: 10, fontWeight: 500, textDecoration: 'none',
+          }}>
+            Ir a mis álbumes
+          </a>
+        </div>
+      </div>
+    )
+  }
+
   // ── Loading ────────────────────────────────────────────────────────────────
   if (!book || !structure) {
     return (
@@ -308,6 +338,8 @@ export default function BookPage() {
   }
 
   const title = book.cover.title || book.narrative?.title || 'Mi álbum'
+  // Pagado = congelado: se puede ver y mostrar, no editar ni volver a pagar.
+  const ordered = isOrdered(book.status)
   const totalSpreads = spreads.length
 
   // spreadIdx puede venir de un ?spread= con un valor fuera de rango (álbum
@@ -407,16 +439,24 @@ export default function BookPage() {
         padding: '0 24px', zIndex: 300,
       }}>
         <button
-          onClick={() => window.history.back()}
+          onClick={() => (ordered ? router.push('/mis-albumes') : window.history.back())}
           style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px' }}
         >
-          ← Volver
+          {ordered ? '← Mis álbumes' : '← Volver'}
         </button>
 
         <span style={{ fontFamily: 'Playfair Display, serif', fontSize: '16px', color: 'white' }}>
           {title}
         </span>
 
+        {ordered ? (
+          <span style={{
+            fontSize: '12px', padding: '6px 12px', borderRadius: '999px',
+            background: 'rgba(232,85,58,0.14)', color: '#F08A72', whiteSpace: 'nowrap',
+          }}>
+            {ORDER_STAGE_LABEL[orderStage(book.status)]}
+          </span>
+        ) : (
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
             onClick={() => router.push(`/book/${id}/edit-v2?spread=${displayIdx}`)}
@@ -439,6 +479,7 @@ export default function BookPage() {
             Comprar álbum
           </button>
         </div>
+        )}
       </div>
 
       {/* Área del pliego */}

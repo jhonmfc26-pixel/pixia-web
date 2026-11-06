@@ -74,9 +74,33 @@ export function updatePhotoCacheEntry(file: File, partial: Partial<PhotoCacheEnt
       ...partial,
       ...(writingAnalysis ? { analysisVersion: ANALYSIS_VERSION } : {}),
     }
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
+    } catch {
+      // Navegador lleno (Safari en iPhone: ~5 MB): este caché acumula
+      // miniaturas de todos los álbumes anteriores. Se sueltan y se reintenta.
+      localStorage.setItem(CACHE_KEY, JSON.stringify(stripThumbnails(cache)))
+    }
   } catch (err) {
     console.warn('[PhotoCache] No se pudo guardar:', err)
+  }
+}
+
+function stripThumbnails(cache: Record<string, PhotoCacheEntry>): Record<string, PhotoCacheEntry> {
+  const out: Record<string, PhotoCacheEntry> = {}
+  for (const [k, { thumbnail: _t, ...rest }] of Object.entries(cache)) out[k] = rest
+  return out
+}
+
+/**
+ * Libera espacio: quita las miniaturas del caché (se regeneran solas cuando
+ * hacen falta) y conserva el análisis y las URLs de R2.
+ */
+export function prunePhotoCache(): void {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(stripThumbnails(readPhotoCache())))
+  } catch {
+    try { localStorage.removeItem(CACHE_KEY) } catch { /* nada más que hacer */ }
   }
 }
 

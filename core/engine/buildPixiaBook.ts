@@ -74,7 +74,9 @@ function toBookPhoto(
 ): PixiaBook['content']['spreads'][number]['photos'][number] {
   return {
     id: photo.id,
-    src: photo.src,
+    // Si src y url son lo mismo no se guarda dos veces: con fotos en base64
+    // eso duplicaba el tamaño del libro y llenaba el almacenamiento del iPhone.
+    src: photo.url && photo.url === photo.src ? '' : photo.src,
     url: photo.url,
     thumbnailUrl: photo.thumbnailUrl,
     r2Key: photo.r2Key,

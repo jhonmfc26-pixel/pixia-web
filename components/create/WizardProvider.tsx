@@ -23,8 +23,8 @@ export type CoverDraft = {
   title: string;
   subtitle: string;
   date: string;
-  /** Índice en `photos` de la foto de portada. */
-  photoIndex: number;
+  /** id (PhotoItem.id) de la foto de portada. Por id y no por posición: sobrevive a reordenar o quitar fotos. */
+  photoId: string;
 };
 
 /** Pasos del asistente. La barra de progreso y el reducer salen de acá. */

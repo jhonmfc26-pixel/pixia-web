@@ -1,3 +1,4 @@
+import { isOrdered } from '@/core/modules/album/orderLock'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   // token (user.id) — el body nunca decide de quién es un blueprint.
   const { data: existing, error: ownershipError } = await supabaseAdmin
     .from('blueprints')
-    .select('user_id')
+    .select('user_id, status')
     .eq('id', blueprint.id)
     .maybeSingle()
 
@@ -52,6 +53,10 @@ export async function POST(req: NextRequest) {
   if (existing?.user_id && existing.user_id !== user.id) {
     console.warn('[persist] Intento de escritura sobre blueprint ajeno — solicitante:', user.id)
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
+  // Pagado = congelado: lo que está en la fila es lo que se imprime.
+  if (isOrdered(existing?.status)) {
+    return NextResponse.json({ error: 'Este álbum ya fue pedido y no se puede modificar' }, { status: 409 })
   }
   // Sin existing → primer guardado (creación legítima).
   // Con existing.user_id nulo → fila huérfana (nunca reclamada); se permite

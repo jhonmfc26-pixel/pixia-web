@@ -9,6 +9,8 @@ import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
 import { calculateOrderTotal } from '@/lib/wompi'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import { getLocalBook } from '@/core/engine/localBookStorage'
+import { isOrdered } from '@/core/modules/album/orderLock'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import { countRealPages, countEmptyFaces } from '@/core/modules/foldModel/validate'
@@ -104,6 +106,8 @@ export default function CheckoutPage() {
             .eq('id', bookId)
             .single()
           if (!error && data) {
+            // Ya pagado: no se vuelve a cobrar, se manda a verlo.
+            if (isOrdered(data.status)) { router.replace(`/book/${bookId}`); return }
             setBook(normalizeBook(data, bookId) as AlbumBlueprint)
             setLoadingBook(false)
             return
@@ -115,8 +119,7 @@ export default function CheckoutPage() {
       }
 
       try {
-        const allBooks = JSON.parse(localStorage.getItem('pixia_books') || '{}')
-        const raw = allBooks[bookId]
+        const raw = await getLocalBook(bookId)
         if (!raw) {
           setBookError('No se encontró el álbum. ¿Lo creaste en este navegador?')
           setLoadingBook(false)
