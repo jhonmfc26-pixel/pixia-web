@@ -6,6 +6,10 @@ export type NarrativeTone = 'emocional' | 'documental' | 'celebracion' | 'sobrio
 
 export interface PixiaBook {
   identity: { bookId: string; title: string; createdAt: string; version: string }
+  /** Ocasión del álbum (boda, viaje, aniversario, familia...) — elige la plantilla de portada. */
+  occasion?: string
+  /** Lo que el cliente escribió en el paso "Tu portada". normalizeBook lo lee como raw.cover. */
+  cover?: { title: string; subtitle?: string; date?: string; photoId?: string }
   editorial: {
     intent: string; tone: NarrativeTone; summary: string
     decisions: { id: string; reason: string }[]

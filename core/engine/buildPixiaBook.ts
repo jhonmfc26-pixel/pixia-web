@@ -4,6 +4,12 @@ import { classifyOrientation } from '../modules/album/photoGeometry'
 
 export interface AlbumDraft {
   title?: string
+  /** Nombres o subtítulo de la portada (p.ej. "Laura & Andrés"). */
+  subtitle?: string
+  /** Fecha o lugar de la portada (p.ej. "Cartagena · 2026"). */
+  date?: string
+  /** id de la foto elegida para la portada. */
+  coverPhotoId?: string
   photos: {
     id: string
     src: string
@@ -200,8 +206,27 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
 //   return response.json()
 // }
 
-function titleForOccasion(story?: string): string {
+/**
+ * Ids del paso 1 (wedding, honeymoon, trip, anniversary, other) → ocasión de
+ * las plantillas de portada. Antes no se mapeaba y toda portada salía con la
+ * plantilla de boda.
+ */
+export function occasionFromStory(story?: string): string {
+  switch ((story ?? '').toLowerCase()) {
+    case 'wedding': return 'boda'
+    case 'honeymoon':
+    case 'trip': return 'viaje'
+    case 'anniversary': return 'aniversario'
+    default: return 'familia'
+  }
+}
+
+export function titleForOccasion(story?: string): string {
   const s = (story ?? '').toLowerCase()
+  if (s === 'wedding')     return 'Nuestra boda'
+  if (s === 'honeymoon')   return 'Nuestra luna de miel'
+  if (s === 'trip')        return 'Nuestro viaje'
+  if (s === 'anniversary') return 'Nuestra historia'
   if (s.includes('boda') || s.includes('matrimonio') || s.includes('casamiento')) return 'Nuestra boda'
   if (s.includes('viaje') || s.includes('trip') || s.includes('vacacion'))         return 'Nuestro viaje'
   if (s.includes('beb') || s.includes('baby') || s.includes('nacimiento'))         return 'Nuestro bebé'
@@ -279,6 +304,13 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
       title,
       createdAt: new Date().toISOString(),
       version: '2.1-engine',
+    },
+    occasion: occasionFromStory(draft.story),
+    cover: {
+      title,
+      subtitle: draft.subtitle?.trim() || undefined,
+      date: draft.date?.trim() || undefined,
+      photoId: draft.coverPhotoId,
     },
     editorial: {
       intent: 'memory',

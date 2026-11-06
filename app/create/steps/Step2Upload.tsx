@@ -533,12 +533,12 @@ export default function Step2Upload() {
   return (
     <div className="w-full">
       <div className="text-center mb-8">
-        <h1 className="text-4xl md:text-5xl font-semibold text-white">
-          Sube y ordena tus recuerdos
+        <h1 className="font-[family-name:var(--font-display)] text-3xl font-normal text-white md:text-5xl">
+          Sube tus recuerdos
         </h1>
         <p className="text-white/60 mt-3 max-w-xl mx-auto">
-          Arrastra las fotos para definir el orden de tu historia. Marca las más
-          importantes.
+          Pixia las ordena por fecha y diseña cada página. Marca con ⭐ tus
+          favoritas: les daremos más protagonismo.
         </p>
       </div>
 

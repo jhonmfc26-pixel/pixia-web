@@ -15,13 +15,12 @@ export default function ContinueButton({ disabled = false, children, isFinalStep
   const router = useRouter()
 
   return (
-    <div style={{
+    <div className="px-4 sm:px-12" style={{
       position: 'fixed',
       bottom: 0, left: 0, right: 0,
       height: '72px',
       background: 'var(--bg-base)',
       borderTop: '1px solid var(--border-subtle)',
-      padding: '0 48px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -60,7 +59,7 @@ export default function ContinueButton({ disabled = false, children, isFinalStep
         onClick={() => {
           if (disabled) return
           if (isFinalStep) {
-            router.push('/create/loading')
+            router.push('/create/result')
           } else {
             dispatch({ type: 'NEXT_STEP' })
           }

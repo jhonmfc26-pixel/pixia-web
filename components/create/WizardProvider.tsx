@@ -19,12 +19,26 @@ export type PhotoItem = {
   contentHash?: string;
 };
 
+export type CoverDraft = {
+  title: string;
+  subtitle: string;
+  date: string;
+  /** Índice en `photos` de la foto de portada. */
+  photoIndex: number;
+};
+
+/** Pasos del asistente. La barra de progreso y el reducer salen de acá. */
+export const WIZARD_STEPS = [
+  { id: 1, label: "Historia" },
+  { id: 2, label: "Fotos" },
+  { id: 3, label: "Tu portada" },
+] as const;
+
 type WizardState = {
   step: number;
   storyType?: string;
   photos: PhotoItem[];
-  style?: string;
-  emotion?: string;
+  cover?: CoverDraft;
 };
 
 type WizardAction =
@@ -32,8 +46,7 @@ type WizardAction =
   | { type: "PREV_STEP" }
   | { type: "SET_STORY_TYPE"; payload: string }
   | { type: "SET_PHOTOS"; payload: PhotoItem[] }
-  | { type: "SET_STYLE"; payload: string }
-  | { type: "SET_EMOTION"; payload: string };
+  | { type: "SET_COVER"; payload: CoverDraft };
 
 /* =======================
    INITIAL STATE
@@ -54,17 +67,15 @@ function wizardReducer(
 ): WizardState {
   switch (action.type) {
     case "NEXT_STEP":
-      return { ...state, step: Math.min(state.step + 1, 5) };
+      return { ...state, step: Math.min(state.step + 1, WIZARD_STEPS.length) };
     case "PREV_STEP":
       return { ...state, step: Math.max(state.step - 1, 1) };
     case "SET_STORY_TYPE":
       return { ...state, storyType: action.payload };
     case "SET_PHOTOS":
       return { ...state, photos: action.payload };
-    case "SET_STYLE":
-      return { ...state, style: action.payload };
-    case "SET_EMOTION":
-      return { ...state, emotion: action.payload };
+    case "SET_COVER":
+      return { ...state, cover: action.payload };
     default:
       return state;
   }
