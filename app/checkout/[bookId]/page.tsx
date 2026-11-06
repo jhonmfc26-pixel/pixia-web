@@ -65,6 +65,9 @@ export default function CheckoutPage() {
     address: '', city: '', state: 'Bogotá D.C.', postalCode: '', notes: '',
   })
   const [submitting, setSubmitting] = useState(false)
+  // Un álbum pagado queda congelado (es lo que se imprime): el cliente debe
+  // confirmar que lo revisó antes de pagar.
+  const [reviewed, setReviewed] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -230,7 +233,7 @@ export default function CheckoutPage() {
   // antes de dejar pasar a proceedToCheckout. Si el usuario ya confirmó una
   // vez en este intento, no se le vuelve a preguntar.
   const handleCheckout = () => {
-    if (!book || !structure || !pricing || !isFormValid()) return
+    if (!book || !structure || !pricing || !isFormValid() || !reviewed) return
     if (emptyFacesCount > 0 && !emptyPagesAck) {
       setShowEmptyPagesModal(true)
       return
@@ -340,7 +343,7 @@ export default function CheckoutPage() {
     )
   }
 
-  const formValid = isFormValid()
+  const formValid = isFormValid() && reviewed
 
   return (
     <>
@@ -497,7 +500,7 @@ export default function CheckoutPage() {
             Estás a un paso de tener tu álbum impreso
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'start' }}>
+          <div className="grid items-start gap-8 md:grid-cols-[1fr_360px]">
 
             {/* FORMULARIO */}
             <div>
@@ -551,7 +554,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* RESUMEN */}
-            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 24, position: 'sticky', top: 20 }}>
+            <div className="md:sticky md:top-5" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 24 }}>
               <h2 style={{ fontSize: 16, marginBottom: 16, color: 'rgba(255,255,255,0.85)' }}>
                 Resumen del pedido
               </h2>
@@ -581,11 +584,30 @@ export default function CheckoutPage() {
                 </>
               )}
 
+              <div style={{
+                marginTop: 24, padding: '14px 16px', borderRadius: 10,
+                background: 'rgba(232,85,58,0.08)', border: '1px solid rgba(232,85,58,0.25)',
+              }}>
+                <p style={{ fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,0.85)' }}>
+                  <strong style={{ color: '#fff' }}>Revisa tu álbum antes de pagar.</strong>{' '}
+                  Una vez pagado entra a producción tal como está y ya no se puede editar.
+                  Podrás seguir viéndolo y compartiéndolo desde Mis álbumes.
+                </p>
+                <a href={`/book/${bookId}`} style={{ display: 'inline-block', marginTop: 8, fontSize: 13, color: '#F08A72', textDecoration: 'underline' }}>
+                  Revisar mi álbum
+                </a>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12, fontSize: 13, color: 'rgba(255,255,255,0.85)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)}
+                    style={{ marginTop: 2, width: 16, height: 16, accentColor: '#E8553A', flexShrink: 0 }} />
+                  Revisé mi álbum y entiendo que después de pagar no se puede modificar.
+                </label>
+              </div>
+
               <button
                 onClick={handleCheckout}
                 disabled={submitting || !formValid}
                 style={{
-                  width: '100%', padding: '14px', marginTop: 24,
+                  width: '100%', padding: '14px', marginTop: 16,
                   background: formValid && !submitting ? '#fff' : 'rgba(255,255,255,0.15)',
                   color: formValid && !submitting ? '#000' : 'rgba(255,255,255,0.4)',
                   border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600,
@@ -609,7 +631,8 @@ export default function CheckoutPage() {
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '12px 14px', marginBottom: 12,
   background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 6, color: '#fff', fontSize: 14, boxSizing: 'border-box',
+  // 16px: con menos, Safari en iPhone hace zoom al tocar el campo.
+  borderRadius: 6, color: '#fff', fontSize: 16, boxSizing: 'border-box',
 }
 
 function Row({ label, value, bold = false, valueLabel }: { label: string; value: number; bold?: boolean; valueLabel?: string }) {

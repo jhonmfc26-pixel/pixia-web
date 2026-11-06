@@ -27,7 +27,40 @@ interface PageFlipInstance {
   flipPrev(): void
   /** Salto animado a una página — a diferencia de turnToPage(), SÍ anima el curl. */
   flip(page: number): void
+  turnToPage(page: number): void
+  getOrientation(): 'portrait' | 'landscape'
+  getCurrentPageIndex(): number
+  getSettings(): { disableFlipByClick: boolean }
+  getRender(): { getRect(): { left: number; top: number; pageWidth: number; height: number } }
+  getFlipController(): { flip(pos: { x: number; y: number }): void }
+  getPageCollection(): {
+    getCurrentSpreadIndex(): number
+    getSpreadIndexByPage(page: number): number
+    setCurrentSpreadIndex(idx: number): void
+  }
 }
+
+/**
+ * page-flip 2.0.7 tiene un bug en modo vertical (celular): flipPrev() simula
+ * un toque en x=10 del contenedor, pero en vertical la página visible está
+ * corrida y ese punto cae fuera de las esquinas; con disableFlipByClick
+ * (que usamos para que un toque no pase página) el toque se descarta. Por eso
+ * en el celular "‹" y "Portada" no hacían nada. Acá se toca el borde
+ * izquierdo de la página VISIBLE y se habilita el toque solo durante esa llamada.
+ */
+function flipPrevSafe(pf: PageFlipInstance): void {
+  if (pf.getOrientation() !== 'portrait') { pf.flipPrev(); return }
+  const rect = pf.getRender().getRect()
+  const settings = pf.getSettings()
+  const prev = settings.disableFlipByClick
+  settings.disableFlipByClick = false
+  try {
+    pf.getFlipController().flip({ x: rect.left + rect.pageWidth + 10, y: 1 })
+  } finally {
+    settings.disableFlipByClick = prev
+  }
+}
+
 
 export interface PixiaFlipBookHandle {
   goTo: (spreadIdx: number) => void
@@ -92,14 +125,33 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
     goTo: (spreadIdx: number) => {
       const pf = bookRef.current?.pageFlip()
       if (!pf) return
+      const targetPage = spreadIdxToPageIndex(spreadIdx, spreads.length)
+
+      if (pf.getOrientation() === 'portrait') {
+        // En vertical se ve una página a la vez: se navega por páginas reales.
+        const current = pf.getCurrentPageIndex()
+        if (targetPage === current) return
+        if (targetPage === current + 1) pf.flipNext()
+        else if (targetPage > current) pf.flip(targetPage)
+        else if (targetPage === current - 1) flipPrevSafe(pf)
+        else {
+          // Salto largo hacia atrás ("Portada", miniaturas): flip() usa el
+          // mismo flipPrev roto, así que se salta directo, sin animación.
+          pf.turnToPage(targetPage)
+          currentSpreadIdxRef.current = spreadIdx
+          onFlip(spreadIdx)
+        }
+        return
+      }
+
       const delta = spreadIdx - currentSpreadIdxRef.current
       if (delta === 1) pf.flipNext()
       else if (delta === -1) pf.flipPrev()
-      else pf.flip(spreadIdxToPageIndex(spreadIdx, spreads.length))
+      else pf.flip(targetPage)
     },
     flipNext: () => bookRef.current?.pageFlip()?.flipNext(),
-    flipPrev: () => bookRef.current?.pageFlip()?.flipPrev(),
-  }), [spreads.length])
+    flipPrev: () => { const pf = bookRef.current?.pageFlip(); if (pf) flipPrevSafe(pf) },
+  }), [spreads.length, onFlip])
 
   const flipChildren = useMemo(() => {
     const items: ReactNode[] = []
