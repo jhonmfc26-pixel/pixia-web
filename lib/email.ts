@@ -190,3 +190,108 @@ PIXIA · Álbumes que perduran
     return { ok: false, error: msg }
   }
 }
+
+// ── Correos de estado post-venta (en impresión / enviado / entregado) ───────
+
+export type StatusEmailKind = 'printing' | 'shipped' | 'delivered'
+
+export interface StatusEmailData {
+  kind: StatusEmailKind
+  reference: string
+  customerName: string
+  customerEmail: string
+  albumTitle?: string | null
+  bookId?: string | null
+  carrier?: string | null
+  trackingNumber?: string | null
+  trackingUrl?: string | null
+  shippingAddress?: string | null
+  shippingCity?: string | null
+}
+
+function esc(s: string | null | undefined): string {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+}
+
+/** Arma asunto, HTML y texto plano. Puro (sin enviar) para poder probarlo. */
+export function buildStatusEmail(d: StatusEmailData, opts: { siteUrl?: string; support?: string } = {}) {
+  const site = (opts.siteUrl ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pixiaa.com').replace(/\/$/, '')
+  const support = opts.support ?? process.env.EMAIL_SUPPORT ?? 'soporte@pixiaa.com'
+  const name = d.customerName?.split(' ')[0] || d.customerName || ''
+  const album = d.albumTitle ? `«${d.albumTitle}»` : 'tu álbum'
+  const viewUrl = d.bookId ? `${site}/book/${encodeURIComponent(d.bookId)}` : `${site}/mis-albumes`
+
+  const copy = {
+    printing: {
+      subject: `Tu álbum está en impresión · ${d.reference}`,
+      title: 'Tu álbum está en impresión',
+      body: `Hola ${name}, ${album} ya está en la imprenta. Lo estamos imprimiendo y encuadernando en tapa dura; cuando salga hacia tu casa te escribimos con el número de guía.`,
+    },
+    shipped: {
+      subject: `Tu álbum va en camino · ${d.reference}`,
+      title: 'Tu álbum va en camino',
+      body: `Hola ${name}, ${album} ya salió hacia tu casa. Puedes seguir el envío con estos datos:`,
+    },
+    delivered: {
+      subject: `¡Tu álbum llegó! · ${d.reference}`,
+      title: '¡Tu álbum llegó!',
+      body: `Hola ${name}, la transportadora nos confirma que ${album} fue entregado. Esperamos que lo disfrutes muchos años. Si al abrirlo encuentras cualquier defecto de impresión o encuadernación, o algún daño del transporte, escríbenos respondiendo este correo y lo resolvemos.`,
+    },
+  }[d.kind]
+
+  const tracking = d.kind === 'shipped' ? `
+    <tr><td style="padding:0 32px 8px 32px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:rgba(255,255,255,0.04);border-radius:8px;">
+        <tr><td style="padding:16px 20px;font-size:14px;color:rgba(255,255,255,0.7);">Transportadora</td>
+            <td align="right" style="padding:16px 20px;font-size:14px;color:#fff;">${esc(d.carrier)}</td></tr>
+        <tr><td style="padding:0 20px 16px 20px;font-size:14px;color:rgba(255,255,255,0.7);">Número de guía</td>
+            <td align="right" style="padding:0 20px 16px 20px;font-family:monospace;font-size:14px;color:#fff;">${esc(d.trackingNumber)}</td></tr>
+        ${d.shippingAddress ? `<tr><td colspan="2" style="padding:0 20px 16px 20px;font-size:13px;color:rgba(255,255,255,0.6);line-height:1.5;">Destino: ${esc(d.shippingAddress)}${d.shippingCity ? `, ${esc(d.shippingCity)}` : ''}</td></tr>` : ''}
+      </table>
+      ${d.trackingUrl ? `<p style="margin:16px 0 0 0;text-align:center;"><a href="${esc(d.trackingUrl)}" style="color:#F08A72;font-size:14px;">Rastrear el envío</a></p>` : ''}
+    </td></tr>` : ''
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${esc(copy.title)} · Pixia</title></head>
+<body style="margin:0;padding:0;background:#0f0f0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#fff;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0f0f0f;"><tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#1a1a1a;border-radius:16px;overflow:hidden;">
+  <tr><td align="center" style="padding:44px 32px 20px 32px;">
+    <div style="font-size:11px;letter-spacing:0.3em;color:rgba(255,255,255,0.5);text-transform:uppercase;">PIXIA</div>
+    <h1 style="margin:22px 0 12px 0;font-family:Georgia,serif;font-size:28px;font-weight:400;color:#fff;line-height:1.3;">${esc(copy.title)}</h1>
+    <p style="margin:0;font-size:15px;color:rgba(255,255,255,0.75);line-height:1.6;">${esc(copy.body)}</p>
+  </td></tr>
+  ${tracking}
+  <tr><td align="center" style="padding:24px 32px 8px 32px;">
+    <a href="${esc(viewUrl)}" style="display:inline-block;background:#E8553A;color:#fff;text-decoration:none;padding:13px 26px;border-radius:10px;font-size:15px;">Ver mi álbum</a>
+  </td></tr>
+  <tr><td align="center" style="padding:20px 32px 36px 32px;font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6;">
+    Pedido <span style="font-family:monospace;">${esc(d.reference)}</span> · ¿Dudas? Escríbenos a ${esc(support)}
+  </td></tr>
+</table></td></tr></table></body></html>`
+
+  const text = [
+    copy.title, '', copy.body,
+    ...(d.kind === 'shipped' ? ['', `Transportadora: ${d.carrier ?? ''}`, `Número de guía: ${d.trackingNumber ?? ''}`, ...(d.trackingUrl ? [`Rastreo: ${d.trackingUrl}`] : [])] : []),
+    '', `Ver mi álbum: ${viewUrl}`, `Pedido ${d.reference} · ¿Dudas? ${support}`, '', 'PIXIA · Álbumes que perduran',
+  ].join('\n')
+
+  return { subject: copy.subject, html, text }
+}
+
+/** Envía el correo de estado. Nunca lanza: el cambio de estado ya quedó guardado. */
+export async function sendOrderStatusEmail(d: StatusEmailData): Promise<{ ok: boolean; error?: string }> {
+  const from = process.env.EMAIL_FROM || 'Pixia <onboarding@resend.dev>'
+  const { subject, html, text } = buildStatusEmail(d)
+  try {
+    const result = await resend.emails.send({ from, to: d.customerEmail, subject, html, text, replyTo: process.env.EMAIL_SUPPORT || undefined })
+    if (result.error) {
+      console.error('[email] Resend error (estado):', result.error)
+      return { ok: false, error: result.error.message }
+    }
+    return { ok: true }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[email] Exception (estado):', msg)
+    return { ok: false, error: msg }
+  }
+}

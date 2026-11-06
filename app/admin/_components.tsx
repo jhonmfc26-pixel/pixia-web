@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { PAYMENT_LABEL, PDF_STATE_LABEL, type PdfState } from '@/lib/admin/model'
+import { PRINT_STATUS_ADMIN_LABEL, isPrintStatus } from '@/lib/orderStatus'
 
 type Tone = 'ok' | 'warn' | 'bad' | 'info' | 'muted'
 
@@ -66,4 +67,12 @@ export function ButtonLink({ href, children, variant = 'secondary' }: { href: st
       {children}
     </a>
   )
+}
+
+/** Estado post-venta (impresión / envío). Solo para pedidos pagados. */
+export function ShipBadge({ status }: { status: string | null }) {
+  if (!isPrintStatus(status)) return <span className="text-[var(--text-tertiary)]">—</span>
+  const tone: Tone = status === 'delivered' ? 'ok' : status === 'shipped' ? 'info' : status === 'printing' ? 'info' : 'warn'
+  const label = status === 'paid' ? 'Por imprimir' : PRINT_STATUS_ADMIN_LABEL[status]
+  return <Badge tone={tone}>{label}</Badge>
 }

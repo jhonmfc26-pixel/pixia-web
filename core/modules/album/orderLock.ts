@@ -11,16 +11,18 @@ export function isOrdered(status?: string | null): boolean {
   return !!status && !EDITABLE.has(status)
 }
 
-export type OrderStage = 'production' | 'shipped' | 'delivered'
+export type OrderStage = 'production' | 'printing' | 'shipped' | 'delivered'
 
 export function orderStage(status?: string | null): OrderStage {
   if (status === 'delivered') return 'delivered'
   if (status === 'shipped') return 'shipped'
+  if (status === 'printing' || status === 'sent-to-print') return 'printing'
   return 'production'
 }
 
 export const ORDER_STAGE_LABEL: Record<OrderStage, string> = {
-  production: 'Pedido · En producción',
+  production: 'Pedido · Preparando',
+  printing: 'Pedido · En impresión',
   shipped: 'Pedido · En camino',
   delivered: 'Pedido · Entregado',
 }

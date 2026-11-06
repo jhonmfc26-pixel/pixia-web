@@ -2,8 +2,9 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { isAdminRequest } from '@/lib/admin/auth'
 import { getOrder } from '@/lib/admin/data'
-import { formatCop, formatDateTime, formatDuration, needsAttention, PDF_STATE_LABEL, PRINT_STATUS_LABEL } from '@/lib/admin/model'
+import { formatCop, formatDateTime, formatDuration, needsAttention, PDF_STATE_LABEL } from '@/lib/admin/model'
 import { Badge, ButtonLink, Card, Field, PaymentBadge, PdfBadge } from '../../_components'
+import { CARRIERS, isPrintStatus, statusIndex } from '@/lib/orderStatus'
 
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,8 @@ export const dynamic = 'force-dynamic'
 const FLASH: Record<string, { tone: 'ok' | 'bad'; text: string }> = {
   reencolado: { tone: 'ok', text: 'Regenerando el PDF — tarda alrededor de un minuto. Recarga la página para ver el estado.' },
   'reencolado-cola': { tone: 'ok', text: 'PDF encolado de nuevo. El barrido automático lo toma en máximo 5 minutos.' },
+  estado: { tone: 'ok', text: 'Estado actualizado (sin correo al cliente).' },
+  'estado-correo': { tone: 'ok', text: 'Estado actualizado y correo enviado al cliente.' },
 }
 
 function Step({ label, at, done, last }: { label: string; at: string | null; done: boolean; last?: boolean }) {
@@ -23,6 +26,59 @@ function Step({ label, at, done, last }: { label: string; at: string | null; don
         <div className="text-xs tabular-nums text-[var(--text-secondary)]">{at ? formatDateTime(at) : '—'}</div>
       </div>
     </li>
+  )
+}
+
+const input = 'w-full rounded-lg border border-[var(--border-medium)] bg-[var(--bg-base)] px-3 py-2 text-sm'
+const notifyBox = (
+  <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+    <input type="checkbox" name="notify" defaultChecked className="h-4 w-4 accent-[var(--brand-coral)]" />
+    Avisar al cliente por correo
+  </label>
+)
+
+/** Botón del siguiente paso. "Enviado" pide transportadora y guía. */
+function StatusForm({ reference, current, carrier, tracking, trackingUrl }: {
+  reference: string; current: string | null; carrier?: string | null; tracking?: string | null; trackingUrl?: string | null
+}) {
+  const idx = statusIndex(isPrintStatus(current) ? current : 'paid')
+  const action = `/api/admin/orders/${reference}/status`
+  const btn = 'rounded-lg bg-[var(--brand-coral)] px-3.5 py-2 text-sm font-medium text-white hover:brightness-110'
+  return (
+    <div className="mt-5 space-y-4 border-t border-[var(--border-subtle)] pt-5">
+      {idx < 1 && (
+        <form method="post" action={action} className="space-y-2">
+          <input type="hidden" name="status" value="printing" />
+          {notifyBox}
+          <button className={btn}>Marcar en impresión</button>
+        </form>
+      )}
+      {idx <= 2 && (
+        <form method="post" action={action} className="space-y-2">
+          <input type="hidden" name="status" value="shipped" />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <select name="carrier" defaultValue={carrier ?? ''} required className={input}>
+              <option value="" disabled>Transportadora</option>
+              {CARRIERS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input name="trackingNumber" defaultValue={tracking ?? ''} required placeholder="Número de guía" className={input} />
+          </div>
+          <input name="trackingUrl" type="url" defaultValue={trackingUrl ?? ''} placeholder="Enlace de rastreo (opcional)" className={input} />
+          {notifyBox}
+          <button className={idx === 2 ? 'rounded-lg border border-[var(--border-medium)] px-3.5 py-2 text-sm font-medium hover:bg-[var(--bg-hover)]' : btn}>
+            {idx === 2 ? 'Corregir guía' : 'Marcar enviado'}
+          </button>
+        </form>
+      )}
+      {idx === 2 && (
+        <form method="post" action={action} className="space-y-2">
+          <input type="hidden" name="status" value="delivered" />
+          {notifyBox}
+          <button className={btn}>Marcar entregado</button>
+        </form>
+      )}
+      {idx === 3 && <p className="text-sm text-[var(--text-secondary)]">Pedido entregado: no hay más pasos.</p>}
+    </div>
   )
 }
 
@@ -137,9 +193,27 @@ export default async function AdminOrderPage({
             <Field label="Ciudad">{[order.shipping_city, order.shipping_state].filter(Boolean).join(', ') || null}</Field>
             <Field label="Código postal">{order.shipping_postal_code}</Field>
             <Field label="Notas">{order.shipping_notes}</Field>
-            <Field label="Estado de impresión">{order.print_status ? PRINT_STATUS_LABEL[order.print_status] ?? order.print_status : null}</Field>
           </dl>
         </Card>
+
+        {isPaid && (
+          <Card title="Estado del pedido">
+            <ol>
+              <Step label="Pagado" at={order.paid_at} done />
+              <Step label="En impresión" at={order.printing_at ?? null} done={statusIndex(order.print_status) >= 1} />
+              <Step label="Enviado" at={order.shipped_at ?? null} done={statusIndex(order.print_status) >= 2} />
+              <Step label="Entregado" at={order.delivered_at ?? null} done={statusIndex(order.print_status) >= 3} last />
+            </ol>
+            {order.tracking_number && (
+              <dl className="mt-4">
+                <Field label="Transportadora">{order.shipping_carrier}</Field>
+                <Field label="Guía"><span className="font-mono text-xs">{order.tracking_number}</span></Field>
+                {order.tracking_url && <Field label="Rastreo"><a className="hover:underline" href={order.tracking_url} target="_blank" rel="noreferrer">Abrir</a></Field>}
+              </dl>
+            )}
+            <StatusForm reference={ref} current={order.print_status} carrier={order.shipping_carrier} tracking={order.tracking_number} trackingUrl={order.tracking_url} />
+          </Card>
+        )}
       </div>
     </div>
   )

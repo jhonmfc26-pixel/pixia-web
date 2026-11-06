@@ -11,7 +11,8 @@ import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { getLocalBook } from '@/core/engine/localBookStorage'
-import { isOrdered, orderStage, ORDER_STAGE_LABEL } from '@/core/modules/album/orderLock'
+import { isOrdered } from '@/core/modules/album/orderLock'
+import OrderStatusBadge from '@/components/book/OrderStatusBadge'
 import type { AlbumStructure } from '@/core/modules/foldModel/types'
 import CoverPage from '@/core/modules/viewer/pages/CoverPage'
 import BackCoverPage from '@/core/modules/viewer/pages/BackCoverPage'
@@ -479,12 +480,7 @@ export default function BookPage() {
         </span>
 
         {ordered ? (
-          <span style={{
-            fontSize: '12px', padding: '6px 12px', borderRadius: '999px',
-            background: 'rgba(232,85,58,0.14)', color: '#F08A72', whiteSpace: 'nowrap',
-          }}>
-            {ORDER_STAGE_LABEL[orderStage(book.status)]}
-          </span>
+          <OrderStatusBadge bookId={id} blueprintStatus={book.status} />
         ) : (
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button

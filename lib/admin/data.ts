@@ -1,4 +1,9 @@
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendOrderStatusEmail } from '@/lib/email'
+import {
+  BLUEPRINT_STATUS_FOR, TIMESTAMP_COLUMN_FOR, canTransition, parseShipment,
+  type PrintStatus,
+} from '@/lib/orderStatus'
 import {
   buildAdminOrder, matchesPdfFilter, rangeStart,
   type AdminOrder, type Filters, type OrderRow, type PdfJobRow,
@@ -15,6 +20,7 @@ const ORDER_COLUMNS = [
   'shipping_address', 'shipping_city', 'shipping_state', 'shipping_postal_code', 'shipping_notes',
   'base_price_cop', 'pages_included', 'pages_total', 'extra_pages_price_cop', 'shipping_cop', 'total_cop',
   'payment_status', 'print_status', 'wompi_transaction_id', 'wompi_payment_method', 'paid_at', 'created_at',
+  'printing_at', 'shipped_at', 'delivered_at', 'shipping_carrier', 'tracking_number', 'tracking_url',
 ].join(', ')
 
 const JOB_COLUMNS = 'blueprint_id, order_reference, status, attempt_count, error_message, claimed_at, alerted_at, interior_path, cover_path, created_at, updated_at'
@@ -103,6 +109,63 @@ export async function requeuePdf(reference: string): Promise<{ ok: true } | { ok
   }, { onConflict: 'blueprint_id' })
   if (error) return { ok: false, error: error.message }
   return { ok: true }
+}
+
+/**
+ * Avanza el estado post-venta del pedido (en impresión / enviado / entregado),
+ * mueve el álbum del cliente al mismo estado y, si se pide, le manda el correo.
+ */
+export async function updatePrintStatus(
+  reference: string,
+  to: PrintStatus,
+  opts: { carrier?: string; trackingNumber?: string; trackingUrl?: string; notify: boolean },
+): Promise<{ ok: true; emailed: boolean; emailError?: string } | { ok: false; error: string }> {
+  const found = await getOrder(reference)
+  if (!found) return { ok: false, error: 'Orden no encontrada' }
+  const { order } = found
+  if (order.payment_status !== 'approved') return { ok: false, error: 'La orden no está pagada' }
+  if (!canTransition(order.print_status ?? 'paid', to)) {
+    return { ok: false, error: 'Ese cambio de estado no está permitido (solo se avanza: impresión → enviado → entregado).' }
+  }
+
+  const updates: Record<string, unknown> = { print_status: to }
+  const tsCol = TIMESTAMP_COLUMN_FOR[to]
+  // Corregir la guía de un pedido ya enviado no cambia la fecha de envío.
+  if (tsCol && !(to === 'shipped' && order.print_status === 'shipped')) updates[tsCol] = new Date().toISOString()
+  if (to === 'shipped') {
+    const parsed = parseShipment({ carrier: opts.carrier, trackingNumber: opts.trackingNumber, trackingUrl: opts.trackingUrl })
+    if (!parsed.ok) return { ok: false, error: parsed.error }
+    updates.shipping_carrier = parsed.value.carrier
+    updates.tracking_number = parsed.value.trackingNumber
+    updates.tracking_url = parsed.value.trackingUrl
+  }
+
+  const { error } = await supabaseAdmin.from('orders').update(updates).eq('reference', reference)
+  if (error) return { ok: false, error: error.message }
+
+  if (order.book_id) {
+    const bp = await supabaseAdmin.from('blueprints')
+      .update({ status: BLUEPRINT_STATUS_FOR[to], updated_at: new Date().toISOString() })
+      .eq('id', order.book_id)
+    // El pedido ya quedó actualizado (es lo que importa); el álbum se reconcilia luego.
+    if (bp.error) console.error('[admin] No se pudo actualizar el estado del álbum:', bp.error.message)
+  }
+
+  if (!opts.notify || to === 'paid' || !order.customer_email) return { ok: true, emailed: false }
+  const sent = await sendOrderStatusEmail({
+    kind: to,
+    reference,
+    customerName: order.customer_name ?? '',
+    customerEmail: order.customer_email,
+    albumTitle: found.albumTitle,
+    bookId: order.book_id,
+    carrier: (updates.shipping_carrier as string | undefined) ?? order.shipping_carrier,
+    trackingNumber: (updates.tracking_number as string | undefined) ?? order.tracking_number,
+    trackingUrl: (updates.tracking_url as string | null | undefined) ?? order.tracking_url,
+    shippingAddress: order.shipping_address,
+    shippingCity: order.shipping_city,
+  })
+  return { ok: true, emailed: sent.ok, emailError: sent.error }
 }
 
 // ── Descargas ──────────────────────────────────────────────────────────────
