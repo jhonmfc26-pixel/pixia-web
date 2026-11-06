@@ -70,10 +70,24 @@ test('auth: rechaza firma de otra llave, audiencia, emisor, email y token vencid
   }
 })
 
+test('auth: sin CF_ACCESS_AUD igual exige firma del equipo, emisor y email', async () => {
+  const { kp, jwk } = await keypair()
+  const other = await keypair()
+  const fetcher = async () => [jwk]
+  const noAud = cfg({ audiences: [] })
+  assert.deepEqual(await getAdmin(hdr(await sign(kp.privateKey, { ...good(), aud: ['cualquier-app'] })), noAud, { fetcher }), { email: 'jhon@pixiaa.com' })
+  _resetJwksCacheForTests()
+  assert.equal(await getAdmin(hdr(await sign(other.kp.privateKey, good())), noAud, { fetcher }), null, 'firma ajena')
+  _resetJwksCacheForTests()
+  assert.equal(await getAdmin(hdr(await sign(kp.privateKey, { ...good(), email: 'x@y.co' })), noAud, { fetcher }), null, 'email ajeno')
+  _resetJwksCacheForTests()
+  assert.equal(await getAdmin(hdr(await sign(kp.privateKey, { ...good(), iss: 'https://otro.cloudflareaccess.com' })), noAud, { fetcher }), null, 'emisor ajeno')
+})
+
 test('auth: con config incompleta nadie entra (aunque el JWT sea válido)', async () => {
   const { kp, jwk } = await keypair()
   const token = await sign(kp.privateKey, good())
-  for (const over of [{ teamDomain: undefined }, { audiences: [] }, { emails: [] }]) {
+  for (const over of [{ teamDomain: undefined }, { emails: [] }]) {
     _resetJwksCacheForTests()
     assert.equal(await getAdmin(hdr(token), cfg(over), { fetcher: async () => [jwk] }), null)
   }

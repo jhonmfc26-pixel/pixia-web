@@ -12,10 +12,10 @@
  *
  * Variables (Cloudflare Pages → Settings → Variables):
  *   CF_ACCESS_TEAM_DOMAIN  p.ej. "miequipo.cloudflareaccess.com"
- *   CF_ACCESS_AUD          "Application Audience (AUD) Tag" de la app de
- *                          Access; varias separadas por coma
+ *   CF_ACCESS_AUD          (opcional) "Application Audience (AUD) Tag" de la
+ *                          app de Access; varias separadas por coma
  *   ADMIN_EMAILS           emails permitidos, separados por coma
- * Si falta cualquiera → nadie entra (en producción).
+ * Si falta CF_ACCESS_TEAM_DOMAIN o ADMIN_EMAILS → nadie entra (en producción).
  *
  * En `next dev` (NODE_ENV !== 'production') se deja pasar sin Access, para
  * poder trabajar local — mismo criterio que la ruta /api/dev/generate-pdf.
@@ -119,8 +119,8 @@ export async function getAdmin(
   if (!token) {
     return config.allowDevBypass ? { email: 'dev@localhost' } : deny('la request no trae el header de Cloudflare Access — ¿la ruta está cubierta por la app "Pixia Admin" o se entró por *.pages.dev?')
   }
-  if (!config.teamDomain || config.audiences.length === 0 || config.emails.length === 0) {
-    console.error('[admin] Falta CF_ACCESS_TEAM_DOMAIN, CF_ACCESS_AUD o ADMIN_EMAILS — acceso denegado')
+  if (!config.teamDomain || config.emails.length === 0) {
+    console.error('[admin] Falta CF_ACCESS_TEAM_DOMAIN o ADMIN_EMAILS — acceso denegado')
     return null
   }
 
@@ -146,7 +146,10 @@ export async function getAdmin(
     if (typeof claims.nbf === 'number' && claims.nbf > nowSec + 60) return deny('token todavía no válido')
     if (claims.iss !== `https://${config.teamDomain}`) return deny(`emisor ${claims.iss} no coincide con CF_ACCESS_TEAM_DOMAIN=${config.teamDomain}`)
     const auds = Array.isArray(claims.aud) ? claims.aud : [claims.aud]
-    if (!auds.some(a => a && config.audiences.includes(a))) return deny(`el AUD del token (${auds.join(', ')}) no está en CF_ACCESS_AUD — copiar el de la app "Pixia Admin"`)
+    // CF_ACCESS_AUD es opcional: sin él igual se exige firma del equipo de
+    // Access de Pixia + emisor + email permitido. Con él, además, el token
+    // tiene que ser de la app "Pixia Admin" y no de otra app del equipo.
+    if (config.audiences.length > 0 && !auds.some(a => a && config.audiences.includes(a))) return deny(`el AUD del token (${auds.join(', ')}) no está en CF_ACCESS_AUD — copiar el de la app "Pixia Admin"`)
 
     const email = claims.email?.toLowerCase()
     if (!email || !config.emails.includes(email)) return deny(`el email ${email ?? '(vacío)'} no está en ADMIN_EMAILS`)
