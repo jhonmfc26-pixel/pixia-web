@@ -1,115 +1,80 @@
-'use client'
+import Link from 'next/link'
+import { LEGAL_ENTITY, SIC_URL, isPlaceholder } from '@/lib/legal'
+
+/**
+ * Pie del sitio. Además de navegación, cumple lo que exige el art. 50 de la
+ * Ley 1480 para quien vende en línea: identificación del vendedor, enlace a
+ * términos y datos personales, y enlace visible a la autoridad (SIC).
+ * Antes todos los enlaces apuntaban a "#".
+ */
+const COLS: { title: string; links: { label: string; href: string; external?: boolean }[] }[] = [
+  {
+    title: 'Producto',
+    links: [
+      { label: 'Crear álbum', href: '/create' },
+      { label: 'Cómo funciona', href: '/#como-funciona' },
+      { label: 'Ejemplos', href: '/#ejemplos' },
+      { label: 'Precios', href: '/#precios' },
+    ],
+  },
+  {
+    title: 'Ayuda',
+    links: [
+      { label: 'Mis álbumes', href: '/mis-albumes' },
+      { label: LEGAL_ENTITY.email, href: `mailto:${LEGAL_ENTITY.email}`, external: true },
+      { label: 'Garantía y devoluciones', href: '/terminos#garantia' },
+      { label: 'Peticiones, quejas y reclamos', href: '/terminos#pqr' },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Términos y condiciones', href: '/terminos' },
+      { label: 'Tratamiento de datos personales', href: '/privacidad' },
+      { label: 'Superintendencia de Industria y Comercio', href: SIC_URL, external: true },
+    ],
+  },
+]
 
 export default function Footer() {
+  const identity = [
+    isPlaceholder(LEGAL_ENTITY.legalName) ? null : LEGAL_ENTITY.legalName,
+    isPlaceholder(LEGAL_ENTITY.taxId) ? null : `NIT ${LEGAL_ENTITY.taxId}`,
+    LEGAL_ENTITY.city,
+  ].filter(Boolean).join(' · ')
+
   return (
-    <footer style={{
-      background: 'var(--bg-base)',
-      borderTop: '1px solid var(--border-subtle)',
-      padding: '64px 24px 40px',
-    }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '40px',
-          marginBottom: '48px',
-        }}>
-          {/* Marca */}
+    <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-base)] px-6 pb-10 pt-16">
+      <div className="mx-auto max-w-[1100px]">
+        <div className="mb-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <p style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '18px',
-              fontWeight: 500,
-              color: 'var(--text-primary)',
-              marginBottom: '10px',
-            }}>
-              Pixia
-            </p>
-            <p style={{
-              fontSize: '13px',
-              color: 'var(--text-tertiary)',
-              lineHeight: 1.65,
-              fontWeight: 300,
-              maxWidth: '220px',
-            }}>
-              Tus fotos, transformadas en libros con criterio editorial e IA.
+            <p className="mb-2.5 font-[family-name:var(--font-display)] text-lg font-medium text-[var(--text-primary)]">Pixia</p>
+            <p className="max-w-[240px] text-[13px] font-light leading-relaxed text-[var(--text-tertiary)]">
+              Tus fotos, transformadas en álbumes impresos con criterio editorial.
             </p>
           </div>
-
-          {/* Producto */}
-          <div>
-            <p style={{
-              fontSize: '12px',
-              color: 'var(--text-tertiary)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              fontWeight: 500,
-              marginBottom: '16px',
-            }}>
-              Producto
-            </p>
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {['Crear álbum', 'Cómo funciona', 'Precios', 'Ejemplos'].map(item => (
-                <li key={item}>
-                  <a href="#" style={{
-                    fontSize: '13px',
-                    color: 'var(--text-tertiary)',
-                    textDecoration: 'none',
-                    transition: 'color 0.2s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-                  >
-                    {item}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <p style={{
-              fontSize: '12px',
-              color: 'var(--text-tertiary)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              fontWeight: 500,
-              marginBottom: '16px',
-            }}>
-              Legal
-            </p>
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {['Privacidad', 'Términos de uso', 'Cookies'].map(item => (
-                <li key={item}>
-                  <a href="#" style={{
-                    fontSize: '13px',
-                    color: 'var(--text-tertiary)',
-                    textDecoration: 'none',
-                    transition: 'color 0.2s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-                  >
-                    {item}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {COLS.map(col => (
+            <div key={col.title}>
+              <p className="mb-4 text-xs font-medium uppercase tracking-[0.1em] text-[var(--text-tertiary)]">{col.title}</p>
+              <ul className="flex flex-col gap-2.5">
+                {col.links.map(l => (
+                  <li key={l.label}>
+                    {l.external ? (
+                      <a href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
+                        className="text-[13px] text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]">{l.label}</a>
+                    ) : (
+                      <Link href={l.href} className="text-[13px] text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]">{l.label}</Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        <div style={{
-          borderTop: '1px solid var(--border-subtle)',
-          paddingTop: '24px',
-        }}>
-          <p style={{
-            fontSize: '12px',
-            color: 'var(--text-tertiary)',
-            letterSpacing: '0.02em',
-          }}>
-            © {new Date().getFullYear()} Pixia. Todos los derechos reservados.
-          </p>
+        <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-6 text-xs tracking-[0.02em] text-[var(--text-tertiary)] sm:flex-row sm:justify-between">
+          <p>© {new Date().getFullYear()} Pixia. Todos los derechos reservados.</p>
+          <p>{identity}</p>
         </div>
       </div>
     </footer>

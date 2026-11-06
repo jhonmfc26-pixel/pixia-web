@@ -326,6 +326,9 @@ function LoginPrompt() {
                 className="w-full rounded-xl bg-[var(--brand-coral)] px-6 py-3.5 font-medium text-white transition hover:brightness-110 disabled:opacity-60">
                 {state === 'sending' ? 'Enviando…' : 'Enviarme el enlace'}
               </button>
+              <p className="text-xs leading-relaxed text-white/40">
+                Usamos tu correo solo para tu cuenta y tus pedidos, según nuestra <Link href="/privacidad" className="underline">Política de datos personales</Link>.
+              </p>
               {state === 'error' && (
                 <p className="text-sm text-[#F08A72]">No pudimos enviar el enlace. Revisa el correo (debe ser el de tu pedido) e inténtalo de nuevo.</p>
               )}
