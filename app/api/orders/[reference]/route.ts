@@ -30,7 +30,8 @@ export async function GET(
         payment_status,
         print_status,
         created_at,
-        paid_at
+        paid_at,
+        book_id
       `)
       .eq('reference', reference)
       .single()
@@ -49,6 +50,9 @@ export async function GET(
         print_status: order.print_status,
         created_at: order.created_at,
         paid_at: order.paid_at,
+        // Para el botón "Ver mi álbum". El álbum en sí sigue protegido: solo
+        // lo abre su dueño con sesión (RLS de blueprints).
+        book_id: order.book_id,
       },
     })
   } catch (err) {

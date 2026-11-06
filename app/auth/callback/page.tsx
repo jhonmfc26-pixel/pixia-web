@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import { getLocalBook } from '@/core/engine/localBookStorage'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 
 type SpinnerMsg = 'session' | 'saving'
@@ -29,8 +30,7 @@ export default function AuthCallbackPage() {
         const saveStart = Date.now()
 
         try {
-          const allBooks = JSON.parse(localStorage.getItem('pixia_books') || '{}')
-          const rawBook = allBooks[pending.bookId]
+          const rawBook = await getLocalBook(pending.bookId)
           if (rawBook) {
             const blueprint = normalizeBook(rawBook, pending.bookId)
             const sessionId = localStorage.getItem('pixia_session_id') ?? ''
@@ -58,7 +58,10 @@ export default function AuthCallbackPage() {
         localStorage.removeItem('pixia_pending_checkout')
         router.replace(pending.returnTo)
       } else {
-        router.replace('/')
+        // Entró desde "Mis álbumes" (o abrió el enlace sin un pedido en curso).
+        const next = localStorage.getItem('pixia_auth_next')
+        localStorage.removeItem('pixia_auth_next')
+        router.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/mis-albumes')
       }
     })
   }, [router])

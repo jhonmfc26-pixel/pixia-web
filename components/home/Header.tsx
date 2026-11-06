@@ -3,9 +3,16 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { supabaseBrowser } from '@/lib/supabase-browser'
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false)
+  const [loggedIn, setLoggedIn] = useState(false)
+
+  // Con sesión (ya compró o inició el pedido) se muestra el acceso a sus álbumes.
+  useEffect(() => {
+    supabaseBrowser.auth.getSession().then(({ data: { session } }) => setLoggedIn(!!session)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -80,6 +87,14 @@ export default function Header() {
       </nav>
 
       {/* CTA */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      {loggedIn && (
+        <Link href="/mis-albumes" style={{
+          fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', whiteSpace: 'nowrap',
+        }}>
+          Mis álbumes
+        </Link>
+      )}
       <Link href="/create" style={{
         fontSize: '14px',
         fontWeight: 500,
@@ -97,6 +112,7 @@ export default function Header() {
       >
         Crear álbum
       </Link>
+      </div>
     </header>
   )
 }

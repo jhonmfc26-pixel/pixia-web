@@ -9,6 +9,9 @@ import { buildPixiaBookWithAI } from '../../../core/engine/buildPixiaBook'
 import { saveBookToLocal } from '../../../core/engine/localBookStorage'
 import { useWizard } from '../../../components/create/WizardProvider'
 import { MIN_PHOTOS, MAX_PHOTOS } from '@/core/modules/upload/limits'
+import { readPhotoAnalysis, readR2Photos, mergeR2Photos } from '@/core/modules/upload/photoSession'
+import { useUpload } from '@/core/modules/upload/useUpload'
+import { useSession } from '@/core/modules/session/useSession'
 
 /**
  * Generación del álbum. Antes había una pantalla de espera FALSA
@@ -55,26 +58,14 @@ async function fileToCompressedBase64(file: File): Promise<string> {
   })
 }
 
-type Phase = 'fotos' | 'diseno' | 'guardando' | 'listo'
+type Phase = 'subiendo' | 'fotos' | 'diseno' | 'guardando' | 'listo'
 
 const PHASE_COPY: Record<Phase, { title: string; sub: string }> = {
+  subiendo: { title: 'Subiendo tus fotos', sub: 'Guardándolas en alta calidad para imprimir' },
   fotos: { title: 'Preparando tus fotos', sub: 'Ordenándolas por fecha y momento' },
   diseno: { title: 'Diseñando cada página', sub: 'Eligiendo el mejor diseño para cada momento' },
   guardando: { title: 'Dando los últimos toques', sub: 'Tu álbum está casi listo' },
   listo: { title: '¡Listo!', sub: 'Abriendo tu álbum' },
-}
-
-interface AnalysisEntry {
-  id?: string
-  originalIndex: number
-  takenAt?: string | null
-  thumbnail?: string
-  width?: number
-  height?: number
-  orientation?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  score?: any
-  contentHash?: string
 }
 
 export default function ResultPage() {
@@ -86,8 +77,11 @@ export default function ResultPage() {
   const [total, setTotal] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const running = useRef(false)
+  const { sessionId, isReady: sessionReady } = useSession()
+  const { uploadProgress, uploadPhotos } = useUpload(sessionId || '')
 
   useEffect(() => {
+    if (!sessionReady) return
     if (running.current) return
     if (state.photos.length === 0) return
     running.current = true
@@ -97,34 +91,40 @@ export default function ResultPage() {
 
     async function build() {
       try {
-        const analysisRaw = localStorage.getItem('pixia_photo_analysis')
-        const analysis: AnalysisEntry[] = analysisRaw ? JSON.parse(analysisRaw) : []
+        // Todo se empareja por el id de la foto (ver photoSession.ts).
+        const analysis = readPhotoAnalysis()
+        const r2Map = readR2Photos()
 
-        // Orden cronológico por fecha de captura (EXIF)
-        const sortedAnalysis = [...analysis].sort((a, b) => {
-          if (!a.takenAt && !b.takenAt) return 0
-          if (!a.takenAt) return 1
-          if (!b.takenAt) return -1
-          return new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime()
-        })
-
-        // URLs de R2 si ya se subieron
-        const r2Raw = localStorage.getItem('pixia_r2_photos')
-        const r2Photos: { photoId: string; url: string }[] = r2Raw ? JSON.parse(r2Raw) : []
-        const r2Map = new Map(r2Photos.map(p => [p.photoId, p.url]))
-
-        const aligned = sortedAnalysis.length === state.photos.length
-        const filesToProcess = (aligned
-          ? sortedAnalysis.map(a => state.photos[a.originalIndex])
-          : state.photos
-        ).slice(0, MAX_PHOTOS)
+        // Orden cronológico por fecha de captura (EXIF); sin fecha, al final
+        // en el orden en que se eligieron.
+        const time = (id: string) => {
+          const t = analysis.get(id)?.takenAt
+          return t ? new Date(t).getTime() : Infinity
+        }
+        const filesToProcess = state.photos
+          .slice(0, MAX_PHOTOS)
+          .map((p, i) => ({ p, i }))
+          .sort((a, b) => (time(a.p.id) - time(b.p.id)) || (a.i - b.i))
+          .map(({ p }) => p)
         setTotal(filesToProcess.length)
+
+        // Fotos que no alcanzaron a subirse en el paso 2 (se pasó rápido, falló
+        // la red...): se suben ahora. Sin esto quedaban en base64 dentro del
+        // libro — pesado, llenaba el almacenamiento del celular y no sirve para imprimir.
+        const missing = filesToProcess.filter(p => !r2Map.has(p.id))
+        if (missing.length > 0 && sessionId) {
+          setPhase('subiendo')
+          const uploaded = await uploadPhotos(missing.map(p => ({ file: p.file, photoId: p.id })))
+          for (const u of uploaded) r2Map.set(u.photoId, u.url)
+          mergeR2Photos(uploaded, new Set(state.photos.map(p => p.id)))
+          setPhase('fotos')
+        }
 
         let processed = 0
         const results = await Promise.allSettled(
           filesToProcess.map(async (p, index) => {
-            const meta = aligned ? sortedAnalysis[index] : undefined
-            const r2Url = meta?.id ? r2Map.get(meta.id) : null
+            const meta = analysis.get(p.id)
+            const r2Url = r2Map.get(p.id)
             const src = r2Url ?? await fileToCompressedBase64(p.file)
             setDone(++processed)
             const baseScore = meta?.score || null
@@ -132,10 +132,11 @@ export default function ResultPage() {
               ? { ...(baseScore ?? {}), finalScore: Math.max(baseScore?.finalScore ?? 0, STARRED_SCORE) }
               : baseScore
             return {
-              id: meta?.id || `photo-${index}`,
+              id: p.id,
               src,
               url: src,
-              thumbnailUrl: meta?.thumbnail || '',
+              // En R2 la miniatura es la misma URL (no se carga el base64 al libro).
+              thumbnailUrl: r2Url ?? (meta?.thumbnail || ''),
               r2Key: '',
               width: meta?.width ?? 0,
               height: meta?.height ?? 0,
@@ -143,7 +144,7 @@ export default function ResultPage() {
               orientation: (meta?.orientation || 'landscape') as 'landscape' | 'portrait' | 'square',
               score,
               originalName: p.file?.name || `photo-${index}`,
-              contentHash: meta?.contentHash,
+              contentHash: meta?.contentHash ?? p.contentHash,
             }
           })
         )
@@ -160,18 +161,18 @@ export default function ResultPage() {
         }
 
         setPhase('diseno')
-        const coverMeta = aligned ? sortedAnalysis.find(a => a.originalIndex === state.cover?.photoIndex) : undefined
+        const coverPhotoId = photos.some(p => p.id === state.cover?.photoId) ? state.cover?.photoId : undefined
         const book = await buildPixiaBookWithAI({
           photos,
           story: state.storyType ?? 'general',
           title: state.cover?.title?.trim() || undefined,
           subtitle: state.cover?.subtitle,
           date: state.cover?.date,
-          coverPhotoId: coverMeta?.id,
+          coverPhotoId,
         })
 
         setPhase('guardando')
-        saveBookToLocal(book)
+        await saveBookToLocal(book)
 
         setPhase('listo')
         router.push(`/book/${book.identity.bookId}`)
@@ -186,7 +187,8 @@ export default function ResultPage() {
     }
 
     build()
-  }, [state.photos, state.storyType, state.cover, router, attempt])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.photos, state.storyType, state.cover, router, attempt, sessionId])
 
   const backToPhotos = () => {
     dispatch({ type: 'PREV_STEP' })
@@ -224,7 +226,10 @@ export default function ResultPage() {
   }
 
   // Progreso real: preparar fotos = 0–80 %, diseño = 90 %, guardar = 97 %, listo = 100 %
-  const pct = phase === 'fotos' ? (total ? Math.round((done / total) * 80) : 0)
+  // (si hay fotos por subir, la subida ocupa 0–60 % y preparar 60–80 %)
+  const up = uploadProgress.total ? uploadProgress.completed / uploadProgress.total : 0
+  const pct = phase === 'subiendo' ? Math.round(up * 60)
+    : phase === 'fotos' ? (total ? Math.round((uploadProgress.total ? 60 : 0) + (done / total) * (uploadProgress.total ? 20 : 80)) : 0)
     : phase === 'diseno' ? 90 : phase === 'guardando' ? 97 : 100
   const copy = PHASE_COPY[phase]
 
@@ -239,7 +244,8 @@ export default function ResultPage() {
         </AnimatePresence>
       </div>
       <p className="mt-3 text-white/55">
-        {phase === 'fotos' && total ? `${copy.sub} · ${done} de ${total}` : copy.sub}
+        {phase === 'subiendo' && uploadProgress.total ? `${copy.sub} · ${uploadProgress.completed} de ${uploadProgress.total}`
+          : phase === 'fotos' && total ? `${copy.sub} · ${done} de ${total}` : copy.sub}
       </p>
       <div className="mx-auto mt-10 h-[2px] w-full max-w-sm overflow-hidden rounded bg-white/10">
         <motion.div className="h-full bg-[var(--brand-coral)]" animate={{ width: `${pct}%` }} transition={{ ease: 'easeOut', duration: 0.4 }} />

@@ -6,6 +6,7 @@ import ContinueButton from "@/components/create/ContinueButton";
 import CoverPage from "@/core/modules/viewer/pages/CoverPage";
 import { getDefaultTemplate } from "@/core/modules/cover/coverTemplates";
 import { occasionFromStory, titleForOccasion } from "@/core/engine/buildPixiaBook";
+import { readPhotoAnalysis, type PhotoAnalysisEntry } from "@/core/modules/upload/photoSession";
 import type { CoverConfig, OccasionType, PhotoAsset } from "@/core/contracts/AlbumBlueprint";
 
 /**
@@ -24,70 +25,61 @@ const PLACEHOLDERS: Record<string, { subtitle: string; date: string }> = {
   other: { subtitle: "La familia Rojas", date: "2026" },
 };
 
-interface AnalysisEntry {
-  originalIndex: number;
-  width?: number;
-  height?: number;
-  score?: { finalScore?: number } | null;
-}
-
-function readAnalysis(): AnalysisEntry[] {
-  try {
-    const raw = localStorage.getItem("pixia_photo_analysis");
-    return raw ? (JSON.parse(raw) as AnalysisEntry[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 export default function Step3Cover() {
   const { state, dispatch } = useWizard();
   const story = state.storyType ?? "other";
   const occasion = occasionFromStory(story) as OccasionType;
   const ph = PLACEHOLDERS[story] ?? PLACEHOLDERS.other;
 
-  // Análisis del paso 2 (dimensiones y score de cada foto). Se lee una vez.
-  const [analysis] = useState<AnalysisEntry[]>(() => (typeof window === "undefined" ? [] : readAnalysis()));
-  const byIndex = useMemo(() => new Map(analysis.map((a) => [a.originalIndex, a])), [analysis]);
+  // Análisis del paso 2 (dimensiones, score, miniatura), por id de foto. Se lee una vez.
+  const [analysis] = useState<Map<string, PhotoAnalysisEntry>>(() =>
+    typeof window === "undefined" ? new Map() : readPhotoAnalysis(),
+  );
 
-  // Candidatas a portada: primero las marcadas con ★, después las de mejor score.
-  const candidates = useMemo(() => {
-    const idx = state.photos.map((_, i) => i);
-    const score = (i: number) => byIndex.get(i)?.score?.finalScore ?? 0;
-    return idx
-      .sort((a, b) => Number(state.photos[b].priority) - Number(state.photos[a].priority) || score(b) - score(a))
-      .slice(0, 8);
-  }, [state.photos, byIndex]);
+  // TODAS las fotos como opción de portada: primero las ★, después las de mejor score.
+  const ordered = useMemo(() => {
+    const score = (id: string) => analysis.get(id)?.score?.finalScore ?? 0;
+    return [...state.photos].sort(
+      (a, b) => Number(b.priority) - Number(a.priority) || score(b.id) - score(a.id),
+    );
+  }, [state.photos, analysis]);
 
-  const cover = state.cover ?? {
-    title: titleForOccasion(story),
-    subtitle: "",
-    date: "",
-    photoIndex: candidates[0] ?? 0,
-  };
+  const validId = (id?: string) => !!id && state.photos.some((p) => p.id === id);
+  const cover = state.cover && validId(state.cover.photoId)
+    ? state.cover
+    : {
+        title: state.cover?.title ?? titleForOccasion(story),
+        subtitle: state.cover?.subtitle ?? "",
+        date: state.cover?.date ?? "",
+        photoId: ordered[0]?.id ?? "",
+      };
   useEffect(() => {
-    if (!state.cover) dispatch({ type: "SET_COVER", payload: cover });
-    // solo la primera vez: deja la portada por defecto en el estado
+    // Deja la portada por defecto en el estado (o la corrige si la foto elegida se quitó).
+    if (!state.cover || state.cover.photoId !== cover.photoId) dispatch({ type: "SET_COVER", payload: cover });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cover.photoId]);
   const update = (patch: Partial<typeof cover>) => dispatch({ type: "SET_COVER", payload: { ...cover, ...patch } });
 
-  // URLs locales de las miniaturas (se liberan al salir del paso).
-  const urls = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const i of new Set([...candidates, cover.photoIndex])) {
-      const f = state.photos[i]?.file;
-      if (f) map.set(i, URL.createObjectURL(f));
+  // Tapa en vivo: el archivo original de la foto elegida (una sola URL local).
+  const coverFile = state.photos.find((p) => p.id === cover.photoId)?.file;
+  const coverUrl = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : ""), [coverFile]);
+  useEffect(() => () => { if (coverUrl) URL.revokeObjectURL(coverUrl); }, [coverUrl]);
+
+  // Grilla: miniaturas livianas del análisis; si alguna falta, URL local del archivo.
+  const thumbs = useMemo(() => {
+    const map = new Map<string, { url: string; local: boolean }>();
+    for (const p of state.photos) {
+      const t = analysis.get(p.id)?.thumbnail;
+      map.set(p.id, t ? { url: t, local: false } : { url: URL.createObjectURL(p.file), local: true });
     }
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidates, state.photos]);
-  useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls]);
+  }, [state.photos, analysis]);
+  useEffect(() => () => thumbs.forEach((t) => t.local && URL.revokeObjectURL(t.url)), [thumbs]);
 
-  const meta = byIndex.get(cover.photoIndex);
+  const meta = analysis.get(cover.photoId);
   const photo = {
     id: "cover-preview",
-    url: urls.get(cover.photoIndex) ?? "",
+    url: coverUrl,
     width: meta?.width ?? 0,
     height: meta?.height ?? 0,
   } as PhotoAsset;
@@ -143,16 +135,20 @@ export default function Step3Cover() {
               placeholder={ph.date} onChange={(e) => update({ date: e.target.value })} />
           </label>
 
-          {candidates.length > 1 && (
+          {ordered.length > 1 && (
             <div>
-              <span className="mb-2 block text-sm text-white/70">Foto de portada</span>
-              <div className="grid grid-cols-4 gap-2">
-                {candidates.map((i) => (
-                  <button key={i} type="button" onClick={() => update({ photoIndex: i })}
-                    aria-label={`Usar la foto ${i + 1} como portada`} aria-pressed={cover.photoIndex === i}
-                    className={`aspect-square overflow-hidden rounded-lg ring-2 ring-offset-2 ring-offset-[var(--bg-base)] transition ${cover.photoIndex === i ? "ring-[var(--brand-coral)]" : "ring-transparent opacity-70 hover:opacity-100"}`}>
+              <span className="mb-2 flex items-baseline justify-between text-sm text-white/70">
+                Foto de portada
+                <span className="text-xs text-white/35">{ordered.length} fotos</span>
+              </span>
+              <div className="grid max-h-[288px] grid-cols-4 gap-2 overflow-y-auto overscroll-contain p-1 sm:grid-cols-5">
+                {ordered.map((p, n) => (
+                  <button key={p.id} type="button" onClick={() => update({ photoId: p.id })}
+                    aria-label={`Usar la foto ${n + 1} como portada`} aria-pressed={cover.photoId === p.id}
+                    className={`relative aspect-square overflow-hidden rounded-lg ring-2 ring-offset-2 ring-offset-[var(--bg-base)] transition ${cover.photoId === p.id ? "ring-[var(--brand-coral)]" : "ring-transparent opacity-70 hover:opacity-100"}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={urls.get(i)} alt="" className="h-full w-full object-cover" />
+                    <img src={thumbs.get(p.id)?.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    {p.priority && <span aria-hidden className="absolute right-1 top-1 text-[11px] drop-shadow">★</span>}
                   </button>
                 ))}
               </div>
