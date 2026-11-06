@@ -4,7 +4,7 @@ const steps = [
   {
     number: '01',
     title: 'Sube tus fotos',
-    description: 'Selecciona entre 5 y 30 fotos desde tu dispositivo. Arrastra para definir el orden.',
+    description: 'Elige entre 15 y 100 fotos desde tu celular o computador. Pixia las ordena por ti.',
   },
   {
     number: '02',

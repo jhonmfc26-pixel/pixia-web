@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getAdmin } from '@/lib/admin/auth'
-import './admin.css'
 
 export const metadata: Metadata = {
   title: 'Pixia · Admin',
@@ -16,7 +15,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   if (!admin) notFound()
 
   return (
-    <div className="pixia-admin min-h-screen bg-[var(--bg-base)]">
+    <div className="min-h-screen bg-[var(--bg-base)]">
       <header className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--bg-base)]/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <a href="/admin" className="flex items-baseline gap-2">
