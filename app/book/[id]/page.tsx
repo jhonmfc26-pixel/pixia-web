@@ -53,6 +53,7 @@ export default function BookPage() {
 
   // ── Carga del blueprint ────────────────────────────────────────────────────
   const [book, setBook] = useState<AlbumBlueprint | null>(null)
+  const adminView = searchParams.get('admin') === '1'
 
   useEffect(() => {
     async function loadBook() {
@@ -68,14 +69,22 @@ export default function BookPage() {
 
       try {
         const raw = localStorage.getItem('pixia_books')
-        if (!raw) return
-        const books = JSON.parse(raw)
-        const b = books[id]
-        if (b) setBook(normalizeBook(b, id))
+        const b = raw ? JSON.parse(raw)[id] : null
+        if (b) { setBook(normalizeBook(b, id)); return }
       } catch (e) { console.error('[Viewer] localStorage:', e) }
+
+      // Abierto desde el portal admin (/book/[id]?admin=1): el admin no es el
+      // dueño, así que carga por la API admin (protegida con Cloudflare Access).
+      if (adminView) {
+        try {
+          const res = await fetch(`/api/admin/blueprint/${encodeURIComponent(id)}`, { cache: 'no-store' })
+          if (res.ok) setBook(normalizeBook(await res.json(), id))
+          else console.warn('[Viewer] admin load:', res.status)
+        } catch (e) { console.warn('[Viewer] admin load:', e) }
+      }
     }
     loadBook()
-  }, [id])
+  }, [id, adminView])
 
   // ── Estructura ─────────────────────────────────────────────────────────────
   const structureInitialized = useRef(false)

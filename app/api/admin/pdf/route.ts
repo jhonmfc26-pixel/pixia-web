@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const url = await signPdfDownloadUrl(key)
   if (!url) {
     console.error('[admin/pdf] Falta PDF_CONTAINER_URL o PDF_CONTAINER_SECRET')
-    return new NextResponse('Descargas no configuradas (PDF_CONTAINER_URL / PDF_CONTAINER_SECRET)', { status: 500 })
+    return new NextResponse('Descargas no configuradas: faltan PDF_CONTAINER_URL y/o PDF_CONTAINER_SECRET en las variables de Cloudflare Pages (y redesplegar).', { status: 500 })
   }
   return NextResponse.redirect(url, 302)
 }
