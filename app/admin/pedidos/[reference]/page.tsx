@@ -9,7 +9,8 @@ export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 const FLASH: Record<string, { tone: 'ok' | 'bad'; text: string }> = {
-  reencolado: { tone: 'ok', text: 'PDF encolado de nuevo. El barrido lo toma en máximo 5 minutos.' },
+  reencolado: { tone: 'ok', text: 'Regenerando el PDF — tarda alrededor de un minuto. Recarga la página para ver el estado.' },
+  'reencolado-cola': { tone: 'ok', text: 'PDF encolado de nuevo. El barrido automático lo toma en máximo 5 minutos.' },
 }
 
 function Step({ label, at, done, last }: { label: string; at: string | null; done: boolean; last?: boolean }) {
@@ -104,7 +105,7 @@ export default async function AdminOrderPage({
                   </button>
                 </form>
               )}
-              {order.book_id && <ButtonLink href={`/book/${order.book_id}`}>Ver álbum</ButtonLink>}
+              {order.book_id && <ButtonLink href={`/book/${order.book_id}?admin=1`}>Ver álbum</ButtonLink>}
             </div>
           )}
         </Card>
