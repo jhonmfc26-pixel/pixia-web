@@ -1,6 +1,6 @@
 import Hero from "@/components/home/Hero";
 import HowItWorks from "@/components/home/HowItWorks";
-import ExampleAlbums from "@/components/home/ExampleAlbums";
+import Showcase from "@/components/home/Showcase";
 import Features from "@/components/home/Features";
 import Pricing from "@/components/home/Pricing";
 import CTA from "@/components/home/CTA";
@@ -41,7 +41,7 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
       <Header />
       <Hero />
-      <ExampleAlbums />
+      <Showcase />
       <HowItWorks />
       <Features />
       <Pricing />
