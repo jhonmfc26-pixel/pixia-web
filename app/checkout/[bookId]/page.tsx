@@ -640,7 +640,7 @@ export default function CheckoutPage() {
                 Pago seguro con Wompi · Tarjeta, PSE, Nequi
               </p>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 6, textAlign: 'center', lineHeight: 1.6 }}>
-                Entrega en {COMMERCIAL.deliveryLabel} · Cancelación con devolución total antes de que entre a impresión ·{' '}
+                Producción en {COMMERCIAL.productionBusinessDays} días hábiles + envío ({COMMERCIAL.shippingLabel}) · Cancelación con devolución total antes de que entre a impresión ·{' '}
                 <a href="/terminos#garantia" target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>Garantía de {COMMERCIAL.warrantyMonths} meses</a>
               </p>
             </div>

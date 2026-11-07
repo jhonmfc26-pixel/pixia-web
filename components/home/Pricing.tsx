@@ -3,13 +3,19 @@
 import Reveal from '@/components/ui/Reveal'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
+import { PRICING } from '@/lib/wompi'
+import { COMMERCIAL } from '@/lib/legal'
+
+// Mismos valores que se cobran en el checkout (antes la home decía $250.000 a mano).
+const cop = (n: number) => '$' + n.toLocaleString('es-CO')
 
 const includes = [
-  '20 páginas incluidas (10 spreads)',
+  `${PRICING.pagesIncluded} páginas incluidas (${PRICING.pagesIncluded / 2} spreads)`,
   'Tapa dura premium con foto y texto',
   'Impresión de alta calidad en papel grueso',
   'Diseño editorial decidido por Pixia',
-  'Envío a tu puerta en Colombia',
+  `Producción en ${COMMERCIAL.productionBusinessDays} días hábiles`,
+  PRICING.shippingCop === 0 ? 'Envío gratis a tu puerta en Colombia' : 'Envío a tu puerta en Colombia',
 ]
 
 export default function Pricing() {
@@ -87,7 +93,7 @@ export default function Pricing() {
                   color: 'var(--text-primary)',
                   letterSpacing: '-0.02em',
                 }}>
-                  $250.000
+                  {cop(PRICING.basePriceCop)}
                 </span>
                 <span style={{
                   fontSize: '14px',
@@ -103,7 +109,7 @@ export default function Pricing() {
                 marginTop: '8px',
                 fontWeight: 300,
               }}>
-                Páginas extra: $8.000 c/u (desde la página 21)
+                Páginas extra: {cop(PRICING.extraPagePriceCop)} c/u (desde la página {PRICING.pagesIncluded + 1})
               </p>
             </div>
 
