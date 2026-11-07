@@ -23,7 +23,8 @@ const COLS: { title: string; links: { label: string; href: string; external?: bo
       { label: 'Mis álbumes', href: '/mis-albumes' },
       { label: LEGAL_ENTITY.email, href: `mailto:${LEGAL_ENTITY.email}`, external: true },
       { label: 'Garantía y devoluciones', href: '/terminos#garantia' },
-      { label: 'Peticiones, quejas y reclamos', href: '/terminos#pqr' },
+      { label: 'Peticiones, quejas y reclamos', href: '/soporte' },
+      { label: 'Consultar un radicado', href: '/soporte/seguimiento' },
     ],
   },
   {

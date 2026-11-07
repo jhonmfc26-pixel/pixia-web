@@ -119,7 +119,7 @@ export default function TerminosPage() {
         </p>
         <p>
           Aun así, <Strong>puedes cancelar tu pedido y recibir la devolución total</Strong> mientras no haya entrado a impresión (el estado lo ves en tu álbum y en los correos).
-          Escríbenos a <a className="underline" href={`mailto:${email}`}>{email}</a> con tu número de orden. Devolvemos el dinero por el mismo medio de pago en máximo {COMMERCIAL.refundCalendarDays} días calendario.
+          Radica la solicitud en <Link className="underline" href="/soporte?tipo=cancelacion">pixiaa.com/soporte</Link> (o escríbenos a <a className="underline" href={`mailto:${email}`}>{email}</a>) con tu número de orden. Devolvemos el dinero por el mismo medio de pago en máximo {COMMERCIAL.refundCalendarDays} días calendario.
           Una vez que el álbum entra a impresión ya no es posible cancelarlo.
         </p>
       </Section>
@@ -135,7 +135,7 @@ export default function TerminosPage() {
           <>Daños del transporte (tapa golpeada, humedad, empaque roto): repórtalos dentro de los <Strong>{COMMERCIAL.transportDamageBusinessDays} días hábiles</Strong> siguientes a la entrega, con fotos del álbum y del empaque.</>,
         ]} />
         <p>
-          <Strong>Cómo la hacemos efectiva:</Strong> escríbenos a <a className="underline" href={`mailto:${email}`}>{email}</a> con tu número de orden y fotos del defecto. Te respondemos
+          <Strong>Cómo la hacemos efectiva:</Strong> radica una solicitud de garantía en <Link className="underline" href="/soporte?tipo=garantia">pixiaa.com/soporte</Link> con tu número de orden y envíanos fotos del defecto. Te respondemos
           en máximo {COMMERCIAL.pqrResponseBusinessDays} días hábiles. Si procede, <Strong>reimprimimos y te enviamos el álbum sin ningún costo</Strong>; si la reimpresión no es posible,
           te devolvemos el dinero. No es necesario que nos devuelvas el álbum defectuoso salvo que te lo pidamos (en ese caso, el envío corre por nuestra cuenta).
         </p>
@@ -194,9 +194,9 @@ export default function TerminosPage() {
 
       <Section id="pqr" n={14} title="Peticiones, quejas y reclamos">
         <p>
-          Escríbenos a <a className="underline" href={`mailto:${email}`}>{email}</a>{LEGAL_ENTITY.phone.startsWith('[') ? '' : <> o al {LEGAL_ENTITY.phone}</>} con tu nombre, número de orden
-          (si lo tienes) y tu solicitud. Te confirmamos el recibo con un <Strong>número de radicado, fecha y hora</Strong> para que puedas hacerle seguimiento, y te respondemos de fondo en
-          máximo {COMMERCIAL.pqrResponseBusinessDays} días hábiles.
+          Radica tu petición, queja o reclamo en <Link className="underline" href="/soporte">pixiaa.com/soporte</Link> (o escríbenos a <a className="underline" href={`mailto:${email}`}>{email}</a>{LEGAL_ENTITY.phone.startsWith('[') ? '' : <> o al {LEGAL_ENTITY.phone}</>}).
+          Al radicar recibes en tu correo un <Strong>número de radicado con fecha y hora</Strong>, y puedes consultar su estado en cualquier momento en{' '}
+          <Link className="underline" href="/soporte/seguimiento">pixiaa.com/soporte/seguimiento</Link>. Te respondemos de fondo en máximo {COMMERCIAL.pqrResponseBusinessDays} días hábiles.
         </p>
         <p>
           Si no quedas satisfecho con la respuesta, puedes acudir a la Superintendencia de Industria y Comercio (<a className="underline" href={SIC_URL} target="_blank" rel="noreferrer">www.sic.gov.co</a>).

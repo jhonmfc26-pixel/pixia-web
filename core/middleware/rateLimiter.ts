@@ -7,6 +7,7 @@ const LIMITS: Record<string, number> = {
   '/api/editorial': 5,
   '/api/upload': 120,
   '/api/orders': 10,
+  '/api/pqr': 5,
 }
 
 // En dev/build no hay contexto Cloudflare; getRequestContext() throws → null → sin rate limiting
