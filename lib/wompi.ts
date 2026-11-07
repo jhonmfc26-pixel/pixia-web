@@ -120,6 +120,14 @@ const PAGES_INCLUDED = 20
 const EXTRA_PAGE_PRICE_COP = 8_000 // por página adicional a las 20 incluidas
 const SHIPPING_COP = 0             // envío gratis, siempre incluido en el precio base
 
+/** Para mostrar en la web (términos, precios) — mismos valores que se cobran. */
+export const PRICING = {
+  basePriceCop: BASE_PRICE_COP,
+  pagesIncluded: PAGES_INCLUDED,
+  extraPagePriceCop: EXTRA_PAGE_PRICE_COP,
+  shippingCop: SHIPPING_COP,
+} as const
+
 /**
  * Calcula el precio total de un álbum a partir del número REAL de páginas
  * (ver countRealPages en foldModel/validate.ts) — nunca de un número que

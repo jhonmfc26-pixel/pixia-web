@@ -1,3 +1,4 @@
+import { TERMS_VERSION } from '@/lib/legal'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { generateIntegrityHash, calculateOrderTotal, generateOrderReference } from '@/lib/wompi'
@@ -15,6 +16,8 @@ interface CreateOrderRequest {
   bookSnapshot: unknown   // AlbumBlueprint completo
   sessionId?: string
   pagesTotal: number
+  /** Versión de los términos que el cliente aceptó en el checkout. */
+  termsVersion?: string
   customer: {
     email: string
     phone: string
@@ -56,6 +59,10 @@ export async function POST(req: NextRequest) {
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.customer.email)) {
       return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
+    }
+    // Aceptación expresa de los términos vigentes (no se cobra sin ella).
+    if (body.termsVersion !== TERMS_VERSION) {
+      return NextResponse.json({ error: 'Debes aceptar los términos y condiciones vigentes. Recarga la página e inténtalo de nuevo.' }, { status: 400 })
     }
 
     // Leer el blueprint existente UNA vez — sirve tanto para el chequeo de
@@ -130,6 +137,10 @@ export async function POST(req: NextRequest) {
         shipping_state: body.shipping.state,
         shipping_postal_code: body.shipping.postalCode || null,
         shipping_notes: body.shipping.notes || null,
+        // Constancia de la aceptación (supabase/orders_terminos.sql).
+        terms_version: TERMS_VERSION,
+        terms_accepted_at: new Date().toISOString(),
+        terms_accepted_ip: req.headers.get('cf-connecting-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
         base_price_cop: pricing.basePriceCop,
         pages_included: pricing.pagesIncluded,
         pages_total: realPageCount,

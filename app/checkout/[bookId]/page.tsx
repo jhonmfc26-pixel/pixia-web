@@ -11,6 +11,7 @@ import { calculateOrderTotal } from '@/lib/wompi'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { getLocalBook } from '@/core/engine/localBookStorage'
 import { isOrdered } from '@/core/modules/album/orderLock'
+import { COMMERCIAL, TERMS_VERSION } from '@/lib/legal'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import { countRealPages, countEmptyFaces } from '@/core/modules/foldModel/validate'
@@ -68,6 +69,9 @@ export default function CheckoutPage() {
   // Un álbum pagado queda congelado (es lo que se imprime): el cliente debe
   // confirmar que lo revisó antes de pagar.
   const [reviewed, setReviewed] = useState(false)
+  // Aceptación expresa de términos + autorización de datos (Ley 1480 / Ley 1581).
+  // Se guarda con la orden (versión, fecha, IP) como constancia.
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -233,7 +237,7 @@ export default function CheckoutPage() {
   // antes de dejar pasar a proceedToCheckout. Si el usuario ya confirmó una
   // vez en este intento, no se le vuelve a preguntar.
   const handleCheckout = () => {
-    if (!book || !structure || !pricing || !isFormValid() || !reviewed) return
+    if (!book || !structure || !pricing || !isFormValid() || !reviewed || !acceptedTerms) return
     if (emptyFacesCount > 0 && !emptyPagesAck) {
       setShowEmptyPagesModal(true)
       return
@@ -275,6 +279,7 @@ export default function CheckoutPage() {
           bookSnapshot: book,
           sessionId: localStorage.getItem('pixia_session_id') ?? '',
           pagesTotal: pricing.pagesTotal,
+          termsVersion: TERMS_VERSION,
           customer: { name: form.name, email: form.email, phone: form.phone },
           shipping: {
             address: form.address,
@@ -343,7 +348,7 @@ export default function CheckoutPage() {
     )
   }
 
-  const formValid = isFormValid() && reviewed
+  const formValid = isFormValid() && reviewed && acceptedTerms
 
   return (
     <>
@@ -436,6 +441,10 @@ export default function CheckoutPage() {
                   >
                     {otpSending ? 'Enviando...' : 'Enviar enlace'}
                   </button>
+                  <p style={{ marginTop: 12, fontSize: 11, lineHeight: 1.5, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+                    Usamos tu correo para tu cuenta y tu pedido, según nuestra{' '}
+                    <a href="/privacidad" target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>Política de datos personales</a>.
+                  </p>
                 </>
               ) : (
                 <>
@@ -601,6 +610,16 @@ export default function CheckoutPage() {
                     style={{ marginTop: 2, width: 16, height: 16, accentColor: '#E8553A', flexShrink: 0 }} />
                   Revisé mi álbum y entiendo que después de pagar no se puede modificar.
                 </label>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 10, fontSize: 13, color: 'rgba(255,255,255,0.85)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)}
+                    style={{ marginTop: 2, width: 16, height: 16, accentColor: '#E8553A', flexShrink: 0 }} />
+                  <span>
+                    Acepto los{' '}
+                    <a href="/terminos" target="_blank" rel="noreferrer" style={{ color: '#F08A72', textDecoration: 'underline' }}>Términos y condiciones</a>{' '}
+                    y autorizo el tratamiento de mis datos según la{' '}
+                    <a href="/privacidad" target="_blank" rel="noreferrer" style={{ color: '#F08A72', textDecoration: 'underline' }}>Política de datos personales</a>.
+                  </span>
+                </label>
               </div>
 
               <button
@@ -619,6 +638,10 @@ export default function CheckoutPage() {
 
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 12, textAlign: 'center', lineHeight: 1.5 }}>
                 Pago seguro con Wompi · Tarjeta, PSE, Nequi
+              </p>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 6, textAlign: 'center', lineHeight: 1.6 }}>
+                Entrega en {COMMERCIAL.deliveryLabel} · Cancelación con devolución total antes de que entre a impresión ·{' '}
+                <a href="/terminos#garantia" target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>Garantía de {COMMERCIAL.warrantyMonths} meses</a>
               </p>
             </div>
           </div>
