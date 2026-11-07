@@ -35,10 +35,11 @@ BEGIN
   END LOOP;
 END $$;
 
+-- OJO: NO se agrega un CHECK con la lista de estados. La orden se crea ANTES
+-- del pago y print_status toma el DEFAULT de la columna (p. ej. 'pending');
+-- un CHECK que no lo incluya rompe /api/orders/create con un 500 (pasó el
+-- 2026-11-06). Los estados válidos los controla el código (lib/orderStatus.ts).
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_print_status_check;
-ALTER TABLE orders ADD CONSTRAINT orders_print_status_check
-  CHECK (print_status IS NULL OR print_status IN ('paid', 'printing', 'shipped', 'delivered'))
-  NOT VALID; -- no revisa filas viejas (por si alguna quedó con otro valor); sí las nuevas
 
 -- Lo mismo para blueprints.status (el álbum del cliente refleja el estado).
 DO $$

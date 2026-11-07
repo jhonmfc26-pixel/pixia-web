@@ -175,7 +175,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                     <div><PdfTime o={o} /></div>
                     <div className="mt-1"><Downloads o={o} /></div>
                   </td>
-                  <td className="px-4 py-3">{o.order.payment_status === 'approved' ? <ShipBadge status={o.order.print_status} /> : <span className="text-[var(--text-tertiary)]">—</span>}</td>
+                  <td className="px-4 py-3">{o.order.payment_status === 'approved' ? <ShipBadge status={o.order.print_status ?? 'paid'} /> : <span className="text-[var(--text-tertiary)]">—</span>}</td>
                 </tr>
               )
             })}
