@@ -104,7 +104,7 @@ export default function TerminosPage() {
 
       <Section id="entrega" n={6} title="Producción y entrega">
         <List items={[
-          <>Enviamos a {COMMERCIAL.coverage}. El plazo de entrega es de <Strong>{COMMERCIAL.deliveryLabel}</Strong> contados desde la confirmación del pago, salvo que al comprar te informemos otro.</>,
+          <>Enviamos a {COMMERCIAL.coverage}. El plazo de entrega es de <Strong>{COMMERCIAL.deliveryLabel}</Strong> contados desde la confirmación del pago: <Strong>{COMMERCIAL.productionBusinessDays} días hábiles de producción</Strong> más el tiempo de la transportadora ({COMMERCIAL.shippingLabel}), salvo que al comprar te informemos otro.</>,
           <>Te avisamos por correo cuando tu álbum entra a impresión, cuando sale (con la transportadora y el número de guía) y cuando se entrega. También puedes ver el estado en tu álbum.</>,
           <>Revisa que la dirección sea correcta y completa. Si el envío no se puede entregar por una dirección errada o porque nadie lo recibe después de los intentos de la transportadora, coordinaremos contigo un nuevo envío; en ese caso el costo del reenvío corre por tu cuenta.</>,
           <>Si no cumplimos el plazo, puedes terminar la compra y te devolvemos todo lo pagado en máximo {COMMERCIAL.refundCalendarDays} días calendario, o esperar el álbum si lo prefieres.</>,

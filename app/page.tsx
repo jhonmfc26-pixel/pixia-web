@@ -6,6 +6,7 @@ import Pricing from "@/components/home/Pricing";
 import CTA from "@/components/home/CTA";
 import Footer from "@/components/home/Footer";
 import Header from '@/components/home/Header'
+import { PRICING } from '@/lib/wompi'
 
 // Datos estructurados para Google: quién es Pixia y qué vende (precio en COP).
 const JSON_LD = {
@@ -25,7 +26,7 @@ const JSON_LD = {
       brand: { '@type': 'Brand', name: 'Pixia' },
       offers: {
         '@type': 'Offer',
-        price: '250000',
+        price: String(PRICING.basePriceCop),
         priceCurrency: 'COP',
         availability: 'https://schema.org/InStock',
         areaServed: 'CO',
