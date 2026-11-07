@@ -71,8 +71,9 @@ export function ButtonLink({ href, children, variant = 'secondary' }: { href: st
 }
 
 /** Estado post-venta (impresión / envío). Solo para pedidos pagados. */
-export function ShipBadge({ status }: { status: string | null }) {
-  if (!isPrintStatus(status)) return <span className="text-[var(--text-tertiary)]">—</span>
+export function ShipBadge({ status: raw }: { status: string | null }) {
+  // Pagada pero con un estado fuera de la lista (DEFAULT de la columna): por imprimir.
+  const status = isPrintStatus(raw) ? raw : 'paid'
   const tone: Tone = status === 'delivered' ? 'ok' : status === 'shipped' ? 'info' : status === 'printing' ? 'info' : 'warn'
   const label = status === 'paid' ? 'Por imprimir' : PRINT_STATUS_ADMIN_LABEL[status]
   return <Badge tone={tone}>{label}</Badge>

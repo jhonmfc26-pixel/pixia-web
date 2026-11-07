@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendOrderStatusEmail } from '@/lib/email'
 import {
-  BLUEPRINT_STATUS_FOR, TIMESTAMP_COLUMN_FOR, canTransition, parseShipment,
+  BLUEPRINT_STATUS_FOR, TIMESTAMP_COLUMN_FOR, canTransition, isPrintStatus, parseShipment,
   type PrintStatus,
 } from '@/lib/orderStatus'
 import {
@@ -124,14 +124,17 @@ export async function updatePrintStatus(
   if (!found) return { ok: false, error: 'Orden no encontrada' }
   const { order } = found
   if (order.payment_status !== 'approved') return { ok: false, error: 'La orden no está pagada' }
-  if (!canTransition(order.print_status ?? 'paid', to)) {
+  // Una orden pagada con print_status fuera de la lista (el DEFAULT de la
+  // columna, p. ej. 'pending') cuenta como 'paid': pagada, por imprimir.
+  const from = isPrintStatus(order.print_status) ? order.print_status : 'paid'
+  if (!canTransition(from, to)) {
     return { ok: false, error: 'Ese cambio de estado no está permitido (solo se avanza: impresión → enviado → entregado).' }
   }
 
   const updates: Record<string, unknown> = { print_status: to }
   const tsCol = TIMESTAMP_COLUMN_FOR[to]
   // Corregir la guía de un pedido ya enviado no cambia la fecha de envío.
-  if (tsCol && !(to === 'shipped' && order.print_status === 'shipped')) updates[tsCol] = new Date().toISOString()
+  if (tsCol && !(to === 'shipped' && from === 'shipped')) updates[tsCol] = new Date().toISOString()
   if (to === 'shipped') {
     const parsed = parseShipment({ carrier: opts.carrier, trackingNumber: opts.trackingNumber, trackingUrl: opts.trackingUrl })
     if (!parsed.ok) return { ok: false, error: parsed.error }
