@@ -34,6 +34,43 @@ declare global {
   }
 }
 
+const WOMPI_WIDGET_SRC = 'https://checkout.wompi.co/widget.js'
+let wompiLoading: Promise<void> | null = null
+
+/**
+ * Asegura que el widget de Wompi esté cargado. El <Script> lo carga al abrir
+ * la página, pero en iPhone, después de cerrar el widget (o volver atrás),
+ * window.WidgetCheckout podía no estar al reintentar y el cliente veía
+ * "Wompi Widget no está cargado". Si falta, se inyecta el script de nuevo y
+ * se espera a que cargue.
+ */
+function ensureWompiWidget(timeoutMs = 15000): Promise<void> {
+  if (window.WidgetCheckout) return Promise.resolve()
+  if (wompiLoading) return wompiLoading
+  wompiLoading = new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = WOMPI_WIDGET_SRC
+    script.async = true
+    const timer = window.setTimeout(() => reject(new Error('timeout')), timeoutMs)
+    script.onload = () => {
+      window.clearTimeout(timer)
+      if (window.WidgetCheckout) resolve()
+      else reject(new Error('widget sin WidgetCheckout'))
+    }
+    script.onerror = () => { window.clearTimeout(timer); reject(new Error('error de red')) }
+    document.head.appendChild(script)
+  }).finally(() => { wompiLoading = null })
+  return wompiLoading
+}
+
+/** Orden creada en este intento: si el cliente cierra el widget y vuelve a pagar, se reutiliza. */
+interface PendingOrder {
+  key: string
+  createdAt: number
+  data: { currency: string; amountInCents: number; reference: string; publicKey: string; integrityHash: string }
+}
+const ORDER_REUSE_MS = 30 * 60 * 1000
+
 interface FormData {
   name: string
   email: string
@@ -73,6 +110,15 @@ export default function CheckoutPage() {
   // Se guarda con la orden (versión, fecha, IP) como constancia.
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const pendingOrder = useRef<PendingOrder | null>(null)
+
+  // iPhone restaura la página desde caché al volver atrás (bfcache): el botón
+  // quedaba en "Procesando…" para siempre.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) setSubmitting(false) }
+    window.addEventListener('pageshow', onShow)
+    return () => window.removeEventListener('pageshow', onShow)
+  }, [])
 
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [otpSending, setOtpSending] = useState(false)
@@ -265,37 +311,58 @@ export default function CheckoutPage() {
     setSubmitError(null)
 
     try {
-      const { data: { session: activeSession } } = await supabaseBrowser.auth.getSession()
-      const orderHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (activeSession?.access_token) {
-        orderHeaders['Authorization'] = `Bearer ${activeSession.access_token}`
+      // Primero el widget: si no carga, no se crea una orden que nunca se va a pagar.
+      try {
+        await ensureWompiWidget()
+      } catch (e) {
+        console.error('[checkout] Wompi no cargó:', e)
+        throw new Error('No pudimos abrir la pasarela de pago. Revisa tu conexión e inténtalo de nuevo.')
       }
 
-      const res = await fetch('/api/orders/create', {
-        method: 'POST',
-        headers: orderHeaders,
-        body: JSON.stringify({
-          bookId,
-          bookSnapshot: book,
-          sessionId: localStorage.getItem('pixia_session_id') ?? '',
-          pagesTotal: pricing.pagesTotal,
-          termsVersion: TERMS_VERSION,
-          customer: { name: form.name, email: form.email, phone: form.phone },
-          shipping: {
-            address: form.address,
-            city: form.city,
-            state: form.state,
-            postalCode: form.postalCode || undefined,
-            notes: form.notes || undefined,
-          },
-        }),
-      })
+      // Misma orden si el cliente cerró el widget y vuelve a pagar sin cambiar nada
+      // (antes cada intento creaba otra orden pendiente).
+      const orderKey = JSON.stringify({ bookId, pages: pricing.pagesTotal, total: pricing.totalCop, form })
+      const reusable = pendingOrder.current
+        && pendingOrder.current.key === orderKey
+        && Date.now() - pendingOrder.current.createdAt < ORDER_REUSE_MS
+      let data: PendingOrder['data']
+      if (reusable) {
+        data = pendingOrder.current!.data
+      } else {
+        const { data: { session: activeSession } } = await supabaseBrowser.auth.getSession()
+        const orderHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (activeSession?.access_token) {
+          orderHeaders['Authorization'] = `Bearer ${activeSession.access_token}`
+        }
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al crear la orden')
+        const res = await fetch('/api/orders/create', {
+          method: 'POST',
+          headers: orderHeaders,
+          body: JSON.stringify({
+            bookId,
+            bookSnapshot: book,
+            sessionId: localStorage.getItem('pixia_session_id') ?? '',
+            pagesTotal: pricing.pagesTotal,
+            termsVersion: TERMS_VERSION,
+            customer: { name: form.name, email: form.email, phone: form.phone },
+            shipping: {
+              address: form.address,
+              city: form.city,
+              state: form.state,
+              postalCode: form.postalCode || undefined,
+              notes: form.notes || undefined,
+            },
+          }),
+        })
+
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Error al crear la orden')
+        data = json
+        pendingOrder.current = { key: orderKey, createdAt: Date.now(), data }
+      }
 
       if (!window.WidgetCheckout) {
-        throw new Error('Wompi Widget no está cargado. Recarga la página.')
+        throw new Error('No pudimos abrir la pasarela de pago. Recarga la página e inténtalo de nuevo.')
       }
 
       const checkout = new window.WidgetCheckout({
@@ -315,6 +382,8 @@ export default function CheckoutPage() {
 
       checkout.open((result) => {
         if (result?.transaction) {
+          // La referencia ya tiene una transacción: no se puede reutilizar.
+          pendingOrder.current = null
           router.push(`/checkout/success?ref=${data.reference}`)
         } else {
           console.log('[checkout] Widget cerrado sin transacción')
