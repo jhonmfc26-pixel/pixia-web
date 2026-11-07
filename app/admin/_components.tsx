@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { PAYMENT_LABEL, PDF_STATE_LABEL, type PdfState } from '@/lib/admin/model'
 import { PRINT_STATUS_ADMIN_LABEL, isPrintStatus } from '@/lib/orderStatus'
+import { bogotaDate, businessDaysUntil } from '@/lib/businessDays'
 
 type Tone = 'ok' | 'warn' | 'bad' | 'info' | 'muted'
 
@@ -76,3 +77,13 @@ export function ShipBadge({ status }: { status: string | null }) {
   const label = status === 'paid' ? 'Por imprimir' : PRINT_STATUS_ADMIN_LABEL[status]
   return <Badge tone={tone}>{label}</Badge>
 }
+
+/** Días hábiles para el vencimiento, con color según urgencia. */
+export function DueBadge({ due, status }: { due: string; status: string }) {
+  if (status === 'respondido') return <span className="text-[var(--text-tertiary)]">—</span>
+  const left = businessDaysUntil(bogotaDate(), new Date(`${due}T00:00:00Z`))
+  const tone: Tone = left < 0 ? 'bad' : left <= 3 ? 'warn' : 'muted'
+  const text = left < 0 ? `Vencido hace ${-left} d. háb.` : left === 0 ? 'Vence hoy' : `${left} d. háb.`
+  return <Badge tone={tone}>{text}</Badge>
+}
+

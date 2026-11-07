@@ -127,7 +127,7 @@ export default function PrivacidadPage() {
 
       <Section id="procedimiento" n={9} title="Cómo ejercer tus derechos">
         <p>
-          Escríbenos a <a className="underline" href={`mailto:${email}`}>{email}</a> desde el correo de tu cuenta (o demostrando que eres el titular o su representante), indicando
+          Radica tu consulta o reclamo en <Link className="underline" href="/soporte?tipo=datos_consulta">pixiaa.com/soporte</Link> (o escríbenos a <a className="underline" href={`mailto:${email}`}>{email}</a>) desde el correo de tu cuenta (o demostrando que eres el titular o su representante), indicando
           qué necesitas. Te confirmamos el recibo con un número de radicado.
         </p>
         <List items={[

@@ -295,3 +295,97 @@ export async function sendOrderStatusEmail(d: StatusEmailData): Promise<{ ok: bo
     return { ok: false, error: msg }
   }
 }
+
+// ── PQR (peticiones, quejas y reclamos) ────────────────────────────────────
+
+export interface PqrEmailData {
+  radicado: string
+  name: string
+  email: string
+  typeLabel: string
+  createdAtLabel: string   // fecha y hora de radicación (Bogotá)
+  dueDateLabel: string     // fecha límite de respuesta
+  message: string
+  response?: string | null
+}
+
+function pqrShell(title: string, inner: string): string {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${esc(title)} · Pixia</title></head>
+<body style="margin:0;padding:0;background:#0f0f0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#fff;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0f0f0f;"><tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#1a1a1a;border-radius:16px;overflow:hidden;">
+<tr><td style="padding:40px 32px;">
+<div style="font-size:11px;letter-spacing:0.3em;color:rgba(255,255,255,0.5);text-align:center;">PIXIA</div>
+<h1 style="margin:20px 0 16px 0;font-family:Georgia,serif;font-size:26px;font-weight:400;color:#fff;text-align:center;">${esc(title)}</h1>
+${inner}
+</td></tr></table></td></tr></table></body></html>`
+}
+
+const pre = (s: string) => esc(s).replace(/\n/g, '<br>')
+
+/** Constancia de radicación para el cliente. Puro, para poder probarlo. */
+export function buildPqrReceiptEmail(d: PqrEmailData, opts: { siteUrl?: string } = {}) {
+  const site = (opts.siteUrl ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pixiaa.com').replace(/\/$/, '')
+  const track = `${site}/soporte/seguimiento?radicado=${encodeURIComponent(d.radicado)}`
+  const row = (k: string, v: string, mono = false) =>
+    `<tr><td style="padding:6px 0;font-size:14px;color:rgba(255,255,255,0.6);">${k}</td><td align="right" style="padding:6px 0;font-size:14px;color:#fff;${mono ? 'font-family:monospace;' : ''}">${esc(v)}</td></tr>`
+  const html = pqrShell('Recibimos tu solicitud', `
+<p style="font-size:15px;line-height:1.6;color:rgba(255,255,255,0.75);margin:0 0 20px 0;">Hola ${esc(d.name.split(' ')[0])}, quedó radicada con estos datos. Guárdalos para hacerle seguimiento.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px 18px;">
+${row('Número de radicado', d.radicado, true)}${row('Fecha y hora', d.createdAtLabel)}${row('Tipo', d.typeLabel)}${row('Respuesta a más tardar', d.dueDateLabel)}
+</table>
+<p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,0.55);margin:20px 0 6px 0;">Tu mensaje:</p>
+<p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,0.8);margin:0;padding:12px 16px;border-left:2px solid #E8553A;background:rgba(255,255,255,0.02);">${pre(d.message)}</p>
+<p style="text-align:center;margin:28px 0 8px 0;"><a href="${esc(track)}" style="display:inline-block;background:#E8553A;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:15px;">Ver el estado</a></p>
+<p style="font-size:12px;line-height:1.6;color:rgba(255,255,255,0.45);text-align:center;margin:16px 0 0 0;">Si necesitas agregar fotos o información, responde este correo indicando tu número de radicado.</p>`)
+  const text = [
+    'Recibimos tu solicitud', '',
+    `Número de radicado: ${d.radicado}`, `Fecha y hora: ${d.createdAtLabel}`, `Tipo: ${d.typeLabel}`, `Respuesta a más tardar: ${d.dueDateLabel}`,
+    '', 'Tu mensaje:', d.message, '', `Ver el estado: ${track}`,
+    'Si necesitas agregar fotos o información, responde este correo indicando tu número de radicado.',
+  ].join('\n')
+  return { subject: `Radicado ${d.radicado} · Recibimos tu solicitud`, html, text }
+}
+
+/** Respuesta de fondo al cliente. */
+export function buildPqrResponseEmail(d: PqrEmailData) {
+  const html = pqrShell('Respuesta a tu solicitud', `
+<p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,0.6);margin:0 0 18px 0;text-align:center;">Radicado <span style="font-family:monospace;color:#fff;">${esc(d.radicado)}</span> · ${esc(d.typeLabel)}</p>
+<p style="font-size:15px;line-height:1.7;color:rgba(255,255,255,0.85);margin:0;">Hola ${esc(d.name.split(' ')[0])},</p>
+<p style="font-size:15px;line-height:1.7;color:rgba(255,255,255,0.85);margin:12px 0 0 0;">${pre(d.response ?? '')}</p>
+<p style="font-size:12px;line-height:1.6;color:rgba(255,255,255,0.45);margin:28px 0 0 0;">Si no estás de acuerdo con esta respuesta, puedes responder este correo o acudir a la Superintendencia de Industria y Comercio (www.sic.gov.co).</p>`)
+  const text = [`Radicado ${d.radicado} · ${d.typeLabel}`, '', `Hola ${d.name.split(' ')[0]},`, '', d.response ?? '', '',
+    'Si no estás de acuerdo con esta respuesta, puedes responder este correo o acudir a la Superintendencia de Industria y Comercio (www.sic.gov.co).'].join('\n')
+  return { subject: `Respuesta a tu solicitud ${d.radicado}`, html, text }
+}
+
+async function sendRaw(to: string | string[], m: { subject: string; html: string; text: string }, replyTo?: string) {
+  const from = process.env.EMAIL_FROM || 'Pixia <onboarding@resend.dev>'
+  try {
+    const result = await resend.emails.send({ from, to, subject: m.subject, html: m.html, text: m.text, replyTo })
+    if (result.error) { console.error('[email] Resend error (pqr):', result.error); return { ok: false, error: result.error.message } }
+    return { ok: true as const }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[email] Exception (pqr):', msg)
+    return { ok: false, error: msg }
+  }
+}
+
+/** Constancia al cliente + aviso interno al equipo. Nunca lanza. */
+export async function sendPqrReceivedEmails(d: PqrEmailData) {
+  const customer = await sendRaw(d.email, buildPqrReceiptEmail(d), process.env.EMAIL_SUPPORT || undefined)
+  const team = (process.env.PQR_NOTIFY_EMAILS || process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim()).filter(Boolean)
+  if (team.length) {
+    await sendRaw(team, {
+      subject: `[PQR] ${d.typeLabel} · ${d.radicado} · vence ${d.dueDateLabel}`,
+      html: `<p><b>${esc(d.typeLabel)}</b> de ${esc(d.name)} (${esc(d.email)})</p><p>Radicado ${esc(d.radicado)} · ${esc(d.createdAtLabel)} · responder a más tardar el ${esc(d.dueDateLabel)}</p><p>${pre(d.message)}</p><p>Responder desde /admin/pqr</p>`,
+      text: `${d.typeLabel} de ${d.name} (${d.email})\nRadicado ${d.radicado} · ${d.createdAtLabel} · vence ${d.dueDateLabel}\n\n${d.message}\n\nResponder desde /admin/pqr`,
+    }, d.email)
+  }
+  return customer
+}
+
+export async function sendPqrResponseEmail(d: PqrEmailData) {
+  return sendRaw(d.email, buildPqrResponseEmail(d), process.env.EMAIL_SUPPORT || undefined)
+}

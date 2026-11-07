@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { headers } from 'next/headers'
@@ -22,7 +23,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             <span className="font-[family-name:var(--font-display)] text-xl">Pixia</span>
             <span className="text-xs uppercase tracking-widest text-[var(--text-secondary)]">Admin</span>
           </a>
-          <span className="truncate text-xs text-[var(--text-tertiary)]">{admin.email}</span>
+          <nav className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
+            <a href="/admin" className="hover:text-white">Pedidos</a>
+            <Link href="/admin/pqr" className="hover:text-white">PQR</Link>
+            <span className="hidden truncate text-xs text-[var(--text-tertiary)] sm:inline">{admin.email}</span>
+          </nav>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
