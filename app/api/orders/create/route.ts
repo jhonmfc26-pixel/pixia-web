@@ -2,6 +2,7 @@ import { TERMS_VERSION } from '@/lib/legal'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { generateIntegrityHash, calculateOrderTotal, generateOrderReference } from '@/lib/wompi'
+import { formatOfBook } from '@/lib/formats'
 import { rateLimit } from '@/core/middleware/rateLimiter'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
@@ -110,15 +111,23 @@ export async function POST(req: NextRequest) {
     //    derivarla del snapshot que manda el cliente — sigue siendo mucho
     //    más difícil de falsificar barato que un entero: tiene que ser una
     //    structure consistente (folds/faces bien formados).
+    const blueprintFromSnapshot = normalizeBook(body.bookSnapshot, body.bookId)
     if (!realStructure) {
-      const blueprintFromSnapshot = normalizeBook(body.bookSnapshot, body.bookId)
       realStructure = blueprintFromSnapshot.structure && validateAlbumStructure(blueprintFromSnapshot.structure).ok
         ? blueprintFromSnapshot.structure
         : foldsFromBlueprint(blueprintFromSnapshot).structure
     }
 
+    // Formato: el del álbum que se va a guardar e imprimir (el snapshot se
+    // persiste abajo con este mismo formato), así lo que se cobra y lo que
+    // se imprime nunca difieren. Un formato que todavía no se vende no se cobra.
+    const albumFormat = formatOfBook(blueprintFromSnapshot.format)
+    if (!albumFormat.available) {
+      return NextResponse.json({ error: `El formato ${albumFormat.sizeLabel} todavía no está disponible.` }, { status: 400 })
+    }
+
     const realPageCount = countRealPages(realStructure)
-    const pricing = calculateOrderTotal(realPageCount)
+    const pricing = calculateOrderTotal(realPageCount, albumFormat.id)
 
     const reference = generateOrderReference(body.bookId)
 

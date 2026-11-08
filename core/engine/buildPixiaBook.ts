@@ -1,6 +1,7 @@
 import { ActId, NarrativeTone, PixiaBook } from '../domain/PixiaBook'
 import type { PhotoOrientation, MeaningRegion } from '../contracts/AlbumBlueprint'
 import { classifyOrientation } from '../modules/album/photoGeometry'
+import { formatOfBook, type BlueprintFormat } from '@/lib/formats'
 
 export interface AlbumDraft {
   title?: string
@@ -26,6 +27,8 @@ export interface AlbumDraft {
     meaningRegions?: MeaningRegion[]
     contentHash?: string
   }[]
+  /** Formato elegido en el paso 1 (blueprint: '30x30' | '20x20' | 'a4'). */
+  format?: BlueprintFormat
   style?: string
   emotion?: string
   story?: string
@@ -209,7 +212,7 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
 // }
 
 /**
- * Ids del paso 1 (wedding, honeymoon, trip, anniversary, other) → ocasión de
+ * Ids del paso 1 (wedding, honeymoon, trip, anniversary, kids, other) → ocasión de
  * las plantillas de portada. Antes no se mapeaba y toda portada salía con la
  * plantilla de boda.
  */
@@ -219,6 +222,7 @@ export function occasionFromStory(story?: string): string {
     case 'honeymoon':
     case 'trip': return 'viaje'
     case 'anniversary': return 'aniversario'
+    case 'kids': return 'bebe-mensual'
     default: return 'familia'
   }
 }
@@ -229,6 +233,7 @@ export function titleForOccasion(story?: string): string {
   if (s === 'honeymoon')   return 'Nuestra luna de miel'
   if (s === 'trip')        return 'Nuestro viaje'
   if (s === 'anniversary') return 'Nuestra historia'
+  if (s === 'kids')        return 'Creciendo juntos'
   if (s.includes('boda') || s.includes('matrimonio') || s.includes('casamiento')) return 'Nuestra boda'
   if (s.includes('viaje') || s.includes('trip') || s.includes('vacacion'))         return 'Nuestro viaje'
   if (s.includes('beb') || s.includes('baby') || s.includes('nacimiento'))         return 'Nuestro bebé'
@@ -308,6 +313,7 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
       version: '2.1-engine',
     },
     occasion: occasionFromStory(draft.story),
+    format: formatOfBook(draft.format).blueprintFormat,
     cover: {
       title,
       subtitle: draft.subtitle?.trim() || undefined,
@@ -329,8 +335,8 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
       ],
     },
     physical: {
-      format: 'square',
-      size: '30x30cm',
+      format: formatOfBook(draft.format).id === '21x28' ? 'vertical' : 'square',
+      size: `${formatOfBook(draft.format).id}cm`,
       orientation: 'landscape',
       paper: 'premium-glossy',
       cover: 'hard-cover',

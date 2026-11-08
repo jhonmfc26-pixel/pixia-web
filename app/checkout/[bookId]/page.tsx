@@ -8,6 +8,7 @@ import Script from 'next/script'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
 import { calculateOrderTotal } from '@/lib/wompi'
+import { formatOfBook } from '@/lib/formats'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { getLocalBook } from '@/core/engine/localBookStorage'
 import { isOrdered } from '@/core/modules/album/orderLock'
@@ -231,10 +232,11 @@ export default function CheckoutPage() {
     [structure],
   )
 
+  const albumFormat = formatOfBook(book?.format)
   const pricing = useMemo(() => {
     if (realPageCount === null) return null
-    return { pagesTotal: realPageCount, ...calculateOrderTotal(realPageCount) }
-  }, [realPageCount])
+    return { pagesTotal: realPageCount, ...calculateOrderTotal(realPageCount, albumFormat.id) }
+  }, [realPageCount, albumFormat.id])
 
   const handleChange = (field: keyof FormData) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -641,7 +643,7 @@ export default function CheckoutPage() {
                 <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Álbum</p>
                 <p style={{ fontSize: 16, fontWeight: 500 }}>{book.cover?.title || 'Mi álbum'}</p>
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-                  {pricing?.pagesTotal || 0} páginas · Cuadrado 30×30 cm
+                  {albumFormat.name} {albumFormat.sizeLabel} · {pricing?.pagesTotal || 0} páginas
                 </p>
                 {emptyFacesCount > 0 && (
                   <p style={{ fontSize: 12, color: '#fbbf24', marginTop: 8 }}>
@@ -652,7 +654,7 @@ export default function CheckoutPage() {
 
               {pricing && (
                 <>
-                  <Row label="Precio base (20 páginas)" value={pricing.basePriceCop} />
+                  <Row label={`Álbum ${albumFormat.name.toLowerCase()} (hasta ${pricing.pagesIncluded} págs.)`} value={pricing.basePriceCop} />
                   {pricing.extraPages > 0 && (
                     <Row label={`Páginas extra (${pricing.extraPages})`} value={pricing.extraPagesPriceCop} />
                   )}

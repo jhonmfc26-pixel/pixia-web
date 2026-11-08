@@ -8,6 +8,8 @@ interface OrderConfirmationData {
   customerEmail: string
   totalCop: number
   pagesTotal: number
+  /** "Pequeño 20 × 20 cm" */
+  formatLabel: string
   shippingAddress: string
   shippingCity: string
   shippingState: string
@@ -76,7 +78,7 @@ export async function sendOrderConfirmation(data: OrderConfirmationData): Promis
                             <tr>
                               <td style="font-size:14px;color:rgba(255,255,255,0.7);">Álbum</td>
                               <td align="right" style="font-size:14px;color:#fff;">
-                                ${data.pagesTotal} páginas · 30×30 cm
+                                ${esc(data.formatLabel)} · ${data.pagesTotal} páginas
                               </td>
                             </tr>
                           </table>
@@ -152,7 +154,7 @@ Pedido confirmado
 Hola ${data.customerName}, recibimos tu pago.
 
 Número de orden: ${data.reference}
-Álbum: ${data.pagesTotal} páginas, 30×30 cm
+Álbum: ${data.formatLabel}, ${data.pagesTotal} páginas
 Total: ${formatCop(data.totalCop)}
 
 Envío a:

@@ -14,6 +14,8 @@ interface Order {
   created_at: string
   paid_at: string | null
   book_id: string | null
+  /** "Pequeño 20 × 20 cm" */
+  format_label?: string
 }
 
 export default function CheckoutSuccessPage() {
@@ -116,7 +118,7 @@ function CheckoutSuccessContent() {
 
       <dl className="mt-8 space-y-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 text-left text-sm">
         <Detail label="Número de orden" value={order.reference} mono />
-        <Detail label="Álbum" value={`${order.pages_total} páginas · Tapa dura 30 × 30 cm`} />
+        <Detail label="Álbum" value={`${order.format_label ?? 'Grande 30 × 30 cm'} · ${order.pages_total} páginas · Tapa dura`} />
         <Detail label="Total" value={formatCop(order.total_cop)} />
         <Detail label="Correo" value={order.customer_email_masked} />
       </dl>

@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { formatOfBook } from '@/lib/formats'
 import { notFound } from 'next/navigation'
 import { isAdminRequest } from '@/lib/admin/auth'
 import { getOrder } from '@/lib/admin/data'
@@ -95,6 +96,7 @@ export default async function AdminOrderPage({
   if (!o) notFound()
 
   const { order, job } = o
+  const fmt = formatOfBook(order.album_format)
   const flash = typeof sp.ok === 'string' ? FLASH[sp.ok] : typeof sp.error === 'string' ? { tone: 'bad' as const, text: sp.error } : null
   const ref = encodeURIComponent(order.reference)
   const isPaid = order.payment_status === 'approved'
@@ -112,7 +114,7 @@ export default async function AdminOrderPage({
         <PdfBadge state={o.pdf} />
         {needsAttention(o) && <Badge tone="bad">Requiere atención</Badge>}
       </div>
-      {o.albumTitle && <p className="-mt-4 text-[var(--text-secondary)]">{o.albumTitle}</p>}
+      <p className="-mt-4 text-[var(--text-secondary)]">{[o.albumTitle, `Álbum ${fmt.name.toLowerCase()} ${fmt.sizeLabel}`].filter(Boolean).join(' · ')}</p>
 
       {flash && (
         <div className={`rounded-lg border px-4 py-3 text-sm ${flash.tone === 'ok' ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200' : 'border-red-400/40 bg-red-500/10 text-red-200'}`}>
@@ -168,6 +170,7 @@ export default async function AdminOrderPage({
 
         <Card title="Pago">
           <dl>
+            <Field label="Formato"><span className="font-semibold">{fmt.name} {fmt.sizeLabel}</span></Field>
             <Field label="Base">{formatCop(order.base_price_cop)}</Field>
             <Field label="Páginas">{order.pages_total ?? '—'}{order.pages_included ? ` (incluye ${order.pages_included})` : ''}</Field>
             <Field label="Páginas extra">{formatCop(order.extra_pages_price_cop)}</Field>

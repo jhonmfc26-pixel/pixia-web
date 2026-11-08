@@ -13,8 +13,8 @@ const JSON_LD = {
       url: 'https://pixiaa.com',
       logo: 'https://pixiaa.com/icon.png',
     },
-    // Un producto por formato (mismos precios que la home).
-    ...FORMATS.map(f => ({
+    // Un producto por formato que ya se vende (mismos precios que la home).
+    ...FORMATS.filter(f => f.available).map(f => ({
       '@type': 'Product',
       name: `Álbum Pixia ${f.name} ${f.sizeLabel} tapa dura`,
       description: `Álbum de fotos impreso de tapa dura, ${f.sizeLabel}, diseñado automáticamente a partir de tus fotos. Ideal para ${f.use.toLowerCase()}.`,

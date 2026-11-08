@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { formatOfBook } from '@/lib/formats'
 import { supabaseAdmin } from '@/lib/supabase'
 import { validateWebhookSignature, fetchTransactionStatus } from '@/lib/wompi'
 import { sendOrderConfirmation } from '@/lib/email'
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
   if (newStatus === 'approved') {
     const { data: fullOrder } = await supabaseAdmin
       .from('orders')
-      .select('reference, customer_name, customer_email, total_cop, pages_total, shipping_address, shipping_city, shipping_state')
+      .select('reference, customer_name, customer_email, total_cop, pages_total, shipping_address, shipping_city, shipping_state, album_format:book_snapshot->>format')
       .eq('reference', verified.reference)
       .single()
 
@@ -194,6 +195,7 @@ export async function POST(req: NextRequest) {
           customerEmail: fullOrder.customer_email,
           totalCop: fullOrder.total_cop,
           pagesTotal: fullOrder.pages_total,
+          formatLabel: `${formatOfBook(fullOrder.album_format).name} ${formatOfBook(fullOrder.album_format).sizeLabel}`,
           shippingAddress: fullOrder.shipping_address,
           shippingCity: fullOrder.shipping_city,
           shippingState: fullOrder.shipping_state,

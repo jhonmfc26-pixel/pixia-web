@@ -3,12 +3,16 @@ import Link from 'next/link'
 import { LegalDoc, Section, List, Strong, EntityBlock } from '@/components/legal/LegalDoc'
 import { COMMERCIAL, LEGAL_ENTITY, SIC_URL } from '@/lib/legal'
 import { PRICING } from '@/lib/wompi'
+import { FORMATS } from '@/lib/formats'
 
 export const metadata: Metadata = {
   title: 'Términos y condiciones',
   description: 'Condiciones de uso y de compra de los álbumes impresos de Pixia: precio, entrega, cancelación, garantía y reclamos.',
   alternates: { canonical: '/terminos' },
 }
+
+const SELLABLE = FORMATS.filter(f => f.available)
+const sizesText = SELLABLE.map(f => `${f.name.toLowerCase()} de ${f.sizeLabel}`).join(' o ')
 
 const cop = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 
@@ -46,7 +50,7 @@ export default function TerminosPage() {
           <div className="mt-6 rounded-2xl border border-[rgba(232,85,58,0.25)] bg-[rgba(232,85,58,0.06)] p-5">
             <p className="mb-3 text-sm font-medium text-white">Lo esencial, en 30 segundos</p>
             <List items={[
-              <>Pixia diseña con tus fotos un álbum <Strong>impreso de tapa dura de 30 × 30 cm</Strong> y te lo envía a casa.</>,
+              <>Pixia diseña con tus fotos un álbum <Strong>impreso de tapa dura</Strong> ({sizesText}) y te lo envía a casa.</>,
               <>Antes de pagar <Strong>revisas y apruebas</Strong> la vista previa. Se imprime exactamente lo que apruebas: <Strong>después de pagar el álbum ya no se puede editar</Strong>.</>,
               <>Por ser un producto personalizado no aplica el derecho de retracto, pero <Strong>puedes cancelar con devolución total mientras tu pedido no haya entrado a impresión</Strong>.</>,
               <>Si llega con un defecto de impresión o encuadernación, o dañado por el transporte, <Strong>lo reimprimimos sin costo o te devolvemos el dinero</Strong>.</>,
@@ -73,7 +77,7 @@ export default function TerminosPage() {
 
       <Section id="servicio" n={3} title="Cómo funciona el servicio">
         <List items={[
-          <>Subes tus fotos y eliges el tipo de historia. Pixia las ordena y propone un diseño página por página usando herramientas automáticas (incluida inteligencia artificial). Puedes cambiar el diseño, el orden, la portada y los textos antes de pagar.</>,
+          <>Eliges el tipo de historia y el <Strong>tamaño del álbum</Strong> ({sizesText}), y subes tus fotos. El tamaño queda fijo al crear el álbum: si quieres otro, crea un álbum nuevo. Pixia las ordena y propone un diseño página por página usando herramientas automáticas (incluida inteligencia artificial). Puedes cambiar el diseño, el orden, la portada y los textos antes de pagar.</>,
           <><Strong>La vista previa es una representación digital.</Strong> Los colores en pantalla dependen del brillo y la calibración de cada dispositivo, por lo que el impreso puede verse ligeramente distinto. Los bordes de cada página tienen una pequeña zona de corte, por lo que una franja muy delgada del borde de las fotos a página completa puede quedar fuera.</>,
           <>Si una foto tiene baja resolución te lo advertimos cuando sea posible; si decides usarla, puede verse borrosa o pixelada en el impreso.</>,
           <>Los textos (título, nombres, fechas) se imprimen tal como los escribes. Revisa la ortografía antes de aprobar.</>,
@@ -82,7 +86,7 @@ export default function TerminosPage() {
 
       <Section id="aprobacion" n={4} title="Revisión y aprobación del álbum">
         <p>
-          Antes de pagar te mostramos el álbum completo y un resumen del pedido (páginas, precio total y dirección de entrega) para que puedas corregir cualquier
+          Antes de pagar te mostramos el álbum completo y un resumen del pedido (tamaño, páginas, precio total y dirección de entrega) para que puedas corregir cualquier
           error. Al marcar la casilla de revisión y pagar, <Strong>apruebas el contenido y el diseño</Strong> del álbum.
         </p>
         <p>
@@ -94,7 +98,7 @@ export default function TerminosPage() {
       <Section id="precio" n={5} title="Precio, pago y factura">
         <List items={[
           <>Los precios están en pesos colombianos e <Strong>incluyen los impuestos aplicables</Strong>. El precio total se muestra antes de pagar y es el único que se cobra.</>,
-          <>El precio base es de <Strong>{cop(PRICING.basePriceCop)}</Strong> e incluye hasta {PRICING.pagesIncluded} páginas. Cada página adicional cuesta {cop(PRICING.extraPagePriceCop)}. {PRICING.shippingCop === 0 ? <>El envío está <Strong>incluido</Strong>.</> : <>El envío cuesta {cop(PRICING.shippingCop)}.</>}</>,
+          <>El precio base depende del tamaño: {SELLABLE.map((f, i) => <span key={f.id}>{i > 0 && '; '}<Strong>{f.name.toLowerCase()} de {f.sizeLabel}, {cop(f.priceCop)}</Strong></span>)}. Cada uno incluye hasta {PRICING.pagesIncluded} páginas. Cada página adicional cuesta {cop(PRICING.extraPagePriceCop)}. {PRICING.shippingCop === 0 ? <>El envío está <Strong>incluido</Strong>.</> : <>El envío cuesta {cop(PRICING.shippingCop)}.</>}</>,
           <>Los pagos se procesan a través de Wompi (tarjeta, PSE, Nequi y los demás medios que muestre la pasarela). Pixia no recibe ni guarda los datos de tu tarjeta.</>,
           <>El pedido se confirma cuando la pasarela aprueba el pago; te enviamos un correo con el número de orden y el resumen.</>,
           <>Te enviamos la factura electrónica al correo que registraste.</>,

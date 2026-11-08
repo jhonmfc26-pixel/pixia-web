@@ -8,6 +8,8 @@ export interface PixiaBook {
   identity: { bookId: string; title: string; createdAt: string; version: string }
   /** Ocasión del álbum (boda, viaje, aniversario, familia...) — elige la plantilla de portada. */
   occasion?: string
+  /** Formato físico como lo guarda el blueprint: '30x30' | '20x20' | 'a4' (vertical). Sin valor = 30x30. normalizeBook lo lee como raw.format. */
+  format?: string
   /** Lo que el cliente escribió en el paso "Tu portada". normalizeBook lo lee como raw.cover. */
   cover?: { title: string; subtitle?: string; date?: string; photoId?: string }
   editorial: {

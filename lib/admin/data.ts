@@ -18,6 +18,8 @@ import {
 const ORDER_COLUMNS = [
   'id', 'reference', 'book_id', 'customer_name', 'customer_email', 'customer_phone',
   'shipping_address', 'shipping_city', 'shipping_state', 'shipping_postal_code', 'shipping_notes',
+  // Solo el formato del snapshot (no el álbum entero): qué tamaño imprimir.
+  'album_format:book_snapshot->>format',
   'base_price_cop', 'pages_included', 'pages_total', 'extra_pages_price_cop', 'shipping_cop', 'total_cop',
   'payment_status', 'print_status', 'wompi_transaction_id', 'wompi_payment_method', 'paid_at', 'created_at',
   'printing_at', 'shipped_at', 'delivered_at', 'shipping_carrier', 'tracking_number', 'tracking_url',
