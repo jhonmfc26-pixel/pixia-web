@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { formatOfBook, shortSize } from '@/lib/formats'
 import { notFound } from 'next/navigation'
 import { isAdminRequest } from '@/lib/admin/auth'
 import { listOrders } from '@/lib/admin/data'
@@ -116,7 +117,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate font-medium">{o.order.customer_name || o.order.customer_email || '—'}</div>
-                  <div className="truncate text-xs text-[var(--text-tertiary)]">{o.albumTitle ?? o.order.reference}</div>
+                  <div className="truncate text-xs text-[var(--text-tertiary)]">{shortSize(formatOfBook(o.order.album_format))} · {o.albumTitle ?? o.order.reference}</div>
                 </div>
                 <div className="shrink-0 text-right">
                   <div className="font-medium tabular-nums">{formatCop(o.order.total_cop)}</div>
@@ -141,7 +142,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               <th className="px-4 py-3 font-medium">Fecha</th>
               <th className="px-4 py-3 font-medium">Pedido</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
-              <th className="px-4 py-3 text-right font-medium">Págs.</th>
+              <th className="px-4 py-3 text-right font-medium">Formato · págs.</th>
               <th className="px-4 py-3 text-right font-medium">Total</th>
               <th className="px-4 py-3 font-medium">Pago</th>
               <th className="px-4 py-3 font-medium">PDF</th>
@@ -167,7 +168,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                     <div className="max-w-[12rem] truncate">{o.order.customer_name || '—'}</div>
                     <div className="max-w-[12rem] truncate text-xs text-[var(--text-tertiary)]">{o.order.customer_email}</div>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{o.order.pages_total ?? '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{shortSize(formatOfBook(o.order.album_format))} · {o.order.pages_total ?? '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatCop(o.order.total_cop)}</td>
                   <td className="px-4 py-3"><PaymentBadge status={o.order.payment_status} /></td>
                   <td className="px-4 py-3"><PdfBadge state={o.pdf} /></td>

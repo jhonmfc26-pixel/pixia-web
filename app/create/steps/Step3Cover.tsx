@@ -7,6 +7,7 @@ import CoverPage from "@/core/modules/viewer/pages/CoverPage";
 import { getDefaultTemplate } from "@/core/modules/cover/coverTemplates";
 import { occasionFromStory, titleForOccasion } from "@/core/engine/buildPixiaBook";
 import { readPhotoAnalysis, type PhotoAnalysisEntry } from "@/core/modules/upload/photoSession";
+import { getFormat } from "@/lib/formats";
 import type { CoverConfig, OccasionType, PhotoAsset } from "@/core/contracts/AlbumBlueprint";
 
 /**
@@ -22,6 +23,7 @@ const PLACEHOLDERS: Record<string, { subtitle: string; date: string }> = {
   honeymoon: { subtitle: "Laura & Andrés", date: "Santorini · 2026" },
   trip: { subtitle: "Familia Gómez", date: "Perú · Agosto 2026" },
   anniversary: { subtitle: "10 años juntos", date: "2016 — 2026" },
+  kids: { subtitle: "Sofía", date: "Su primer año · 2026" },
   other: { subtitle: "La familia Rojas", date: "2026" },
 };
 
@@ -30,6 +32,7 @@ export default function Step3Cover() {
   const story = state.storyType ?? "other";
   const occasion = occasionFromStory(story) as OccasionType;
   const ph = PLACEHOLDERS[story] ?? PLACEHOLDERS.other;
+  const format = getFormat(state.format);
 
   // Análisis del paso 2 (dimensiones, score, miniatura), por id de foto. Se lee una vez.
   const [analysis] = useState<Map<string, PhotoAnalysisEntry>>(() =>
@@ -112,9 +115,9 @@ export default function Step3Cover() {
         {/* Tapa en vivo */}
         <div className="mx-auto w-full max-w-[440px] md:order-2">
           <div className="overflow-hidden rounded-[6px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.06)]">
-            {photo.url && <CoverPage photo={photo} cover={config} style="con-margen" format="30x30" />}
+            {photo.url && <CoverPage photo={photo} cover={config} style="con-margen" format={format.blueprintFormat} />}
           </div>
-          <p className="mt-3 text-center text-xs text-white/40">Tapa dura · 30 × 30 cm</p>
+          <p className="mt-3 text-center text-xs text-white/40">Álbum {format.name.toLowerCase()} · Tapa dura · {format.sizeLabel}</p>
         </div>
 
         {/* Formulario */}

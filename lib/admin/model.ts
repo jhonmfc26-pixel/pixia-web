@@ -15,6 +15,8 @@ export interface OrderRow {
   shipping_state: string | null
   shipping_postal_code: string | null
   shipping_notes: string | null
+  /** blueprint.format del snapshot que se cobró ('30x30' | '20x20' | 'a4'); null = 30×30 (pedidos anteriores). */
+  album_format?: string | null
   base_price_cop: number | null
   pages_included: number | null
   pages_total: number | null

@@ -1,5 +1,6 @@
 'use client'
 
+import { formatOfBook, shortSize } from '@/lib/formats'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -16,6 +17,7 @@ interface BlueprintRow {
   status: BlueprintStatus
   occasion: OccasionType
   page_count: number
+  format?: string | null
   created_at: string
   updated_at: string
 }
@@ -39,7 +41,7 @@ function formatDate(iso: string): string {
 
 function occasionLabel(occasion: OccasionType): string {
   const map: Record<OccasionType, string> = {
-    boda: 'Boda', 'bebe-mensual': 'Bebé', viaje: 'Viaje',
+    boda: 'Boda', 'bebe-mensual': 'Niños', viaje: 'Viaje',
     aniversario: 'Aniversario', familia: 'Familia', mascota: 'Mascota',
   }
   return map[occasion] ?? occasion
@@ -89,7 +91,7 @@ export default function MisAlbumesPage() {
 
       const { data, error } = await supabaseBrowser
         .from('blueprints')
-        .select('id, cover, spreads, status, occasion, page_count, created_at, updated_at, narrative')
+        .select('id, cover, spreads, status, occasion, format, page_count, created_at, updated_at, narrative')
         .order('updated_at', { ascending: false })
 
       if (error) {
@@ -275,7 +277,7 @@ export default function MisAlbumesPage() {
                         {occasionLabel(row.occasion)}
                       </span>
                       <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)' }}>
-                        {row.page_count || '—'} páginas
+                        {shortSize(formatOfBook(row.format))} cm · {row.page_count || '—'} páginas
                       </span>
                     </div>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>

@@ -2,6 +2,7 @@
 
 export const runtime = 'edge'
 
+import { getFormat } from '@/lib/formats'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -165,6 +166,7 @@ export default function ResultPage() {
         const book = await buildPixiaBookWithAI({
           photos,
           story: state.storyType ?? 'general',
+          format: getFormat(state.format).blueprintFormat,
           title: state.cover?.title?.trim() || undefined,
           subtitle: state.cover?.subtitle,
           date: state.cover?.date,
@@ -188,7 +190,7 @@ export default function ResultPage() {
 
     build()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.photos, state.storyType, state.cover, router, attempt, sessionId])
+  }, [state.photos, state.storyType, state.format, state.cover, router, attempt, sessionId])
 
   const backToPhotos = () => {
     dispatch({ type: 'PREV_STEP' })

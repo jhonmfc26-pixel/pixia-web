@@ -10,7 +10,7 @@
  * TERMS_VERSION: cada pedido guarda la versión que el cliente aceptó.
  */
 
-export const TERMS_VERSION = '2026-11-06.2' // .2: plazo de entrega = 3 días de producción + transportadora
+export const TERMS_VERSION = '2026-11-08.1' // tamaños 30×30 y 20×20 con precio por formato (antes: .06.2, plazo de entrega 3 días + transportadora)
 export const TERMS_UPDATED_LABEL = '6 de noviembre de 2026'
 
 export const LEGAL_ENTITY = {

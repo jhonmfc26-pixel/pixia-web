@@ -6,6 +6,7 @@ import React, {
   useReducer,
   useEffect,
 } from "react";
+import { isFormatId, suggestedFormat, getFormat, type AlbumFormatId } from "@/lib/formats";
 
 /* =======================
    TYPES
@@ -37,6 +38,10 @@ export const WIZARD_STEPS = [
 type WizardState = {
   step: number;
   storyType?: string;
+  /** Tamaño del álbum. Se sugiere según el momento; el cliente puede cambiarlo. */
+  format: AlbumFormatId;
+  /** true cuando el cliente eligió el tamaño a mano (o vino de la home con ?formato=): elegir otro momento ya no lo cambia. */
+  formatChosen: boolean;
   photos: PhotoItem[];
   cover?: CoverDraft;
 };
@@ -45,6 +50,7 @@ type WizardAction =
   | { type: "NEXT_STEP" }
   | { type: "PREV_STEP" }
   | { type: "SET_STORY_TYPE"; payload: string }
+  | { type: "SET_FORMAT"; payload: AlbumFormatId }
   | { type: "SET_PHOTOS"; payload: PhotoItem[] }
   | { type: "SET_COVER"; payload: CoverDraft };
 
@@ -54,6 +60,8 @@ type WizardAction =
 
 const initialState: WizardState = {
   step: 1,
+  format: "30x30",
+  formatChosen: false,
   photos: [],
 };
 
@@ -71,7 +79,16 @@ function wizardReducer(
     case "PREV_STEP":
       return { ...state, step: Math.max(state.step - 1, 1) };
     case "SET_STORY_TYPE":
-      return { ...state, storyType: action.payload };
+      return {
+        ...state,
+        storyType: action.payload,
+        format: state.formatChosen ? state.format : suggestedFormat(action.payload).id,
+      };
+    case "SET_FORMAT":
+      // Solo los formatos que ya se pueden pedir.
+      return getFormat(action.payload).available
+        ? { ...state, format: action.payload, formatChosen: true }
+        : state;
     case "SET_PHOTOS":
       return { ...state, photos: action.payload };
     case "SET_COVER":
@@ -96,6 +113,12 @@ const WizardContext = createContext<{
 
 export function WizardProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(wizardReducer, initialState);
+
+  // Viene de la home con un tamaño elegido (/create?formato=20x20).
+  useEffect(() => {
+    const f = new URLSearchParams(window.location.search).get("formato");
+    if (isFormatId(f)) dispatch({ type: "SET_FORMAT", payload: f });
+  }, []);
 
   // Auto-scroll suave al cambiar de step
   useEffect(() => {

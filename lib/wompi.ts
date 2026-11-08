@@ -3,6 +3,8 @@
  * Documentación: https://docs.wompi.co
  */
 
+import { DEFAULT_FORMAT_ID, getFormat, type AlbumFormatId } from '@/lib/formats'
+
 const WOMPI_API_URL = process.env.WOMPI_API_URL || 'https://sandbox.wompi.co/v1'
 
 export interface WompiTransactionStatus {
@@ -114,15 +116,17 @@ export async function fetchTransactionStatus(
  * (Antes leía de NEXT_PUBLIC_BASE_PRICE_COP/NEXT_PUBLIC_SHIPPING_COP con
  * defaults desactualizados — un env var mal seteado en producción bastaba
  * para cobrar mal. Este es el precio real del producto, se cambia en código.)
+ *
+ * El precio base depende del formato (lib/formats.ts); las páginas incluidas,
+ * la página extra y el envío son iguales para los tres.
  */
-const BASE_PRICE_COP = 280_000     // incluye las primeras 20 páginas
 const PAGES_INCLUDED = 20
 const EXTRA_PAGE_PRICE_COP = 8_000 // por página adicional a las 20 incluidas
 const SHIPPING_COP = 0             // envío gratis, siempre incluido en el precio base
 
-/** Para mostrar en la web (términos, precios) — mismos valores que se cobran. */
+/** Para mostrar en la web (términos, precios) — mismos valores que se cobran. basePriceCop = el del 30×30. */
 export const PRICING = {
-  basePriceCop: BASE_PRICE_COP,
+  basePriceCop: getFormat(DEFAULT_FORMAT_ID).priceCop,
   pagesIncluded: PAGES_INCLUDED,
   extraPagePriceCop: EXTRA_PAGE_PRICE_COP,
   shippingCop: SHIPPING_COP,
@@ -131,9 +135,10 @@ export const PRICING = {
 /**
  * Calcula el precio total de un álbum a partir del número REAL de páginas
  * (ver countRealPages en foldModel/validate.ts) — nunca de un número que
- * mande el cliente sin verificar.
+ * mande el cliente sin verificar — y del formato del álbum.
  */
-export function calculateOrderTotal(pagesTotal: number): {
+export function calculateOrderTotal(pagesTotal: number, formatId: AlbumFormatId = DEFAULT_FORMAT_ID): {
+  formatId: AlbumFormatId
   basePriceCop: number
   pagesIncluded: number
   extraPages: number
@@ -141,12 +146,14 @@ export function calculateOrderTotal(pagesTotal: number): {
   shippingCop: number
   totalCop: number
 } {
+  const basePriceCop = getFormat(formatId).priceCop
   const extraPages = Math.max(0, pagesTotal - PAGES_INCLUDED)
   const extraPagesPriceCop = extraPages * EXTRA_PAGE_PRICE_COP
-  const totalCop = BASE_PRICE_COP + extraPagesPriceCop + SHIPPING_COP
+  const totalCop = basePriceCop + extraPagesPriceCop + SHIPPING_COP
 
   return {
-    basePriceCop: BASE_PRICE_COP,
+    formatId: getFormat(formatId).id,
+    basePriceCop,
     pagesIncluded: PAGES_INCLUDED,
     extraPages,
     extraPagesPriceCop,

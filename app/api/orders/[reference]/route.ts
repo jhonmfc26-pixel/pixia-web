@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { formatOfBook } from '@/lib/formats'
 
 export const runtime = 'edge'
 
@@ -31,7 +32,8 @@ export async function GET(
         print_status,
         created_at,
         paid_at,
-        book_id
+        book_id,
+        album_format:book_snapshot->>format
       `)
       .eq('reference', reference)
       .single()
@@ -53,6 +55,8 @@ export async function GET(
         // Para el botón "Ver mi álbum". El álbum en sí sigue protegido: solo
         // lo abre su dueño con sesión (RLS de blueprints).
         book_id: order.book_id,
+        // Solo el tamaño, no el álbum: "Álbum pequeño 20 × 20 cm" en la confirmación.
+        format_label: `${formatOfBook(order.album_format).name} ${formatOfBook(order.album_format).sizeLabel}`,
       },
     })
   } catch (err) {

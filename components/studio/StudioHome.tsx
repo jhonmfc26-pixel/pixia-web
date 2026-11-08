@@ -217,7 +217,9 @@ function FormatSlot({ format: f }: { format: AlbumFormat }) {
       <div className="st-meta">
         <b>{f.name}</b>
         <span>{f.sizeLabel} · {f.use}</span>
-        <em>{formatCop(f.priceCop)}</em>
+        {f.available
+          ? <em>{formatCop(f.priceCop)}</em>
+          : <em className="soon">{formatCop(f.priceCop)} · Muy pronto</em>}
       </div>
     </div>
   )
