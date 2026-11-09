@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { LegalDoc, Section, List, Strong, EntityBlock } from '@/components/legal/LegalDoc'
 import { COMMERCIAL, LEGAL_ENTITY, SIC_URL } from '@/lib/legal'
 import { PRICING } from '@/lib/wompi'
-import { FORMATS } from '@/lib/formats'
+import { FORMATS, MIN_ALBUM_PAGES } from '@/lib/formats'
 
 export const metadata: Metadata = {
   title: 'Términos y condiciones',
@@ -98,7 +98,7 @@ export default function TerminosPage() {
       <Section id="precio" n={5} title="Precio, pago y factura">
         <List items={[
           <>Los precios están en pesos colombianos e <Strong>incluyen los impuestos aplicables</Strong>. El precio total se muestra antes de pagar y es el único que se cobra.</>,
-          <>El precio base depende del tamaño: {SELLABLE.map((f, i) => <span key={f.id}>{i > 0 && '; '}<Strong>{f.name.toLowerCase()} de {f.sizeLabel}, {cop(f.priceCop)}</Strong></span>)}. Cada uno incluye hasta {PRICING.pagesIncluded} páginas. Cada página adicional cuesta {cop(PRICING.extraPagePriceCop)}. {PRICING.shippingCop === 0 ? <>El envío está <Strong>incluido</Strong>.</> : <>El envío cuesta {cop(PRICING.shippingCop)}.</>}</>,
+          <>El precio base depende del tamaño: {SELLABLE.map((f, i) => <span key={f.id}>{i > 0 && '; '}<Strong>{f.name.toLowerCase()} de {f.sizeLabel}, {cop(f.priceCop)}</Strong></span>)}. Cada uno incluye hasta {PRICING.pagesIncluded} páginas. Si tu álbum tiene menos (el mínimo es {MIN_ALBUM_PAGES}), <Strong>el precio base es el mismo</Strong>: te lo mostramos antes de pagar y lo confirmas. Cada página adicional cuesta {cop(PRICING.extraPagePriceCop)}. {PRICING.shippingCop === 0 ? <>El envío está <Strong>incluido</Strong>.</> : <>El envío cuesta {cop(PRICING.shippingCop)}.</>}</>,
           <>Los pagos se procesan a través de Wompi (tarjeta, PSE, Nequi y los demás medios que muestre la pasarela). Pixia no recibe ni guarda los datos de tu tarjeta.</>,
           <>El pedido se confirma cuando la pasarela aprueba el pago; te enviamos un correo con el número de orden y el resumen.</>,
           <>Te enviamos la factura electrónica al correo que registraste.</>,

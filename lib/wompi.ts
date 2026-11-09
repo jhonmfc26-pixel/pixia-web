@@ -3,7 +3,7 @@
  * Documentación: https://docs.wompi.co
  */
 
-import { DEFAULT_FORMAT_ID, getFormat, type AlbumFormatId } from '@/lib/formats'
+import { DEFAULT_FORMAT_ID, PAGES_INCLUDED, getFormat, type AlbumFormatId } from '@/lib/formats'
 
 const WOMPI_API_URL = process.env.WOMPI_API_URL || 'https://sandbox.wompi.co/v1'
 
@@ -120,7 +120,6 @@ export async function fetchTransactionStatus(
  * El precio base depende del formato (lib/formats.ts); las páginas incluidas,
  * la página extra y el envío son iguales para los tres.
  */
-const PAGES_INCLUDED = 20
 const EXTRA_PAGE_PRICE_COP = 8_000 // por página adicional a las 20 incluidas
 const SHIPPING_COP = 0             // envío gratis, siempre incluido en el precio base
 

@@ -20,7 +20,10 @@ import { useSession } from "@/core/modules/session/useSession";
 import { MIN_PHOTOS, MAX_PHOTOS } from "@/core/modules/upload/limits";
 import { normalizeFiles, isHeicFile } from "@/core/modules/upload/normalizeFiles";
 import { hashFileContent } from "@/core/modules/upload/contentHash";
-import { mergePhotoAnalysis, mergeR2Photos, type PhotoAnalysisEntry } from "@/core/modules/upload/photoSession";
+import { mergePhotoAnalysis, mergeR2Photos, readPhotoAnalysis, type PhotoAnalysisEntry } from "@/core/modules/upload/photoSession";
+import { estimateAlbumPages } from "@/core/modules/album/estimatePages";
+import { PAGES_INCLUDED, formatCop } from "@/lib/formats";
+import { PRICING } from "@/lib/wompi";
 
 // Genera thumbnail 150x150 base64 (~8-12KB por foto) para grids rápidos
 async function generateThumbnail(file: File, maxSize = 150): Promise<string | null> {
@@ -473,6 +476,17 @@ export default function Step2Upload() {
   }, [photos.length, count]);
 
   const unlocked = photos.length >= MIN_PHOTOS;
+
+  // Cuántas páginas va a tener el álbum (mismo motor que lo arma). Se avisa
+  // acá porque es el momento en que el cliente todavía puede subir más fotos.
+  const [pageEstimate, setPageEstimate] = useState<number | null>(null);
+  useEffect(() => {
+    if (isProcessing || photos.length < MIN_PHOTOS) { setPageEstimate(null); return; }
+    const analysis = readPhotoAnalysis();
+    const entries = photos.map((p) => analysis.get(p.id)).filter((e): e is PhotoAnalysisEntry => !!e);
+    if (entries.length !== photos.length) { setPageEstimate(null); return; }
+    try { setPageEstimate(estimateAlbumPages(entries)); } catch { setPageEstimate(null); }
+  }, [photos, isProcessing]);
   const priorityCount = photos.filter((p) => p.priority).length;
 
   // ── Progreso SIEMPRE visible mientras se procesan fotos ────────────────────
@@ -747,6 +761,31 @@ export default function Step2Upload() {
           </AnimatePresence>
         </Reorder.Group>
         </>
+      )}
+
+      {pageEstimate !== null && (
+        <div
+          role="status"
+          className={`mt-4 rounded-xl px-4 py-3 text-center text-[13px] leading-relaxed ${
+            pageEstimate < PAGES_INCLUDED
+              ? "border border-amber-300/25 bg-amber-300/[0.07] text-amber-100/90"
+              : "border border-white/10 bg-white/[0.04] text-white/70"
+          }`}
+        >
+          {pageEstimate < PAGES_INCLUDED ? (
+            <>
+              Con estas fotos tu álbum tendrá <strong className="text-white">{pageEstimate} de las {PAGES_INCLUDED} páginas</strong> que incluye el precio.
+              {" "}Sube más fotos para aprovecharlas: las horizontales pueden ir a doble página.
+            </>
+          ) : pageEstimate === PAGES_INCLUDED ? (
+            <>Tu álbum tendrá <strong className="text-white">{PAGES_INCLUDED} páginas</strong>, las que incluye el precio.</>
+          ) : (
+            <>
+              Tu álbum tendrá unas <strong className="text-white">{pageEstimate} páginas</strong>: {PAGES_INCLUDED} incluidas y{" "}
+              {pageEstimate - PAGES_INCLUDED} adicionales a {formatCop(PRICING.extraPagePriceCop)} cada una.
+            </>
+          )}
+        </div>
       )}
 
       {minPhotosError && (

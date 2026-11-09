@@ -2,7 +2,7 @@ import { TERMS_VERSION } from '@/lib/legal'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { generateIntegrityHash, calculateOrderTotal, generateOrderReference } from '@/lib/wompi'
-import { formatOfBook } from '@/lib/formats'
+import { formatOfBook, MIN_ALBUM_PAGES, PAGES_INCLUDED } from '@/lib/formats'
 import { rateLimit } from '@/core/middleware/rateLimiter'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
@@ -19,6 +19,8 @@ interface CreateOrderRequest {
   pagesTotal: number
   /** Versión de los términos que el cliente aceptó en el checkout. */
   termsVersion?: string
+  /** Páginas que el cliente confirmó cuando su álbum tiene menos de las incluidas. */
+  fewerPagesAck?: number
   customer: {
     email: string
     phone: string
@@ -127,6 +129,14 @@ export async function POST(req: NextRequest) {
     }
 
     const realPageCount = countRealPages(realStructure)
+    if (realPageCount < MIN_ALBUM_PAGES) {
+      return NextResponse.json({ error: `Tu álbum tiene ${realPageCount} páginas y el mínimo para imprimirlo es ${MIN_ALBUM_PAGES}.` }, { status: 400 })
+    }
+    // Menos páginas de las incluidas: el precio es el mismo y el cliente tuvo
+    // que confirmarlo en el checkout con ESTE número de páginas.
+    if (realPageCount < PAGES_INCLUDED && body.fewerPagesAck !== realPageCount) {
+      return NextResponse.json({ error: `Confirma que tu álbum tiene ${realPageCount} páginas antes de pagar. Recarga la página si cambiaste el álbum.` }, { status: 400 })
+    }
     const pricing = calculateOrderTotal(realPageCount, albumFormat.id)
 
     const reference = generateOrderReference(body.bookId)

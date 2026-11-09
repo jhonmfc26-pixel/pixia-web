@@ -36,6 +36,19 @@ export const FORMATS: AlbumFormat[] = [
   { id: '21x28', name: 'Vertical', sizeLabel: '21 × 28 cm', use: 'Viajes', widthCm: 21, heightCm: 28, priceCop: 230_000, blueprintFormat: 'a4', available: false },
 ]
 
+/**
+ * Páginas interiores que incluye el precio base de cualquier formato. El
+ * motor intenta llegar a este número aunque haya pocas fotos (ver
+ * core/modules/album/fillPages.ts).
+ */
+export const PAGES_INCLUDED = 20
+
+/**
+ * Mínimo de páginas para poder comprar. Entre esto y PAGES_INCLUDED el
+ * cliente paga igual el precio base y lo confirma en el checkout.
+ */
+export const MIN_ALBUM_PAGES = 10
+
 export const DEFAULT_FORMAT_ID: AlbumFormatId = '30x30'
 
 const BY_ID = new Map(FORMATS.map(f => [f.id, f]))
