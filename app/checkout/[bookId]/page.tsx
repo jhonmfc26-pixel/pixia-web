@@ -8,7 +8,7 @@ import Script from 'next/script'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
 import { calculateOrderTotal } from '@/lib/wompi'
-import { formatOfBook } from '@/lib/formats'
+import { formatOfBook, MIN_ALBUM_PAGES, PAGES_INCLUDED } from '@/lib/formats'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { getLocalBook } from '@/core/engine/localBookStorage'
 import { isOrdered } from '@/core/modules/album/orderLock'
@@ -110,6 +110,9 @@ export default function CheckoutPage() {
   // Aceptación expresa de términos + autorización de datos (Ley 1480 / Ley 1581).
   // Se guarda con la orden (versión, fecha, IP) como constancia.
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  // Álbum con menos páginas de las incluidas: el precio es el mismo y el
+  // cliente lo confirma (decisión de Jhon, 2026-11-08). Mínimo MIN_ALBUM_PAGES.
+  const [fewerPagesAck, setFewerPagesAck] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const pendingOrder = useRef<PendingOrder | null>(null)
 
@@ -286,6 +289,8 @@ export default function CheckoutPage() {
   // vez en este intento, no se le vuelve a preguntar.
   const handleCheckout = () => {
     if (!book || !structure || !pricing || !isFormValid() || !reviewed || !acceptedTerms) return
+    if (pricing.pagesTotal < MIN_ALBUM_PAGES) return
+    if (pricing.pagesTotal < PAGES_INCLUDED && !fewerPagesAck) return
     if (emptyFacesCount > 0 && !emptyPagesAck) {
       setShowEmptyPagesModal(true)
       return
@@ -346,6 +351,8 @@ export default function CheckoutPage() {
             sessionId: localStorage.getItem('pixia_session_id') ?? '',
             pagesTotal: pricing.pagesTotal,
             termsVersion: TERMS_VERSION,
+            // Constancia: el cliente confirmó este número de páginas (< las incluidas).
+            fewerPagesAck: pricing.pagesTotal < PAGES_INCLUDED ? pricing.pagesTotal : undefined,
             customer: { name: form.name, email: form.email, phone: form.phone },
             shipping: {
               address: form.address,
@@ -419,7 +426,10 @@ export default function CheckoutPage() {
     )
   }
 
-  const formValid = isFormValid() && reviewed && acceptedTerms
+  const pagesTotal = pricing?.pagesTotal ?? 0
+  const tooFewPages = pricing !== null && pagesTotal < MIN_ALBUM_PAGES
+  const fewerPages = pricing !== null && !tooFewPages && pagesTotal < PAGES_INCLUDED
+  const formValid = isFormValid() && reviewed && acceptedTerms && !tooFewPages && (!fewerPages || fewerPagesAck)
 
   return (
     <>
@@ -662,6 +672,39 @@ export default function CheckoutPage() {
                   <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '16px 0' }} />
                   <Row label="Total" value={pricing.totalCop} bold />
                 </>
+              )}
+
+              {tooFewPages && (
+                <div role="alert" style={{
+                  marginTop: 24, padding: '14px 16px', borderRadius: 10,
+                  background: 'rgba(255,60,60,0.08)', border: '1px solid rgba(255,60,60,0.3)',
+                  fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,0.85)',
+                }}>
+                  <strong style={{ color: '#fff' }}>Tu álbum tiene {pagesTotal} páginas y el mínimo para imprimirlo es {MIN_ALBUM_PAGES}.</strong>{' '}
+                  Edítalo para agregar páginas antes de pagar.
+                  <a href={`/book/${bookId}/edit-v2`} style={{ display: 'block', marginTop: 8, color: '#F08A72', textDecoration: 'underline' }}>
+                    Editar mi álbum
+                  </a>
+                </div>
+              )}
+
+              {fewerPages && (
+                <div style={{
+                  marginTop: 24, padding: '14px 16px', borderRadius: 10,
+                  background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.28)',
+                  fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,0.85)',
+                }}>
+                  <strong style={{ color: '#fff' }}>Tu álbum tiene {pagesTotal} de las {PAGES_INCLUDED} páginas incluidas.</strong>{' '}
+                  El precio es el mismo aunque uses menos. Si quieres aprovecharlas, edita tu álbum y agrega páginas.
+                  <a href={`/book/${bookId}/edit-v2`} style={{ display: 'block', marginTop: 8, color: '#F08A72', textDecoration: 'underline' }}>
+                    Editar mi álbum
+                  </a>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={fewerPagesAck} onChange={e => setFewerPagesAck(e.target.checked)}
+                      style={{ marginTop: 2, width: 16, height: 16, accentColor: '#E8553A', flexShrink: 0 }} />
+                    Entiendo que mi álbum tiene {pagesTotal} páginas y que pago el precio de un álbum de hasta {PAGES_INCLUDED} páginas.
+                  </label>
+                </div>
               )}
 
               <div style={{

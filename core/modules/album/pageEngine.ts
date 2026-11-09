@@ -4,6 +4,8 @@ import { groupPhotos, type PhotoGroup, type PoolPhoto } from './groupPhotos'
 import { rankLayoutsForPhotos, bestAssignment, slotAspectRatios, getHeroSlotIndex, cropLoss } from './layoutFit'
 import { photoAR } from './photoGeometry'
 import { devLog } from '@/lib/devLog'
+import { PAGES_INCLUDED } from '@/lib/formats'
+import { fillToTargetPages } from './fillPages'
 
 function scoreOf(item: PoolPhoto): number {
   return item.photo.score?.finalScore ?? 0
@@ -382,7 +384,12 @@ export function buildPages(
 
   // Normalizar paridad: garantizar que cada tramo de páginas normales sea par
   // para que foldsFromPages empareje todo sin caras huérfanas (estrategia C)
-  const normalizedPages = normalizePageParity(pages, poolById)
+  const parityPages = normalizePageParity(pages, poolById)
+
+  // Pocas fotos → más protagonismo: abrir el álbum hacia las páginas que
+  // incluye el precio (fillPages.ts). Nunca pasa de ese número.
+  const chronoOrder = groups.flatMap(g => g.photos.map(p => p.photo.id))
+  const normalizedPages = fillToTargetPages(parityPages, poolById, chronoOrder, PAGES_INCLUDED)
 
   // Invariante: layout.photoCount debe coincidir con el número de fotos de la página
   for (const page of normalizedPages) {
