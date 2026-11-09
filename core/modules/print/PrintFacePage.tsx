@@ -2,6 +2,7 @@ import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { Face } from '@/core/modules/foldModel/types'
 import type { PrintProfile } from './printProfiles'
 import { FacePageView, HeroSpreadPageView } from '@/core/modules/viewer/SpreadFaces'
+import { PageAspectContext } from '@/core/modules/viewer/PageAspectContext'
 
 /**
  * Contenedor de UNA hoja física — tamaño real del PrintProfile INCLUYENDO
@@ -27,7 +28,11 @@ function PrintPageContainer({ profile, children }: { profile: PrintProfile; chil
       overflow: 'hidden',
       background: '#fff',
     }}>
-      {children}
+      {/* Proporción real de la hoja (con sangrado): 1 en 30×30/20×20, ~0.75 en
+          el vertical 21×28 — los recortes de cada foto se calculan con ella. */}
+      <PageAspectContext.Provider value={widthMm / heightMm}>
+        {children}
+      </PageAspectContext.Provider>
     </div>
   )
 }

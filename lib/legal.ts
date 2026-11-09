@@ -10,7 +10,7 @@
  * TERMS_VERSION: cada pedido guarda la versión que el cliente aceptó.
  */
 
-export const TERMS_VERSION = '2026-11-09.1' // álbumes de 10 a 19 páginas pagan el precio base (antes: .08.1 precio por tamaño; .06.2 plazo de entrega)
+export const TERMS_VERSION = '2026-11-09.2' // .2: se suma el tamaño vertical 21×28 a la lista de precios (.1: 10 a 19 páginas pagan el precio base; .08.1 precio por tamaño)
 export const TERMS_UPDATED_LABEL = '6 de noviembre de 2026'
 
 export const LEGAL_ENTITY = {

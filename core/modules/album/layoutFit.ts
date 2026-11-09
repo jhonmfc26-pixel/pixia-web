@@ -108,6 +108,13 @@ export function slotAspectRatios(layoutId: string, aspect?: number): number[] {
 
 // ── Qué layouts sirven para la página ─────────────────────────────────────────
 
+/**
+ * Diseños que en vertical dejan demasiado blanco arriba y abajo (pensados
+ * para página cuadrada). Jhon los vio en la hoja de diseños y decidió
+ * quitarlos del vertical (2026-11-09).
+ */
+const NOT_IN_VERTICAL = new Set(['portrait-pair', 'duo-portrait-air', 'trio-portrait-air'])
+
 /** Slots más angostos o más panorámicos que esto se ven como tiras: no se usan. */
 const MIN_SLOT_AR = 0.42
 const MAX_SLOT_AR = 2.8
@@ -119,6 +126,7 @@ const MAX_SLOT_AR = 2.8
  */
 export function layoutFitsPage(schema: LayoutSchema, aspect = pageAspect()): boolean {
   if (schema.onlyVertical && !isVerticalAspect(aspect)) return false
+  if (isVerticalAspect(aspect) && NOT_IN_VERTICAL.has(schema.id)) return false
   if ((schema.scope ?? 'page') === 'spread') return true
   return slotAspectRatios(schema.id, aspect).every(ar => ar >= MIN_SLOT_AR && ar <= MAX_SLOT_AR)
 }

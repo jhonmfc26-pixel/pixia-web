@@ -72,3 +72,23 @@ test('solo verticales: no cruzan el lomo, queda con menos páginas pero par', ()
   assert.equal(total % 2, 0)
   assert.ok(pages.every(p => p.layout !== 'hero-spread'))
 })
+
+test('tramo impar sin par fusionable: se divide una página, sin pliego huérfano (regresión)', () => {
+  // Caso real: 46 fotos (casi todas horizontales 3:2) que el motor armaba en
+  // páginas de 3 y 4 fotos alternadas — un tramo impar donde ningún par
+  // vecino cabe en una página. Antes quedaba un pliego huérfano y el álbum
+  // salía con 14 páginas.
+  const photos = Array.from({ length: 46 }, (_, i) => {
+    const portrait = i >= 6 && (i - 6) % 5 === 0
+    const [width, height] = portrait ? [900, 1200] : i < 6 ? [1536, 1024] : [1500, 1000]
+    return {
+      act: 'desarrollo',
+      photo: { id: `p${i}`, src: '', url: '', width, height, orientation: portrait ? 'portrait' : 'landscape',
+        score: { finalScore: 0.6 }, takenAt: new Date(Date.UTC(2026, 6, 1) + i * 3600_000).toISOString() },
+    } as unknown as PoolPhoto
+  })
+  const { pages, problems, total } = album(photos)
+  assert.ok(hasValidParity(pages))
+  assert.deepEqual(problems, [])
+  assert.equal(total, 20)
+})

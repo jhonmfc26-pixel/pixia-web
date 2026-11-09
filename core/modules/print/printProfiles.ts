@@ -49,7 +49,10 @@ const PRINT_PROFILES: readonly PrintProfile[] = [
   },
   {
     id: 'a4v',
-    label: 'A4 vertical',
+    // El formato Vertical 21×28 de Pixia (blueprint.format 'a4'). Mismas
+    // especificaciones de impresión que el 30×30 (sangrado, dpi, lomo) por
+    // decisión de Jhon (2026-11-09), hasta que Range confirme las suyas.
+    label: 'Vertical 21×28',
     widthMm: 210, heightMm: 280, bleedMm: 3, dpi: 300,
     colorSpace: 'RGB', confirmed: false,
     aspectRatio: 210 / 280, // 0.75

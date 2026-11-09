@@ -42,7 +42,8 @@ export function getSlotSizeMm(
   pageHeightMm: number,
 ): { widthMm: number; heightMm: number } | null {
   const areas = slotAreas(layoutId)
-  const ratios = slotAspectRatios(layoutId)
+  // Proporción de cada slot en ESTA hoja (cuadrada o vertical).
+  const ratios = slotAspectRatios(layoutId, pageWidthMm / pageHeightMm)
   const areaFraction = areas[slotIndex]
   const ar = ratios[slotIndex]
   if (areaFraction == null || ar == null) return null

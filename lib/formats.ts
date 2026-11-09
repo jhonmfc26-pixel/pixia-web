@@ -7,8 +7,8 @@
  * cliente elige en el paso 1, y el cliente puede cambiarlo.
  *
  * `available: false` = se muestra como "Muy pronto" y no se puede elegir ni
- * cobrar. El vertical necesita diagramas de página verticales (el motor de
- * layouts, el visor y el PDF hoy asumen página cuadrada), por eso todavía no.
+ * cobrar. Hoy los tres están a la venta (el vertical desde 2026-11-09, con
+ * página 3:4 en motor, visor, editor y PDF — ver album/pageGeometry.ts).
  */
 
 export type AlbumFormatId = '30x30' | '20x20' | '21x28'
@@ -33,7 +33,7 @@ export interface AlbumFormat {
 export const FORMATS: AlbumFormat[] = [
   { id: '30x30', name: 'Grande', sizeLabel: '30 × 30 cm', use: 'Bodas y grandes momentos', widthCm: 30, heightCm: 30, priceCop: 280_000, blueprintFormat: '30x30', available: true },
   { id: '20x20', name: 'Pequeño', sizeLabel: '20 × 20 cm', use: 'Niños y bebés', widthCm: 20, heightCm: 20, priceCop: 200_000, blueprintFormat: '20x20', available: true },
-  { id: '21x28', name: 'Vertical', sizeLabel: '21 × 28 cm', use: 'Viajes', widthCm: 21, heightCm: 28, priceCop: 230_000, blueprintFormat: 'a4', available: false },
+  { id: '21x28', name: 'Vertical', sizeLabel: '21 × 28 cm', use: 'Viajes', widthCm: 21, heightCm: 28, priceCop: 230_000, blueprintFormat: 'a4', available: true },
 ]
 
 /**
