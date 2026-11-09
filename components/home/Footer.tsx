@@ -61,7 +61,11 @@ export default function Footer({ variant = 'dark' }: { variant?: 'dark' | 'light
       <div className="mx-auto max-w-[1100px]">
         <div className="mb-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <p className={`mb-2.5 font-[family-name:var(--font-display)] text-lg font-medium ${c.brand}`}>Pixia</p>
+            <p className={`mb-2.5 flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-medium ${c.brand}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-mark.png" alt="" width={22} height={22} />
+              Pixia
+            </p>
             <p className={`max-w-[240px] text-[13px] font-light leading-relaxed ${c.muted}`}>
               Tus fotos, transformadas en álbumes impresos con criterio editorial.
             </p>
