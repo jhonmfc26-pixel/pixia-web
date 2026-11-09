@@ -196,3 +196,31 @@ export function getDefaultTemplate(occasion: OccasionType): CoverTemplate {
 export function getTemplateById(id: string): CoverTemplate | undefined {
   return COVER_TEMPLATES.find(t => t.id === id)
 }
+
+/**
+ * Tamaño del título (en cqw) para que la palabra más larga quepa entera en
+ * una línea. Sin esto, con títulos de palabras largas ("Cumpleaños papi" en
+ * una plantilla de 17cqw) el navegador partía la palabra por la mitad:
+ * "Cumpleaño / s papi". Las líneas siguen partiendo entre palabras.
+ *
+ * Es una estimación por métrica de fuente (ancho medio de letra en em), no
+ * una medición: el PDF se arma en el servidor sin poder medir texto. Los
+ * factores son conservadores (mejor un poco más chico que partido).
+ */
+const AVG_CHAR_EM: Record<string, number> = {
+  'Playfair Display': 0.55,
+  Inter: 0.56,
+}
+/** Ancho útil del título: 100cqw menos el padding de 5cqw a cada lado, con margen. */
+const TITLE_WIDTH_CQW = 90 * 0.92
+const MIN_TITLE_CQW = 6
+
+export function fitTitleSize(title: string, template: Pick<CoverTemplate, 'titleSize' | 'titleFont' | 'titleWeight' | 'letterSpacing'>): number {
+  const longest = Math.max(0, ...title.trim().split(/\s+/).map(w => [...w].length))
+  if (longest === 0) return template.titleSize
+  const bold = template.titleWeight >= 600 ? 0.05 : 0
+  const spacing = parseFloat(template.letterSpacing) || 0 // em
+  const charEm = (AVG_CHAR_EM[template.titleFont] ?? 0.58) + bold + spacing
+  const fit = TITLE_WIDTH_CQW / (longest * charEm)
+  return Math.max(MIN_TITLE_CQW, Math.min(template.titleSize, Math.round(fit * 10) / 10))
+}
