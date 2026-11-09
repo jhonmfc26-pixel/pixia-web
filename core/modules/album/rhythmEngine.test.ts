@@ -10,7 +10,7 @@ import { getLayoutById } from './layouts/helpers'
 import { RITMO_LAYOUTS_ENABLED } from './layouts/ritmoFlag'
 import type { PoolPhoto } from './groupPhotos'
 
-assert.ok(RITMO_LAYOUTS_ENABLED, 'Correr con NEXT_PUBLIC_RITMO_LAYOUTS=true')
+assert.ok(RITMO_LAYOUTS_ENABLED, 'El motor de ritmo está apagado (NEXT_PUBLIC_RITMO_LAYOUTS=false)')
 
 function rng(seed: number) {
   let s = seed >>> 0

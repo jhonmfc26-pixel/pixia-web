@@ -43,6 +43,11 @@ test('los dípticos-tira no se usan en vertical; los verticales no se usan en cu
   assert.equal(layoutFitsPage(getLayoutById('v-travel-5')!, 1), false)
   assert.equal(layoutFitsPage(getLayoutById('v-travel-5')!, V), true)
   for (const n of [1, 2, 3, 4, 5]) assert.ok(pageLayoutsFor(n, V).length >= 2, `vertical sin layouts de ${n}`)
+  // Quitados a mano: mucho blanco arriba y abajo en página vertical.
+  for (const id of ['portrait-pair', 'duo-portrait-air', 'trio-portrait-air']) {
+    const l = getLayoutById(id)
+    if (l) { assert.equal(layoutFitsPage(l, V), false, id); assert.equal(layoutFitsPage(l, 1), true, id) }
+  }
 })
 
 test('álbum de viaje vertical: muchas fotos, varias por página, todo dentro de lo permitido', () => {

@@ -181,7 +181,19 @@ function mergeOnceParity(tract: Page[], poolById: Map<string, PoolPhoto>): Page[
   }
 
   if (bestIdx === -1) {
-    console.warn('[PageEngine] Paridad: ningún par fusionable en el tramo — pliego huérfano inevitable')
+    // Ningún par vecino cabe en una página (p. ej. 3+4 fotos). Antes quedaba
+    // un pliego huérfano; ahora se divide en dos la página con más fotos, lo
+    // que también deja el tramo par.
+    const bySize = tract.map((p, j) => ({ j, n: p.photoIds.length })).sort((a, b) => b.n - a.n)
+    for (const { j } of bySize) {
+      const split = splitPageForParity(tract[j], poolById)
+      if (split.length === 2) {
+        const result = [...tract]
+        result.splice(j, 1, ...split)
+        return result
+      }
+    }
+    console.warn('[PageEngine] Paridad: ningún par fusionable ni página divisible — pliego huérfano inevitable')
     return tract
   }
 

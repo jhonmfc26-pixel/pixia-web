@@ -61,6 +61,11 @@ interface PrintCoverWrapProps {
  * etc.) — por ahora es deliberadamente simple.
  * Lomo: ver SpineTitle más abajo.
  */
+function coverFormatOf(profile: PrintProfile): '20x20' | '30x30' | 'a4' {
+  if (profile.id === 'a4v') return 'a4'
+  return profile.id === '20x20' ? '20x20' : '30x30'
+}
+
 export default function PrintCoverWrap({ cover, coverPhoto, title, pageCount, profile }: PrintCoverWrapProps) {
   const { spineWidthMm, panelWidthMm, widthMm, heightMm } = getCoverWrapDimensionsMm(profile, pageCount)
   const template = getTemplateById(cover.templateId)
@@ -88,7 +93,10 @@ export default function PrintCoverWrap({ cover, coverPhoto, title, pageCount, pr
       </div>
 
       <div style={{ width: `${panelWidthMm}mm`, height: '100%', flexShrink: 0 }}>
-        <CoverRenderer config={cover} photoUrl={coverPhoto?.url} photoWidth={coverPhoto?.width} photoHeight={coverPhoto?.height} format="30x30" />
+        {/* Formato del perfil (antes fijo en 30x30) y la proporción exacta del
+            panel con sangrado, así la foto cubre también el sangrado de abajo. */}
+        <CoverRenderer config={cover} photoUrl={coverPhoto?.url} photoWidth={coverPhoto?.width} photoHeight={coverPhoto?.height}
+          format={coverFormatOf(profile)} panelAspect={panelWidthMm / heightMm} />
       </div>
     </div>
   )

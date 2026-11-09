@@ -203,6 +203,10 @@ export async function POST(req: NextRequest) {
             page_count: blueprint.pageCount,
             cover: blueprint.cover,
             spreads: blueprint.spreads,
+            // Congela el álbum tal como se cobró y como lo vio el cliente: la
+            // impresión lee esta structure. Sin esto, si el motor de diseños
+            // cambia entre la compra y la impresión, se imprimiría distinto.
+            structure: realStructure,
             narrative: blueprint.narrative,
             ai_generated: blueprint.aiGenerated ?? false,
             version: blueprint.version ?? 1,
@@ -220,6 +224,12 @@ export async function POST(req: NextRequest) {
         })
         // No bloquear la orden — el blueprint es valor agregado, no crítico
       }
+    } else if (existingBp && !existingBp.structure) {
+      // Sin sesión no se reescribe el blueprint, pero igual se congela la
+      // structure cobrada si todavía no había ninguna guardada.
+      const { error: stError } = await supabaseAdmin
+        .from('blueprints').update({ structure: realStructure }).eq('id', body.bookId).is('structure', null)
+      if (stError) console.error('[orders/create] no se pudo congelar la structure:', stError.message)
     }
 
     // Wompi requiere el monto en centavos

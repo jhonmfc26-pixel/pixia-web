@@ -144,16 +144,22 @@ export default function Step3Cover() {
                 Foto de portada
                 <span className="text-xs text-white/35">{ordered.length} fotos</span>
               </span>
-              <div className="grid max-h-[288px] grid-cols-4 gap-2 overflow-y-auto overscroll-contain p-1 sm:grid-cols-5">
+              {/* Safari (iPhone) aplastaba las filas de esta grilla con muchas
+                  fotos (se veían encimadas con 67): el scroll va en un
+                  contenedor aparte y cada celda es cuadrada con padding-top
+                  (no aspect-ratio), que Safari respeta siempre. */}
+              <div className="max-h-[288px] overflow-y-auto overscroll-contain">
+              <div className="grid grid-cols-4 gap-2 p-1 sm:grid-cols-5">
                 {ordered.map((p, n) => (
                   <button key={p.id} type="button" onClick={() => update({ photoId: p.id })}
                     aria-label={`Usar la foto ${n + 1} como portada`} aria-pressed={cover.photoId === p.id}
-                    className={`relative aspect-square overflow-hidden rounded-lg ring-2 ring-offset-2 ring-offset-[var(--bg-base)] transition ${cover.photoId === p.id ? "ring-[var(--brand-coral)]" : "ring-transparent opacity-70 hover:opacity-100"}`}>
+                    className={`relative block w-full overflow-hidden rounded-lg pt-[100%] ring-2 ring-offset-2 ring-offset-[var(--bg-base)] transition ${cover.photoId === p.id ? "ring-[var(--brand-coral)]" : "ring-transparent opacity-70 hover:opacity-100"}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={thumbs.get(p.id)?.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    <img src={thumbs.get(p.id)?.url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                     {p.priority && <span aria-hidden className="absolute right-1 top-1 text-[11px] drop-shadow">★</span>}
                   </button>
                 ))}
+              </div>
               </div>
             </div>
           )}

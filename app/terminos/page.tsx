@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 }
 
 const SELLABLE = FORMATS.filter(f => f.available)
-const sizesText = SELLABLE.map(f => `${f.name.toLowerCase()} de ${f.sizeLabel}`).join(' o ')
+const sizeNames = SELLABLE.map(f => `${f.name.toLowerCase()} de ${f.sizeLabel}`)
+const sizesText = sizeNames.length > 1 ? `${sizeNames.slice(0, -1).join(', ')} o ${sizeNames[sizeNames.length - 1]}` : sizeNames[0]
 
 const cop = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 

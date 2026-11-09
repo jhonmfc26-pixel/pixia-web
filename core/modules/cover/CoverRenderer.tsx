@@ -16,11 +16,16 @@ interface CoverRendererProps {
   photoWidth?: number
   photoHeight?: number
   format?: '20x20' | '30x30' | 'a4'
+  /**
+   * Solo impresión: proporción exacta del panel de la cubierta (con sangrado)
+   * para que la foto cubra también el sangrado. Sin esto, la proporción del formato.
+   */
+  panelAspect?: number
 }
 
-export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeight, format = '30x30' }: CoverRendererProps) {
-  const aspectRatio = format === 'a4' ? '3 / 4' : '1 / 1'
-  const containerAspect = format === 'a4' ? 3 / 4 : 1
+export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeight, format = '30x30', panelAspect }: CoverRendererProps) {
+  const containerAspect = panelAspect ?? (format === 'a4' ? 3 / 4 : 1)
+  const aspectRatio = String(containerAspect)
   const template = getTemplateById(config.templateId)
   if (!template) return null
 

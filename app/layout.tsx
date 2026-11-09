@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 
 const SITE_URL = "https://pixiaa.com";
 const DESCRIPTION =
-  "Sube tus fotos y Pixia diseña un álbum impreso de tapa dura, en 30×30 o 20×20 cm, listo para recibir en tu casa. Para bodas, viajes, aniversarios, niños y familia. Envío a toda Colombia.";
+  "Sube tus fotos y Pixia diseña un álbum impreso de tapa dura, en 30×30, 20×20 o 21×28 cm, listo para recibir en tu casa. Para bodas, viajes, aniversarios, niños y familia. Envío a toda Colombia.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
