@@ -83,7 +83,7 @@ export default function StudioHome() {
                 <img src={IMG('recuerdos')} alt="" />
               </div>
             </div>
-            <div className="st-spine" />
+            <Spine title="Nuestra boda" />
             <div className="st-cover" data-ref="heroCover">
               <div className="st-face st-cover-front">
                 <span className="st-grain" />
@@ -147,7 +147,7 @@ export default function StudioHome() {
           </div>
           <div className="st-book" data-ref="detBook">
             <div className="st-back" /><div className="st-edge-t" /><div className="st-edge-b" /><div className="st-edge-r" />
-            <div className="st-page-r" /><div className="st-spine" />
+            <div className="st-page-r" /><Spine title="Nuestra boda" />
             <div className="st-cover">
               <div className="st-face st-cover-front">
                 <span className="st-grain" />
@@ -224,6 +224,20 @@ function FormatSlot({ format: f }: { format: AlbumFormat }) {
           ? <em>{formatCop(f.priceCop)}</em>
           : <em className="soon">{formatCop(f.priceCop)} · Muy pronto</em>}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Lomo de tela con el título del álbum (de arriba hacia abajo, como los
+ * libros en español) y la marca Pixia al pie. Todo escala con el grosor del
+ * libro (--t).
+ */
+function Spine({ title, style }: { title: string; style?: React.CSSProperties }) {
+  return (
+    <div className="st-spine" style={style}>
+      <span className="st-spine-title">{title}</span>
+      <img className="st-spine-logo" src="/logo-mark.png" alt="" />
     </div>
   )
 }
@@ -407,13 +421,15 @@ function startScrollScenes(root: HTMLElement): () => void {
     // Zona libre bajo la frase más alta de las tres.
     const linesBottom = detLines.offsetTop + Math.max(...lines.map(l => l.offsetHeight))
     const room = H - linesBottom - GAP * 2
-    const w = Math.max(80, Math.min(innerWidth * (mobile() ? .62 : .32), H * .46, room / 1.1))
+    // Escala máxima del acercamiento; 1.15: margen por el giro 3D y la perspectiva.
+    const scMax = mobile() ? 1.25 : 1.4
+    const w = Math.max(80, Math.min(innerWidth * (mobile() ? .6 : .3), H * .46, room / (scMax * 1.15)))
     db.style.setProperty('--w', w + 'px'); db.style.setProperty('--h', w + 'px'); db.style.setProperty('--t', w * .085 + 'px')
     const z = ease(p)
-    const sc = lerp(.95, mobile() ? 1.3 : 1.55, z)
-    // El borde de arriba del libro nunca sube más allá de las frases (abajo sí puede salirse: es un acercamiento).
-    const ty = Math.max(lerp(110, 150, z), linesBottom + GAP + (w * sc) / 2 * .9 - H / 2)
-    db.style.transform = `translate(-50%, -50%) translate(${lerp(0, w * .18, z)}px, ${ty}px) perspective(${w * 9}px) scale(${sc}) rotateX(${lerp(22, 12, z)}deg) rotateY(${lerp(-18, 30, z)}deg) rotateZ(${lerp(-5, -1, z)}deg)`
+    const sc = lerp(1, scMax, z)
+    // Centrado en la zona libre bajo las frases: el libro se ve completo de principio a fin.
+    const ty = linesBottom + GAP + room / 2 - H / 2
+    db.style.transform = `translate(-50%, -50%) translate(${lerp(0, w * .12, z)}px, ${ty}px) perspective(${w * 9}px) scale(${sc}) rotateX(${lerp(22, 12, z)}deg) rotateY(${lerp(-18, 30, z)}deg) rotateZ(${lerp(-5, -1, z)}deg)`
     db.querySelector<HTMLElement>('.st-cover-front')!.style.setProperty('--sheen', lerp(0, 130, p) + '%')
     lines.forEach((l, i) => {
       const a = .05 + i * .32

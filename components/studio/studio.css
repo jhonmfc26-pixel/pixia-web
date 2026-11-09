@@ -58,9 +58,16 @@
 .st-spine { top: 0; left: 0; width: var(--t); height: 100%; transform-origin: left; transform: translateZ(calc(var(--t) / 2)) rotateY(-90deg); }
 .st-spine::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(255,255,255,.10) 40%, rgba(255,255,255,.04) 60%, rgba(0,0,0,.3)); }
 .st-spine::before { content: ''; position: absolute; left: 0; right: 0; top: 4%; height: 1px; background: rgba(0,0,0,.25); box-shadow: 0 calc(var(--h) * .92) 0 rgba(0,0,0,.25); }
+/* Título y marca en el lomo (tela con estampado tipo hot-stamping) */
+.st-spine { display: flex; flex-direction: column; align-items: center; overflow: hidden; }
+.st-spine-title { flex: 1; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; white-space: nowrap;
+  padding-top: calc(var(--t) * .6); font-family: var(--serif); font-weight: 450; font-size: calc(var(--t) * .4); letter-spacing: .06em;
+  color: rgba(244,236,224,.92); text-shadow: 0 -.5px 0 rgba(0,0,0,.35); }
+.st-spine-logo { width: calc(var(--t) * .55); height: calc(var(--t) * .55); margin-bottom: calc(var(--t) * .55); opacity: .95; }
 .st-edge-r { top: 3px; right: 3px; width: calc(var(--t) - 2px); height: calc(100% - 6px); transform-origin: right; transform: translateZ(calc(var(--t) / 2 - 1px)) rotateY(90deg);
   background: repeating-linear-gradient(90deg, #f7f6f2 0 1px, #dcdad4 1px 2px); }
-.st-edge-t, .st-edge-b { left: 2px; width: calc(100% - 5px); height: calc(var(--t) - 2px);
+/* Arrancan un poco después del lomo: si no, el canto de las hojas asoma como un triángulo blanco junto al lomo (cruce de planos 3D). */
+.st-edge-t, .st-edge-b { left: calc(var(--t) * .45); width: calc(100% - var(--t) * .45 - 3px); height: calc(var(--t) - 2px);
   background: repeating-linear-gradient(0deg, #f7f6f2 0 1px, #dcdad4 1px 2px); }
 .st-edge-t { top: 3px; transform-origin: top; transform: translateZ(calc(var(--t) / 2 - 1px)) rotateX(-90deg); }
 .st-edge-b { bottom: 3px; transform-origin: bottom; transform: translateZ(calc(var(--t) / 2 - 1px)) rotateX(90deg); }
