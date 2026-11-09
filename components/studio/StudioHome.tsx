@@ -44,7 +44,10 @@ export default function StudioHome() {
   return (
     <div className="st-root" ref={root}>
       <nav className="st-nav">
-        <Link href="/" className="st-logo"><i />Pixia</Link>
+        <Link href="/" className="st-logo">
+          <img src="/logo-mark.png" alt="" width={24} height={24} />
+          Pixia
+        </Link>
         <ul>
           <li><a href="#formatos">Formatos</a></li>
           <li><a href="#proceso">Cómo funciona</a></li>
@@ -80,7 +83,7 @@ export default function StudioHome() {
                 <img src={IMG('recuerdos')} alt="" />
               </div>
             </div>
-            <div className="st-spine" />
+            <Spine title="Nuestra boda" />
             <div className="st-cover" data-ref="heroCover">
               <div className="st-face st-cover-front">
                 <span className="st-grain" />
@@ -144,7 +147,7 @@ export default function StudioHome() {
           </div>
           <div className="st-book" data-ref="detBook">
             <div className="st-back" /><div className="st-edge-t" /><div className="st-edge-b" /><div className="st-edge-r" />
-            <div className="st-page-r" /><div className="st-spine" />
+            <div className="st-page-r" /><Spine title="Nuestra boda" />
             <div className="st-cover">
               <div className="st-face st-cover-front">
                 <span className="st-grain" />
@@ -225,6 +228,20 @@ function FormatSlot({ format: f }: { format: AlbumFormat }) {
   )
 }
 
+/**
+ * Lomo de tela con el título del álbum (de arriba hacia abajo, como los
+ * libros en español) y la marca Pixia al pie. Todo escala con el grosor del
+ * libro (--t).
+ */
+function Spine({ title, style }: { title: string; style?: React.CSSProperties }) {
+  return (
+    <div className="st-spine" style={style}>
+      <span className="st-spine-title">{title}</span>
+      <img className="st-spine-logo" src="/logo-mark.png" alt="" />
+    </div>
+  )
+}
+
 const KIDS_CLOTH = { ['--tela' as string]: '#C99A86' } as React.CSSProperties
 const PROCESS_PHOTOS = ['playa', 'boda-paseo', 'boda-beso', 'aniversario', 'viaje-carretera', 'recuerdos', 'playa', 'boda-paseo']
 
@@ -254,16 +271,42 @@ function startScrollScenes(root: HTMLElement): () => void {
   const proc = root.querySelector<HTMLElement>('#proceso')!, det = root.querySelector<HTMLElement>('#detalles')!
   const hb = $('heroBook'), hc = $('heroCover'), hCopy = $('heroCopy'), hCap = $('heroCaption'), hSh = $('heroShadow'), hCt = $('heroContact')
   const slots = [...root.querySelectorAll<HTMLElement>('.st-shelf .st-slot')], fHead = $('fmtHead')
+  const shelf = root.querySelector<HTMLElement>('.st-shelf')!
   const stage = $('procStage'), spread = $('spread'), pHead = $('procHead'), pHead2 = $('procHead2'), STAR = $('star'), GUTTER = $('gutter')
   const prints = [...root.querySelectorAll<HTMLElement>('[data-print]')]
   const db = $('detBook'), lines = [...root.querySelectorAll<HTMLElement>('[data-line]')]
 
   let HW = 0, SW = 0, SH = 0
 
+  /*
+   * Regla de las escenas: el texto va arriba y lo visual (libro, estante,
+   * pliego) vive SOLO en el espacio que queda libre debajo. Se mide el texto
+   * real (cambia con el ancho, el alto y la fuente), así en ninguna pantalla
+   * —p. ej. un portátil bajo de ~600 px— lo visual puede tapar las letras.
+   */
+  const GAP = 24
+  const bottomOf = (...els: HTMLElement[]) => Math.max(...els.map(e => e.offsetTop + e.offsetHeight))
+  const stageH = () => hero.querySelector<HTMLElement>('.st-stage')!.clientHeight || innerHeight
+
+  // Hero: dónde arranca el libro (debajo de los botones) y dónde queda abierto.
+  let HERO_START_TY = 0, HERO_OPEN_TY = 0
+
   function sizeHero() {
-    const w = mobile() ? Math.min(innerWidth * .44, innerHeight * .3) : Math.min(innerWidth * .27, innerHeight * .4)
+    const H = stageH()
+    // Abierto y con zoom, el libro cabe entre la barra y el texto de abajo.
+    const top = 52 + GAP, bottom = H - hCap.offsetHeight - H * .07 - GAP
+    const zoomS = mobile() ? 1.04 : 1.3
+    const fit = (bottom - top) / zoomS
+    const w = Math.max(80, mobile()
+      ? Math.min(innerWidth * .44, H * .3, fit)
+      : Math.min(innerWidth * .27, H * .4, fit))
     hb.style.setProperty('--w', w + 'px'); hb.style.setProperty('--h', w + 'px'); hb.style.setProperty('--t', Math.max(16, w * .09) + 'px')
     HW = w
+    HERO_OPEN_TY = (top + bottom) / 2 - H / 2
+    // Cerrado, empieza asomando debajo de los botones, nunca encima del texto.
+    // Mientras gira crece hasta la escala de libro cerrado: se usa esa para que ni girando toque los botones.
+    const sClosed = mobile() ? 1.35 : 1.15
+    HERO_START_TY = Math.max(H * (mobile() ? .22 : .3), bottomOf(hCopy) + GAP + (w * sClosed) / 2 - H / 2)
   }
   function drawHero() {
     const p = progress(hero, .8)
@@ -273,7 +316,8 @@ function startScrollScenes(root: HTMLElement): () => void {
     // Empieza mostrando el lomo de tela y gira de frente hacia ti; abierto, sigue flotando (opción A).
     const rx = lerp(14, 4, turn) * (1 - open), ry = lerp(42, 0, turn), rz = lerp(2, 0, turn)
     const tx = lerp(0, HW / 2, open)
-    const ty = lerp(innerHeight * (mobile() ? .22 : .3), mobile() ? 30 : 40, turn) - zoom * 10
+    // Sube recién cuando el texto ya se desvaneció (el texto se va entre 3 % y 12 %).
+    const ty = lerp(HERO_START_TY, HERO_OPEN_TY, ease(seg(p, .12, .32)))
     hb.style.transform = `translate(-50%, -50%) translate(${tx}px, ${ty}px) perspective(${HW * 5}px) scale(${s}) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`
     hc.style.setProperty('--open', (-178 * open) + 'deg')
     hc.querySelector<HTMLElement>('.st-cover-front')!.style.setProperty('--sheen', lerp(-10, 120, turn * .6 + open * .4) + '%')
@@ -284,16 +328,23 @@ function startScrollScenes(root: HTMLElement): () => void {
     hCt.style.width = HW * s * lerp(.95, 2.05, open) + 'px'; hCt.style.height = HW * s * .05 + 'px'
     hCt.style.transform = `translate(-50%, 0) translate(0px, ${ty + HW * s * .48}px)`
     hCt.style.opacity = String(lerp(.25, .75, turn))
-    hCopy.style.opacity = String(reduced ? 1 : 1 - seg(p, .04, .16))
-    hCopy.style.transform = reduced ? '' : `translateY(${-seg(p, 0, .16) * 50}px)`
+    hCopy.style.opacity = String(reduced ? 1 : 1 - seg(p, .03, .12))
+    hCopy.style.transform = reduced ? '' : `translateY(${-seg(p, 0, .12) * 50}px)`
     hCap.style.opacity = String(reduced ? 0 : seg(p, .7, .82))
     hCap.style.transform = `translateY(${(1 - seg(p, .7, .82)) * 20}px)`
   }
 
   function sizeShelf() {
+    const H = stageH()
     const gapCm = mobile() ? 2.4 : 9
     const totalCm = 30 + 20 + 21 + gapCm * 2 + (mobile() ? 6 : 0)
-    const u = Math.min(innerWidth * (mobile() ? .9 : .78) / totalCm, innerHeight * .36 / 30) // px por cm
+    // Debajo del título caben: el libro más alto (30 cm), su ficha y un margen.
+    const meta = slots[0].querySelector<HTMLElement>('.st-meta')!
+    const metaH = meta.offsetHeight + parseFloat(getComputedStyle(meta).marginTop || '0')
+    const bottomPad = Math.max(GAP, H * .06)
+    const bookRoom = (H - bottomOf(fHead) - GAP * 1.5 - metaH - bottomPad) * .92 // .92: el giro 3D lo agranda un poco
+    const u = Math.max(2, Math.min(innerWidth * (mobile() ? .9 : .78) / totalCm, H * .36 / 30, bookRoom / 30)) // px por cm
+    shelf.style.bottom = bottomPad + 'px'
     slots.forEach((s, i) => {
       const w = Number(s.dataset.wcm) * u, h = Number(s.dataset.hcm) * u
       const b = s.querySelector<HTMLElement>('.st-book')!, holder = s.querySelector<HTMLElement>('.st-holder')!
@@ -316,9 +367,15 @@ function startScrollScenes(root: HTMLElement): () => void {
     })
   }
 
+  // Zona libre del paso 3 (debajo de los dos títulos que se alternan).
+  let AREA_TOP = 0, AREA_H = 0
   function sizeSpread() {
-    SW = Math.min(innerWidth * (mobile() ? .92 : .66), innerHeight * .62 * 2); SH = SW / 2
+    const H = stageH()
+    AREA_TOP = bottomOf(pHead, pHead2) + GAP
+    AREA_H = Math.max(120, H - AREA_TOP - Math.max(GAP, H * .05))
+    SW = Math.min(innerWidth * (mobile() ? .92 : .66), AREA_H * 2); SH = SW / 2
     spread.style.width = SW + 'px'; spread.style.height = SH + 'px'
+    spread.style.top = AREA_TOP + AREA_H / 2 + 'px'
   }
   function drawProcess() {
     const p = progress(proc, .92)
@@ -335,7 +392,8 @@ function startScrollScenes(root: HTMLElement): () => void {
     prints.forEach((el, i) => {
       const sc = SCATTER[i], startW = pw * (mobile() ? .9 : 1), startH = startW * .68
       const sx = st.width / 2 + sc[0] * st.width * (mobile() ? .9 : 1) - startW / 2
-      const sy = st.height * .56 + sc[1] * st.height * .8 - startH / 2
+      // Las fotos sueltas se reparten en la zona libre (sc[1] va de -.04 a .38).
+      const sy = AREA_TOP + ((sc[1] + .04) / .42) * Math.max(0, AREA_H - startH)
       let tx: number, ty: number, tw: number, th: number, op = 1
       if (i < LAYOUT.length) {
         const L = LAYOUT[i]
@@ -356,12 +414,22 @@ function startScrollScenes(root: HTMLElement): () => void {
     GUTTER.style.width = SW * .12 + 'px'; GUTTER.style.height = SH + 'px'; GUTTER.style.opacity = String(pano)
   }
 
+  const detLines = root.querySelector<HTMLElement>('.st-detail-lines')!
   function drawDetails() {
     const p = progress(det, .3)
-    const w = Math.min(innerWidth * (mobile() ? .62 : .32), innerHeight * .46)
+    const H = stageH()
+    // Zona libre bajo la frase más alta de las tres.
+    const linesBottom = detLines.offsetTop + Math.max(...lines.map(l => l.offsetHeight))
+    const room = H - linesBottom - GAP * 2
+    // Escala máxima del acercamiento; 1.15: margen por el giro 3D y la perspectiva.
+    const scMax = mobile() ? 1.25 : 1.4
+    const w = Math.max(80, Math.min(innerWidth * (mobile() ? .6 : .3), H * .46, room / (scMax * 1.15)))
     db.style.setProperty('--w', w + 'px'); db.style.setProperty('--h', w + 'px'); db.style.setProperty('--t', w * .085 + 'px')
     const z = ease(p)
-    db.style.transform = `translate(-50%, -50%) translate(${lerp(0, w * .18, z)}px, ${lerp(110, 150, z)}px) perspective(${w * 9}px) scale(${lerp(.95, mobile() ? 1.3 : 1.55, z)}) rotateX(${lerp(22, 12, z)}deg) rotateY(${lerp(-18, 30, z)}deg) rotateZ(${lerp(-5, -1, z)}deg)`
+    const sc = lerp(1, scMax, z)
+    // Centrado en la zona libre bajo las frases: el libro se ve completo de principio a fin.
+    const ty = linesBottom + GAP + room / 2 - H / 2
+    db.style.transform = `translate(-50%, -50%) translate(${lerp(0, w * .12, z)}px, ${ty}px) perspective(${w * 9}px) scale(${sc}) rotateX(${lerp(22, 12, z)}deg) rotateY(${lerp(-18, 30, z)}deg) rotateZ(${lerp(-5, -1, z)}deg)`
     db.querySelector<HTMLElement>('.st-cover-front')!.style.setProperty('--sheen', lerp(0, 130, p) + '%')
     lines.forEach((l, i) => {
       const a = .05 + i * .32
@@ -382,6 +450,8 @@ function startScrollScenes(root: HTMLElement): () => void {
   const onResize = () => { sizeHero(); sizeShelf(); sizeSpread(); frame() }
 
   onResize()
+  // La fuente propia cambia el alto de los títulos: medir de nuevo cuando cargue.
+  document.fonts?.ready.then(() => onResize()).catch(() => {})
   addEventListener('scroll', onScroll, { passive: true })
   addEventListener('resize', onResize)
   return () => {
