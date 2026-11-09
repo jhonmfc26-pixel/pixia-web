@@ -50,7 +50,7 @@ type WizardAction =
   | { type: "NEXT_STEP" }
   | { type: "PREV_STEP" }
   | { type: "SET_STORY_TYPE"; payload: string }
-  | { type: "SET_FORMAT"; payload: AlbumFormatId }
+  | { type: "SET_FORMAT"; payload: AlbumFormatId; /** Solo pruebas internas: permite un formato que todavía no se vende (/create?formato=21x28&prueba=1). */ preview?: boolean }
   | { type: "SET_PHOTOS"; payload: PhotoItem[] }
   | { type: "SET_COVER"; payload: CoverDraft };
 
@@ -86,7 +86,7 @@ function wizardReducer(
       };
     case "SET_FORMAT":
       // Solo los formatos que ya se pueden pedir.
-      return getFormat(action.payload).available
+      return getFormat(action.payload).available || action.preview
         ? { ...state, format: action.payload, formatChosen: true }
         : state;
     case "SET_PHOTOS":
@@ -116,8 +116,9 @@ export function WizardProvider({ children }: { children: React.ReactNode }) {
 
   // Viene de la home con un tamaño elegido (/create?formato=20x20).
   useEffect(() => {
-    const f = new URLSearchParams(window.location.search).get("formato");
-    if (isFormatId(f)) dispatch({ type: "SET_FORMAT", payload: f });
+    const q = new URLSearchParams(window.location.search);
+    const f = q.get("formato");
+    if (isFormatId(f)) dispatch({ type: "SET_FORMAT", payload: f, preview: q.get("prueba") === "1" });
   }, []);
 
   // Auto-scroll suave al cambiar de step

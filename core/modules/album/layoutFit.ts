@@ -4,6 +4,8 @@
  */
 import { LAYOUTS } from './layouts/registry'
 import { getLayoutById } from './layouts/helpers'
+import type { LayoutSchema } from './layouts/types'
+import { pageAspect, isVerticalAspect } from './pageGeometry'
 
 // ── Parsing interno ───────────────────────────────────────────────────────────
 
@@ -42,12 +44,18 @@ interface SlotGeom {
 
 const _geomCache = new Map<string, SlotGeom[]>()
 
-function _slotGeoms(layoutId: string): SlotGeom[] {
-  const hit = _geomCache.get(layoutId)
+/**
+ * `aspect` = ancho/alto de la página (pageGeometry.ts): 1 en 30×30 y 20×20,
+ * 0.75 en el vertical 21×28. Por defecto, la de la entrada del motor que esté
+ * corriendo (withPageAspect).
+ */
+function _slotGeoms(layoutId: string, aspect = pageAspect()): SlotGeom[] {
+  const key = `${layoutId}@${aspect}`
+  const hit = _geomCache.get(key)
   if (hit) return hit
 
   const schema = getLayoutById(layoutId)
-  if (!schema) { _geomCache.set(layoutId, []); return [] }
+  if (!schema) { _geomCache.set(key, []); return [] }
 
   const colF = parseFracs(schema.grid.columns)
   const rowF = parseFracs(schema.grid.rows)
@@ -66,6 +74,10 @@ function _slotGeoms(layoutId: string): SlotGeom[] {
   // sí baja, al cuadrado del factor de encogimiento lineal.
   const p = _innerPaddingFraction(schema.innerPadding)
   const areaShrink = p > 0 ? (1 - 2 * p) ** 2 : 1
+  // Proporción del área del grid: la de la página, corregida por el padding
+  // (el % de padding CSS se resuelve contra el ANCHO en los 4 lados, así que
+  // en página no cuadrada sí cambia la proporción del grid).
+  const gridAspect = aspect * (1 - 2 * p) / (1 - 2 * p * aspect)
 
   const out = (schema.slots as readonly string[]).map(s => {
     let cMin = Infinity, cMax = -Infinity, rMin = Infinity, rMax = -Infinity
@@ -80,18 +92,40 @@ function _slotGeoms(layoutId: string): SlotGeom[] {
     const cSpan = colF.slice(cMin, cMax + 1).reduce((a, b) => a + b, 0)
     const rSpan = rowF.slice(rMin, rMax + 1).reduce((a, b) => a + b, 0)
     return {
-      ar:   (cSpan * tR) / (rSpan * tC),                    // AR = (col%) / (row%) con página cuadrada — innerPadding no lo distorsiona (encogimiento simétrico)
+      ar:   (cSpan * tR) / (rSpan * tC) * gridAspect,       // AR = (col%) / (row%) × proporción del grid
       area: (cSpan / tC) * (rSpan / tR) * areaShrink,        // fracción de área de página, ya neta del innerPadding
     }
   })
 
-  _geomCache.set(layoutId, out)
+  _geomCache.set(key, out)
   return out
 }
 
-/** AR de cada slot (width/height), página cuadrada. Cacheado. */
-export function slotAspectRatios(layoutId: string): number[] {
-  return _slotGeoms(layoutId).map(g => g.ar)
+/** AR de cada slot (width/height) en una página de proporción `aspect`. Cacheado. */
+export function slotAspectRatios(layoutId: string, aspect?: number): number[] {
+  return _slotGeoms(layoutId, aspect).map(g => g.ar)
+}
+
+// ── Qué layouts sirven para la página ─────────────────────────────────────────
+
+/** Slots más angostos o más panorámicos que esto se ven como tiras: no se usan. */
+const MIN_SLOT_AR = 0.42
+const MAX_SLOT_AR = 2.8
+
+/**
+ * Si un layout sirve en una página de proporción `aspect`. En cuadrado pasan
+ * todos menos los exclusivos del vertical; en vertical se caen los que dejan
+ * tiras (p. ej. dos verticales lado a lado: 10,5×28 cm = 0.38).
+ */
+export function layoutFitsPage(schema: LayoutSchema, aspect = pageAspect()): boolean {
+  if (schema.onlyVertical && !isVerticalAspect(aspect)) return false
+  if ((schema.scope ?? 'page') === 'spread') return true
+  return slotAspectRatios(schema.id, aspect).every(ar => ar >= MIN_SLOT_AR && ar <= MAX_SLOT_AR)
+}
+
+/** Layouts de página para N fotos que sirven en la página actual. */
+export function pageLayoutsFor(photoCount: number, aspect = pageAspect()): LayoutSchema[] {
+  return LAYOUTS.filter(l => l.photoCount === photoCount && (l.scope ?? 'page') === 'page' && layoutFitsPage(l, aspect))
 }
 
 /** Fracción del área de la página que ocupa cada slot [0, 1]. Cacheado. */
@@ -211,8 +245,7 @@ export function rankLayoutsForPhotos(
   photoARs: number[],
 ): Array<{ layoutId: string; avgLoss: number; order: number[] }> {
   const n = photoARs.length
-  return LAYOUTS
-    .filter(l => l.photoCount === n && (l.scope ?? 'page') === 'page')
+  return pageLayoutsFor(n)
     .map(l => {
       const { avgLoss, order } = bestAssignment(photoARs, l.id)
       const adjustedLoss = l.hasAir ? avgLoss + AIR_PENALTY : avgLoss

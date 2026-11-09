@@ -26,7 +26,7 @@ import type { PoolPhoto } from './groupPhotos'
 import type { DensityTier } from './layouts/types'
 import type { LayoutId } from './layouts/registry'
 import { LAYOUTS } from './layouts/registry'
-import { bestAssignment } from './layoutFit'
+import { bestAssignment, pageLayoutsFor } from './layoutFit'
 import { photoAR } from './photoGeometry'
 
 // ── Parámetros (calibrados con scripts/simRitmo.ts — ver PR de Fase B2) ─────
@@ -142,8 +142,7 @@ export function rhythmCost(prev: RhythmState, layoutId: string): number {
 interface Candidate { layout: string; loss: number }
 
 function candidatesFor(ars: number[]): Candidate[] {
-  const all = LAYOUTS
-    .filter(l => l.photoCount === ars.length && (l.scope ?? 'page') === 'page')
+  const all = pageLayoutsFor(ars.length)
     .map(l => ({ layout: l.id, loss: bestAssignment(ars, l.id).avgLoss }))
   if (all.length === 0) return []
   const best = Math.min(...all.map(c => c.loss))

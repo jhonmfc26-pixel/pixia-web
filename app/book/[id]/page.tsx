@@ -17,6 +17,8 @@ import type { AlbumStructure } from '@/core/modules/foldModel/types'
 import CoverPage from '@/core/modules/viewer/pages/CoverPage'
 import BackCoverPage from '@/core/modules/viewer/pages/BackCoverPage'
 import { FacePageView, HeroSpreadPageView } from '@/core/modules/viewer/SpreadFaces'
+import { PageAspectContext } from '@/core/modules/viewer/PageAspectContext'
+import { aspectOfFormat } from '@/core/modules/album/pageGeometry'
 import { buildSpreads, isSingleSpread, getSpreadUrls, type ViewerSpread } from '@/core/modules/viewer/spreadModel'
 import PixiaFlipBook, { type PixiaFlipBookHandle } from '@/core/modules/viewer/PixiaFlipBook'
 import { FlipBookErrorBoundary } from '@/core/modules/viewer/FlipBookErrorBoundary'
@@ -141,21 +143,24 @@ export default function BookPage() {
   // foto cada una, sin costo real); los pliegos usan FaceThumbnail —liviano,
   // thumbnailUrl en vez de url— para no bajar 50+ fotos a resolución completa
   // en un álbum grande.
+  // Proporción de página: 1 en 30×30/20×20, 0.75 en el vertical 21×28.
+  const pageAspect = aspectOfFormat(book?.format)
+
   const thumbItems = useMemo<ThumbnailItem[]>(() => {
     if (!book) return []
     return spreads.map((s, i): ThumbnailItem => {
       if (s.kind === 'cover') {
         return {
-          key: 'cover', label: `${i + 1}`, aspectRatio: 1,
+          key: 'cover', label: `${i + 1}`, aspectRatio: pageAspect,
           render: <CoverPage photo={coverPhoto} cover={book.cover} style={book.style || 'con-margen'} format={book.format || '30x30'} />,
         }
       }
       if (s.kind === 'back') {
-        return { key: 'back', label: `${i + 1}`, aspectRatio: 1, render: <BackCoverPage /> }
+        return { key: 'back', label: `${i + 1}`, aspectRatio: pageAspect, render: <BackCoverPage /> }
       }
       if (s.kind === 'paired') {
         return {
-          key: `${s.left.id}-${s.right.id}`, label: `${i + 1}`, aspectRatio: 2,
+          key: `${s.left.id}-${s.right.id}`, label: `${i + 1}`, aspectRatio: 2 * pageAspect,
           render: (
             <div style={{ display: 'flex', width: '100%', height: '100%', gap: '1px' }}>
               <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={s.left} photosById={photosById} /></div>
@@ -165,13 +170,15 @@ export default function BookPage() {
         }
       }
       // composition (hero-spread)
-      return { key: s.face.id, label: `${i + 1}`, aspectRatio: 2, render: <HeroSpreadThumbnail face={s.face} photosById={photosById} /> }
+      return { key: s.face.id, label: `${i + 1}`, aspectRatio: 2 * pageAspect, render: <HeroSpreadThumbnail face={s.face} photosById={photosById} /> }
     })
-  }, [spreads, photosById, coverPhoto, book])
+  }, [spreads, photosById, coverPhoto, book, pageAspect])
 
   // ── Fit-contain sizing — grande, aprovechando la pantalla ──────────────────
   const areaRef = useRef<HTMLDivElement>(null)
+  // panelSize = ANCHO de una página; panelH = su alto (igual en cuadrado).
   const [panelSize, setPanelSize] = useState(480)
+  const panelH = Math.round(panelSize / pageAspect)
   const [isMobile, setIsMobile] = useState(false)
   // Celular en horizontal (pantalla baja): las barras de arriba y abajo se
   // comían ~1/3 del alto y el libro quedaba chico. En ese caso la barra de
@@ -200,11 +207,11 @@ export default function BookPage() {
       setIsMobile(mobile)
       const byWidth = mobile ? width - 24 : (width - 40) / 2
       const byHeight = height - (window.innerHeight < 500 ? 10 : 24)
-      setPanelSize(Math.floor(Math.max(100, Math.min(byWidth, byHeight))))
+      setPanelSize(Math.floor(Math.max(100, Math.min(byWidth, byHeight * pageAspect))))
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [book, structure, compact])
+  }, [book, structure, compact, pageAspect])
 
   const gutterWidth = Math.round(Math.min(36, Math.max(14, panelSize * 0.05)))
 
@@ -371,7 +378,7 @@ export default function BookPage() {
 
   const panelStyle: React.CSSProperties = {
     width: `${panelSize}px`,
-    height: `${panelSize}px`,
+    height: `${panelH}px`,
     flexShrink: 0,
     overflow: 'hidden',
     background: '#F9F6F1',
@@ -433,6 +440,7 @@ export default function BookPage() {
   }
 
   return (
+    <PageAspectContext.Provider value={pageAspect}>
     <div style={{
       position: 'fixed', inset: 0,
       // Gris cálido claro, no blanco puro (se fundiría con el papel crema
@@ -528,7 +536,7 @@ export default function BookPage() {
               style={book.style || 'con-margen'}
               format={book.format || '30x30'}
               width={panelSize}
-              height={panelSize}
+              height={panelH}
               isMobile={isMobile}
               isCompositionCurrent={displaySpread.kind === 'composition'}
               gutterWidth={gutterWidth}
@@ -541,7 +549,7 @@ export default function BookPage() {
           <div style={{
             position: 'relative',
             width: `${spreadContainerW}px`,
-            height: `${panelSize}px`,
+            height: `${panelH}px`,
             filter: 'drop-shadow(0 26px 48px rgba(80,68,52,0.22)) drop-shadow(0 8px 20px rgba(80,68,52,0.16))',
           }}>
             {trans.phase === 'idle' ? (
@@ -628,5 +636,6 @@ export default function BookPage() {
       />
 
     </div>
+    </PageAspectContext.Provider>
   )
 }

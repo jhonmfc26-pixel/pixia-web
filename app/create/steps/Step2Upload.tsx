@@ -22,7 +22,7 @@ import { normalizeFiles, isHeicFile } from "@/core/modules/upload/normalizeFiles
 import { hashFileContent } from "@/core/modules/upload/contentHash";
 import { mergePhotoAnalysis, mergeR2Photos, readPhotoAnalysis, type PhotoAnalysisEntry } from "@/core/modules/upload/photoSession";
 import { estimateAlbumPages } from "@/core/modules/album/estimatePages";
-import { PAGES_INCLUDED, formatCop } from "@/lib/formats";
+import { PAGES_INCLUDED, formatCop, getFormat } from "@/lib/formats";
 import { PRICING } from "@/lib/wompi";
 
 // Genera thumbnail 150x150 base64 (~8-12KB por foto) para grids rápidos
@@ -485,8 +485,8 @@ export default function Step2Upload() {
     const analysis = readPhotoAnalysis();
     const entries = photos.map((p) => analysis.get(p.id)).filter((e): e is PhotoAnalysisEntry => !!e);
     if (entries.length !== photos.length) { setPageEstimate(null); return; }
-    try { setPageEstimate(estimateAlbumPages(entries)); } catch { setPageEstimate(null); }
-  }, [photos, isProcessing]);
+    try { setPageEstimate(estimateAlbumPages(entries, getFormat(state.format).blueprintFormat)); } catch { setPageEstimate(null); }
+  }, [photos, isProcessing, state.format]);
   const priorityCount = photos.filter((p) => p.priority).length;
 
   // ── Progreso SIEMPRE visible mientras se procesan fotos ────────────────────

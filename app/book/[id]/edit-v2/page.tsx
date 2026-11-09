@@ -15,7 +15,9 @@ import {
   addEmptySpread, removeSpread, convertToDedication, revertDedicationToPhotos, updateDedication, MAX_FACE_PHOTOS,
 } from '@/core/modules/foldModel/mutations'
 import { getBag } from '@/core/modules/foldModel/getBag'
-import { getHeroSlotIndex } from '@/core/modules/album/layoutFit'
+import { getHeroSlotIndex, pageLayoutsFor } from '@/core/modules/album/layoutFit'
+import { aspectOfFormat, setPageAspect, SQUARE } from '@/core/modules/album/pageGeometry'
+import { PageAspectContext } from '@/core/modules/viewer/PageAspectContext'
 import { hasDedication } from '@/core/modules/foldModel/validate'
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
@@ -278,9 +280,8 @@ function FaceDesignPanel({ selectedFace, canConvertToDedication, onAction, onClo
   /** Cierra el panel — hoy solo lo dispara Escape con foco en la tira. */
   onClose: () => void
 }) {
-  const faceLayouts = LAYOUTS.filter(
-    l => l.photoCount === selectedFace.photoIds.length && l.scope !== 'spread'
-  )
+  // Solo los que sirven en la página del formato (en vertical no hay dípticos-tira).
+  const faceLayouts = pageLayoutsFor(selectedFace.photoIds.length)
 
   // Scroll horizontal accesible: arrastre con mouse + rueda vertical (la tira
   // es horizontal, así que un wheel normal sin shift también debe moverla).
@@ -640,6 +641,15 @@ export default function EditV2Page() {
     })
   }
 
+  // Proporción de página del formato (vertical 21×28 = 0.75). Las mutaciones
+  // del editor eligen layouts con la geometría del motor (layoutFit), que la
+  // lee de pageGeometry: se fija mientras el editor está abierto.
+  const pageAspect = aspectOfFormat(book?.format)
+  useEffect(() => {
+    setPageAspect(pageAspect)
+    return () => setPageAspect(SQUARE)
+  }, [pageAspect])
+
   // ── Sesión activa — edit-v2 la EXIGE, no opera "a ciegas" sin ella ────────
   // Antes: sin sesión, handleDone caía en silencio a localStorage y mostraba
   // "Guardado" igual — el usuario perdía su trabajo sin ningún aviso. Ahora
@@ -800,7 +810,7 @@ export default function EditV2Page() {
     return structure.folds.map((fold, i): ThumbnailItem => {
       if (fold.kind === 'paired') {
         return {
-          key: fold.id, label: `${i + 1}`, aspectRatio: 2,
+          key: fold.id, label: `${i + 1}`, aspectRatio: 2 * pageAspect,
           render: (
             <div style={{ display: 'flex', width: '100%', height: '100%', gap: '1px' }}>
               <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={fold.left} photosById={photosById} /></div>
@@ -810,9 +820,9 @@ export default function EditV2Page() {
         }
       }
       // composition (hero-spread)
-      return { key: fold.id, label: `${i + 1}`, aspectRatio: 2, render: <HeroSpreadThumbnail face={fold.face} photosById={photosById} /> }
+      return { key: fold.id, label: `${i + 1}`, aspectRatio: 2 * pageAspect, render: <HeroSpreadThumbnail face={fold.face} photosById={photosById} /> }
     })
-  }, [structure, photosById])
+  }, [structure, photosById, pageAspect])
 
   // Saltar a un pliego desde la tira — mismo reset de selección que usan
   // los botones ‹/› de FoldStructureViewer al navegar.
@@ -1466,6 +1476,7 @@ export default function EditV2Page() {
   }
 
   return (
+    <PageAspectContext.Provider value={pageAspect}>
     <div style={{
       position: 'fixed', inset: 0,
       // Mismo fondo que el viewer — coherencia editar↔ver.
@@ -1950,5 +1961,6 @@ export default function EditV2Page() {
         </div>
       )}
     </div>
+    </PageAspectContext.Provider>
   )
 }

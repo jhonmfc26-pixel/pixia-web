@@ -2,6 +2,7 @@ import type { LayoutSchema } from './types'
 import { HERO_SPREAD_LAYOUT } from './heroSpread'
 import { RITMO_LAYOUTS_ENABLED } from './ritmoFlag'
 import { RITMO_PIXIA_LAYOUTS } from './ritmoPixiaRegistry'
+import { VERTICAL_LAYOUTS, type VerticalLayoutId } from './verticalLayouts'
 
 /**
  * Registry de layouts. Para agregar uno nuevo, solo añade un objeto aquí.
@@ -211,8 +212,12 @@ const LAYOUT_REGISTRY = [
 // trio-air, quad-soft, hero-banner-5, grid-5, quintet-air.
 type RitmoOnlyLayoutId = 'trio-air' | 'quad-soft' | 'hero-banner-5' | 'grid-5' | 'quintet-air'
 
-export type LayoutId = (typeof LAYOUT_REGISTRY)[number]['id'] | RitmoOnlyLayoutId
+export type LayoutId = (typeof LAYOUT_REGISTRY)[number]['id'] | RitmoOnlyLayoutId | VerticalLayoutId
 
-export const LAYOUTS: readonly LayoutSchema[] = RITMO_LAYOUTS_ENABLED
-  ? RITMO_PIXIA_LAYOUTS
-  : LAYOUT_REGISTRY
+// Los layouts verticales van en los dos catálogos: el motor los filtra por
+// geometría de página (layoutFit.layoutFitsPage), así que en 30×30 y 20×20
+// nunca se eligen.
+export const LAYOUTS: readonly LayoutSchema[] = [
+  ...(RITMO_LAYOUTS_ENABLED ? RITMO_PIXIA_LAYOUTS : LAYOUT_REGISTRY),
+  ...VERTICAL_LAYOUTS,
+]

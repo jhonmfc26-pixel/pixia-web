@@ -1,6 +1,7 @@
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
 import { extractPhotoPool, buildPages } from '@/core/modules/album/pageEngine'
 import { foldsFromPages } from './fromPages'
+import { withPageAspect, aspectOfFormat } from '@/core/modules/album/pageGeometry'
 import type { AlbumStructure } from './types'
 
 /**
@@ -20,6 +21,7 @@ export function foldsFromBlueprint(
   book: AlbumBlueprint & { manualPhotoOrder?: string[] },
 ): { structure: AlbumStructure; problems: string[] } {
   const pool = extractPhotoPool(book.spreads, book.manualPhotoOrder)
-  const { pages } = buildPages(pool)
+  // Layouts y recortes según la proporción de página del formato (vertical 3:4).
+  const { pages } = withPageAspect(aspectOfFormat(book.format), () => buildPages(pool))
   return foldsFromPages(pages)
 }
