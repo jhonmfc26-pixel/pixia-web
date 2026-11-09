@@ -34,4 +34,6 @@ export interface LayoutSchema {
   readonly slotOrientations?: ReadonlyArray<ReadonlyArray<LayoutPhotoOrientation>>
   /** Ver DensityTier arriba. Ausente en los layouts base (pre-Ritmo Pixia) — no se les asignó retroactivamente. */
   readonly tier?: DensityTier
+  /** Solo para páginas verticales (formato 21×28) — ver verticalLayouts.ts. */
+  readonly onlyVertical?: boolean
 }

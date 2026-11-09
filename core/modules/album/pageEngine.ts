@@ -1,7 +1,7 @@
 import type { Page, PageLayout, LayoutConfig, AlbumPages } from './types'
 import { getLayoutById, getLayoutsByPhotoCount } from './layouts/helpers'
 import { groupPhotos, type PhotoGroup, type PoolPhoto } from './groupPhotos'
-import { rankLayoutsForPhotos, bestAssignment, slotAspectRatios, getHeroSlotIndex, cropLoss } from './layoutFit'
+import { rankLayoutsForPhotos, bestAssignment, slotAspectRatios, getHeroSlotIndex, cropLoss, layoutFitsPage } from './layoutFit'
 import { photoAR } from './photoGeometry'
 import { devLog } from '@/lib/devLog'
 import { PAGES_INCLUDED } from '@/lib/formats'
@@ -93,6 +93,18 @@ function canUseLayoutForGroup(layout: PageLayout, group: PhotoGroup): boolean {
 // de modo que foldsFromPages empareje todo sin caras huérfanas.
 
 function selectMergeLayout(
+  count: number, photoIds: string[], poolById: Map<string, PoolPhoto>,
+): PageLayout {
+  const legacy = selectMergeLayoutLegacy(count, photoIds, poolById)
+  const schema = getLayoutById(legacy)
+  if (schema && layoutFitsPage(schema)) return legacy
+  // La elección fija de abajo pensaba en página cuadrada (p. ej. 'trio-row' =
+  // tres tiras en vertical): si no sirve en esta página, por geometría.
+  const ars = photoIds.map(id => poolById.get(id)).filter((p): p is PoolPhoto => !!p).map(photoAR)
+  return (rankLayoutsForPhotos(ars)[0]?.layoutId ?? 'single') as PageLayout
+}
+
+function selectMergeLayoutLegacy(
   count: number, photoIds: string[], poolById: Map<string, PoolPhoto>,
 ): PageLayout {
   const valid = getLayoutsByPhotoCount(count).filter(l => l.scope !== 'spread')

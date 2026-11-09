@@ -429,7 +429,7 @@ export default function CheckoutPage() {
   const pagesTotal = pricing?.pagesTotal ?? 0
   const tooFewPages = pricing !== null && pagesTotal < MIN_ALBUM_PAGES
   const fewerPages = pricing !== null && !tooFewPages && pagesTotal < PAGES_INCLUDED
-  const formValid = isFormValid() && reviewed && acceptedTerms && !tooFewPages && (!fewerPages || fewerPagesAck)
+  const formValid = isFormValid() && reviewed && acceptedTerms && !tooFewPages && (!fewerPages || fewerPagesAck) && albumFormat.available
 
   return (
     <>
@@ -672,6 +672,17 @@ export default function CheckoutPage() {
                   <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '16px 0' }} />
                   <Row label="Total" value={pricing.totalCop} bold />
                 </>
+              )}
+
+              {!albumFormat.available && (
+                <div role="alert" style={{
+                  marginTop: 24, padding: '14px 16px', borderRadius: 10,
+                  background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.28)',
+                  fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,0.85)',
+                }}>
+                  <strong style={{ color: '#fff' }}>El formato {albumFormat.name.toLowerCase()} {albumFormat.sizeLabel} llega muy pronto.</strong>{' '}
+                  Este álbum es de prueba y todavía no se puede pedir.
+                </div>
               )}
 
               {tooFewPages && (

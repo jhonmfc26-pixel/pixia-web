@@ -1,4 +1,5 @@
 'use client'
+import { usePageAspect } from '@/core/modules/viewer/PageAspectContext'
 import { useState, useEffect, useRef } from 'react'
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
@@ -308,6 +309,8 @@ export default function FoldStructureViewer({
   // Un pliego = dos caras cuadradas → relación 2:1. ResizeObserver calcula el
   // tamaño de cara que cabe en el área disponible respetando ambas dimensiones.
   const areaRef = useRef<HTMLDivElement>(null)
+  // panelSize = ancho de una cara; en el vertical 21×28 el alto es mayor (PageAspectContext).
+  const aspect = usePageAspect()
   const [panelSize, setPanelSize] = useState(480)
 
   useEffect(() => {
@@ -319,11 +322,11 @@ export default function FoldStructureViewer({
       const byWidth = (width - 48) / 2
       // 40px margen vertical (20px top + bottom)
       const byHeight = height - 40
-      setPanelSize(Math.floor(Math.max(100, Math.min(byWidth, byHeight))))
+      setPanelSize(Math.floor(Math.max(100, Math.min(byWidth, byHeight * aspect))))
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [aspect])
 
   // El gutter escala con el panel para que la proporción se mantenga —
   // angosto: es una sombra de lomo, no una franja separadora.
@@ -351,7 +354,7 @@ export default function FoldStructureViewer({
 
   const panelBase: React.CSSProperties = {
     width: `${panelSize}px`,
-    height: `${panelSize}px`,
+    height: `${Math.round(panelSize / aspect)}px`,
     background: '#F9F6F1',
     boxShadow: PANEL_SHADOW,
     position: 'relative',
