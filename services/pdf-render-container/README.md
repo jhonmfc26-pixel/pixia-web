@@ -86,6 +86,31 @@ docker run --rm -p 8080:8080 \
 curl http://localhost:8080/health
 ```
 
+## Redesplegar después de cambios en el código (lo más común)
+
+Cualquier cambio en `services/pdf-render-container/` o en el `core/` que
+importa (layouts, portada, impresión) solo llega a Cloud Run con un build y
+un deploy nuevos. El proyecto real es `project-d750839b-5664-4e5c-87b`
+(«pixia-print» es solo el nombre visible; los comandos de más abajo usan ese
+nombre como ejemplo y fallan con «Permission denied»).
+
+```bash
+# 1. Siempre desde main actualizado: el build sube TU copia local del repo.
+git checkout main && git pull
+
+# 2. Build con un tag nuevo (subir el número cada vez: v9, v10, …)
+gcloud config set project project-d750839b-5664-4e5c-87b
+gcloud builds submit --config services/pdf-render-container/cloudbuild.yaml \
+  --substitutions _IMAGE_TAG=gcr.io/project-d750839b-5664-4e5c-87b/pdf-render-container:v9 .
+
+# 3. Deploy: solo cambia la imagen; secretos, variables y memoria se mantienen.
+gcloud run deploy pixia-pdf-render --region us-central1 \
+  --image gcr.io/project-d750839b-5664-4e5c-87b/pdf-render-container:v9
+```
+
+Historial: v8 = trigger de PDF pagado (2026-11-03) · v9 = formato vertical,
+portada que cubre el sangrado y título sin palabras partidas (2026-11-09).
+
 ## Deploy a Google Cloud Run — paso a paso
 
 Asume que es la primera vez que se usa GCP para este proyecto.
