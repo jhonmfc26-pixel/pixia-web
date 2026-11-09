@@ -1,6 +1,6 @@
 'use client'
 import type { CoverConfig } from '@/core/contracts/AlbumBlueprint'
-import { getTemplateById } from './coverTemplates'
+import { getTemplateById, fitTitleSize } from './coverTemplates'
 import { manualCoverStyle, aspectOf } from '@/core/modules/viewer/manualCover'
 
 interface CoverRendererProps {
@@ -102,7 +102,8 @@ export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeigh
       }}>
         <h1 style={{
           fontFamily: `'${template.titleFont}', serif`,
-          fontSize: `${template.titleSize}cqw`,
+          // Achica el título si la palabra más larga no cabe (ver fitTitleSize).
+          fontSize: `${fitTitleSize(config.title, template)}cqw`,
           fontWeight: template.titleWeight,
           color: textColor,
           letterSpacing: template.letterSpacing,
@@ -116,6 +117,8 @@ export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeigh
           // es más fácil de gatillar, así que se cubre explícito.
           width: '100%',
           maxWidth: '100%',
+          // Solo como último recurso (palabras absurdamente largas): el tamaño
+          // ya se ajustó para que las palabras normales quepan enteras.
           overflowWrap: 'break-word',
         }}>
           {config.title}
