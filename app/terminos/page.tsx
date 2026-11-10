@@ -79,6 +79,7 @@ export default function TerminosPage() {
       <Section id="servicio" n={3} title="Cómo funciona el servicio">
         <List items={[
           <>Eliges el tipo de historia y el <Strong>tamaño del álbum</Strong> ({sizesText}), y subes tus fotos. El tamaño queda fijo al crear el álbum: si quieres otro, crea un álbum nuevo. Pixia las ordena y propone un diseño página por página usando herramientas automáticas (incluida inteligencia artificial). Puedes cambiar el diseño, el orden, la portada y los textos antes de pagar.</>,
+          <><Strong>Cuánto guardamos tu álbum:</Strong> uno sin comprar se guarda, y lo puedes seguir editando, durante <Strong>{COMMERCIAL.draftRetentionDays} días desde que lo creas</Strong>; después se borra junto con sus fotos. Uno comprado lo guardamos, con sus fotos y su archivo de impresión, hasta {COMMERCIAL.warrantyDays} días después de la entrega (el plazo de la garantía); después los borramos y conservamos solo los datos del pedido.</>,
           <><Strong>La vista previa es una representación digital.</Strong> Los colores en pantalla dependen del brillo y la calibración de cada dispositivo, por lo que el impreso puede verse ligeramente distinto. Los bordes de cada página tienen una pequeña zona de corte, por lo que una franja muy delgada del borde de las fotos a página completa puede quedar fuera.</>,
           <>Si una foto tiene baja resolución te lo advertimos cuando sea posible; si decides usarla, puede verse borrosa o pixelada en el impreso.</>,
           <>Los textos (título, nombres, fechas) se imprimen tal como los escribes. Revisa la ortografía antes de aprobar.</>,
@@ -137,7 +138,7 @@ export default function TerminosPage() {
           recibirlo, déjalo anotado también en la guía de la transportadora.
         </p>
         <p>
-          Además, tu álbum tiene la garantía legal de calidad e idoneidad del Estatuto del Consumidor: Pixia responde durante <Strong>{COMMERCIAL.warrantyMonths} meses desde la entrega</Strong> por
+          Además, tu álbum tiene la garantía legal de calidad e idoneidad del Estatuto del Consumidor: Pixia responde durante <Strong>{COMMERCIAL.warrantyDays} días desde la entrega</Strong> por
           defectos de fabricación, es decir, los que no vienen del uso, por ejemplo:
         </p>
         <List items={[

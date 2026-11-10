@@ -10,8 +10,8 @@
  * TERMS_VERSION: cada pedido guarda la versión que el cliente aceptó.
  */
 
-export const TERMS_VERSION = '2026-11-10.1' // .1: garantía — revisar al recibir y reportar daños visibles en 3 días hábiles; uso indebido no cubierto (antes .09.2: tres tamaños)
-export const TERMS_UPDATED_LABEL = '6 de noviembre de 2026'
+export const TERMS_VERSION = '2026-11-10.2' // .2: garantía de fabricación 30 días; borradores y archivos se guardan 30 días (.1: daños visibles en 3 días hábiles)
+export const TERMS_UPDATED_LABEL = '9 de noviembre de 2026'
 
 export const LEGAL_ENTITY = {
   brand: 'Pixia',
@@ -40,10 +40,14 @@ export const COMMERCIAL = {
   deliveryLabel: 'hasta 8 días hábiles',
   /**
    * Garantía por defectos de fabricación (impresión, encuadernación,
-   * materiales). PROVISIONAL: Jhon la ajusta a la garantía que le dé Range
-   * (Ley 1480 art. 8: vale el plazo anunciado; sin anuncio, 1 año).
+   * materiales), desde la entrega. 30 días: decisión de Jhon (2026-11-09).
+   * Ley 1480 art. 8: vale el plazo que anuncia el vendedor (sin anuncio, 1
+   * año). También es el tiempo que se guardan las fotos y el archivo de
+   * impresión de un pedido entregado (ver lib/retention.ts y /privacidad).
    */
-  warrantyMonths: 6,
+  warrantyDays: 30,
+  /** Un álbum sin comprar se guarda (y se puede seguir editando) estos días desde que se creó. */
+  draftRetentionDays: 30,
   /**
    * Para reportar daños visibles al recibir (golpes, humedad, rayones,
    * cortes, fallas de impresión a simple vista), desde la entrega. Jhon,
