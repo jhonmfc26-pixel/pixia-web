@@ -6,6 +6,11 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { orderStage, type OrderStage } from '@/core/modules/album/orderLock'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import { listLocalBooks } from '@/core/engine/localBookStorage'
+import { normalizeBook } from '@/core/modules/album/normalizeBook'
+import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
+import { countRealPages, validateAlbumStructure } from '@/core/modules/foldModel/validate'
+import type { AlbumStructure } from '@/core/modules/foldModel/types'
 import type { BlueprintStatus, OccasionType } from '@/core/contracts/AlbumBlueprint'
 import type { PhotoAsset, Spread } from '@/core/contracts/AlbumBlueprint'
 
@@ -18,6 +23,7 @@ interface BlueprintRow {
   occasion: OccasionType
   page_count: number
   format?: string | null
+  structure?: AlbumStructure | null
   created_at: string
   updated_at: string
 }
@@ -45,6 +51,52 @@ function occasionLabel(occasion: OccasionType): string {
     aniversario: 'Aniversario', familia: 'Familia', mascota: 'Mascota',
   }
   return map[occasion] ?? occasion
+}
+
+const toIso = (d: unknown): string => {
+  const t = d ? new Date(d as string).getTime() : NaN
+  return Number.isFinite(t) ? new Date(t).toISOString() : new Date(0).toISOString()
+}
+
+/** Borradores guardados en este navegador (creados sin iniciar sesión), con la forma de una fila de Supabase. */
+async function loadLocalRows(): Promise<BlueprintRow[]> {
+  const local = await listLocalBooks().catch(() => [])
+  const rows: BlueprintRow[] = []
+  for (const { id, book } of local) {
+    try {
+      const bp = normalizeBook(book, id)
+      if (!bp.spreads?.length) continue
+      rows.push({
+        id: bp.id || id,
+        cover: bp.cover as BlueprintRow['cover'],
+        spreads: bp.spreads,
+        narrative: bp.narrative as BlueprintRow['narrative'],
+        status: bp.status ?? 'draft',
+        occasion: bp.occasion,
+        page_count: bp.pageCount,
+        format: bp.format,
+        structure: bp.structure ?? null,
+        created_at: toIso(book.createdAt ?? bp.createdAt),
+        updated_at: toIso(book.updatedAt ?? bp.updatedAt ?? book.createdAt),
+      })
+    } catch { /* álbum local ilegible: se omite */ }
+  }
+  return rows
+}
+
+/**
+ * Páginas reales del álbum (las que se imprimen y se cobran), igual que el
+ * checkout: la structure guardada si es válida, si no la que arma el motor.
+ * page_count de la fila es un conteo viejo de la IA y no coincide.
+ */
+function realPages(row: BlueprintRow): number | null {
+  try {
+    if (row.structure && validateAlbumStructure(row.structure).ok) return countRealPages(row.structure)
+    const bp = normalizeBook(row as unknown as Record<string, unknown>, row.id)
+    return countRealPages(foldsFromBlueprint(bp).structure)
+  } catch {
+    return row.page_count || null
+  }
 }
 
 type StatusGroup = 'draft' | OrderStage
@@ -76,13 +128,22 @@ export default function MisAlbumesPage() {
   const [albums, setAlbums] = useState<BlueprintRow[]>([])
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [needsLogin, setNeedsLogin] = useState(false)
+  // Sin sesión pero con borradores en este navegador: se listan igual.
+  const [localOnly, setLocalOnly] = useState(false)
 
   useEffect(() => {
     supabaseBrowser.auth.getSession().then(async ({ data: { session } }) => {
+      const localRows = await loadLocalRows()
       if (!session) {
-        // Antes mandaba a la home: el cliente que pagó en otro dispositivo no
-        // tenía cómo volver a ver su álbum. Ahora puede entrar con su correo.
-        setNeedsLogin(true)
+        // Quien no ha comprado no tiene cuenta, pero sí sus borradores en este
+        // dispositivo: se muestran. Sin nada, se pide el correo (para quien
+        // compró en otro dispositivo) o se ofrece crear el primero.
+        if (localRows.length > 0) {
+          setAlbums(localRows.sort((a, b) => b.updated_at.localeCompare(a.updated_at)))
+          setLocalOnly(true)
+        } else {
+          setNeedsLogin(true)
+        }
         setLoading(false)
         return
       }
@@ -91,14 +152,18 @@ export default function MisAlbumesPage() {
 
       const { data, error } = await supabaseBrowser
         .from('blueprints')
-        .select('id, cover, spreads, status, occasion, format, page_count, created_at, updated_at, narrative')
+        .select('id, cover, spreads, status, occasion, format, page_count, structure, created_at, updated_at, narrative')
         .order('updated_at', { ascending: false })
 
       if (error) {
         console.error('[mis-albumes] Error fetching blueprints:', error)
       }
 
-      setAlbums((data ?? []) as BlueprintRow[])
+      // Más los borradores de este navegador que todavía no están en la cuenta.
+      const remote = (data ?? []) as BlueprintRow[]
+      const remoteIds = new Set(remote.map(r => r.id))
+      setAlbums([...remote, ...localRows.filter(r => !remoteIds.has(r.id))]
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at)))
       setLoading(false)
     })
   }, [router])
@@ -117,7 +182,7 @@ export default function MisAlbumesPage() {
     }
   }
 
-  if (needsLogin) return <LoginPrompt />
+  if (needsLogin) return <LoginPrompt onCreate={() => router.push('/create')} />
 
   return (
     <div style={{ minHeight: '100vh', background: '#0f0f0f', color: '#fff' }}>
@@ -173,6 +238,20 @@ export default function MisAlbumesPage() {
 
       {/* Contenido */}
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '40px 32px' }}>
+
+        {localOnly && !loading && (
+          <div style={{
+            marginBottom: '28px', padding: '14px 18px', borderRadius: '10px',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+            fontSize: '13px', lineHeight: 1.55, color: 'rgba(255,255,255,0.65)',
+          }}>
+            Estos álbumes están guardados en este dispositivo.{' '}
+            <button onClick={() => { setLocalOnly(false); setNeedsLogin(true) }}
+              style={{ background: 'none', border: 'none', padding: 0, color: '#F08A72', textDecoration: 'underline', cursor: 'pointer', fontSize: '13px' }}>
+              ¿Compraste un álbum? Entra con tu correo
+            </button>{' '}para ver tus pedidos.
+          </div>
+        )}
 
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', paddingTop: '80px' }}>
@@ -277,7 +356,7 @@ export default function MisAlbumesPage() {
                         {occasionLabel(row.occasion)}
                       </span>
                       <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)' }}>
-                        {shortSize(formatOfBook(row.format))} cm · {row.page_count || '—'} páginas
+                        {shortSize(formatOfBook(row.format))} cm · {realPages(row) ?? '—'} páginas
                       </span>
                     </div>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
@@ -295,9 +374,9 @@ export default function MisAlbumesPage() {
 }
 
 /** Entrar con un enlace al correo (el mismo login del checkout). */
-function LoginPrompt() {
+function LoginPrompt({ onCreate }: { onCreate: () => void }) {
   const [email, setEmail] = useState('')
-  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error' | 'unknown'>('idle')
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -308,6 +387,9 @@ function LoginPrompt() {
       email: email.trim(),
       options: { emailRedirectTo: `${window.location.origin}/auth/callback`, shouldCreateUser: false },
     })
+    // Con shouldCreateUser:false, un correo sin cuenta (nunca compró) da error
+    // de "signups not allowed": no es una falla, es que no hay álbumes ahí.
+    if (error && /signup|not allowed|not found/i.test(error.message)) { setState('unknown'); return }
     setState(error ? 'error' : 'sent')
   }
 
@@ -325,7 +407,7 @@ function LoginPrompt() {
             <p className="mt-3 text-white/60">Escribe el correo con el que hiciste tu pedido y te enviamos un enlace para entrar.</p>
             <form onSubmit={send} className="mt-8 space-y-3">
               <input type="email" inputMode="email" autoComplete="email" required value={email}
-                onChange={e => { setEmail(e.target.value); if (state === 'error') setState('idle') }}
+                onChange={e => { setEmail(e.target.value); if (state === 'error' || state === 'unknown') setState('idle') }}
                 placeholder="tu@correo.com"
                 className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-[var(--brand-coral)]" />
               <button type="submit" disabled={state === 'sending'}
@@ -338,9 +420,21 @@ function LoginPrompt() {
               {state === 'error' && (
                 <p className="text-sm text-[#F08A72]">No pudimos enviar el enlace. Revisa el correo (debe ser el de tu pedido) e inténtalo de nuevo.</p>
               )}
+              {state === 'unknown' && (
+                <p className="text-sm text-[#F08A72]">No encontramos pedidos con ese correo. Revisa que sea el mismo con el que compraste.</p>
+              )}
             </form>
           </>
         )}
+
+        {/* Quien todavía no tiene álbumes: crear el primero (Jhon, 2026-11-09). */}
+        <div className="mt-10 border-t border-white/10 pt-8">
+          <p className="text-sm text-white/55">¿Todavía no tienes álbumes?</p>
+          <button type="button" onClick={onCreate}
+            className="mt-3 w-full rounded-xl border border-white/15 bg-white/[0.04] px-6 py-3.5 font-medium text-white transition hover:bg-white/[0.08]">
+            Crear mi primer álbum
+          </button>
+        </div>
       </div>
     </main>
   )
