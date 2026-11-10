@@ -183,6 +183,7 @@
 
 /* Acciones de la barra (Mis álbumes con sesión + Crear álbum) */
 .st-nav-actions { display: flex; align-items: center; gap: 18px; }
-.st-nav-link { font-size: 13px; color: #3a3a3c; }
+.st-nav-link { font-size: 13px; color: #3a3a3c; white-space: nowrap; }
+@media (max-width: 720px) { .st-nav-actions { gap: 14px; } }
 .st-nav.dark .st-nav-link { color: #F5F5F7; }
 .st-root a:focus-visible, .st-root button:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; border-radius: 6px; }

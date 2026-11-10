@@ -1,9 +1,8 @@
 'use client'
 /* eslint-disable @next/next/no-img-element -- fotos estáticas en /public, sin optimizador en Cloudflare Pages */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { supabaseBrowser } from '@/lib/supabase-browser'
 import { FORMATS, LOWEST_PRICE_COP, formatCop, type AlbumFormat } from '@/lib/formats'
 import { COMMERCIAL } from '@/lib/legal'
 import './studio.css'
@@ -22,12 +21,6 @@ const IMG = (name: string) => `/showcase/${name}.jpg`
 
 export default function StudioHome() {
   const root = useRef<HTMLDivElement>(null)
-  const [loggedIn, setLoggedIn] = useState(false)
-
-  useEffect(() => {
-    supabaseBrowser.auth.getSession().then(({ data: { session } }) => setLoggedIn(!!session)).catch(() => {})
-  }, [])
-
   // El fondo del documento acompaña al de la página (rebote del scroll en iPhone).
   useEffect(() => {
     const prev = document.body.style.background
@@ -55,7 +48,10 @@ export default function StudioHome() {
           <li><a href="#precios">Precios</a></li>
         </ul>
         <div className="st-nav-actions">
-          {loggedIn && <Link href="/mis-albumes" className="st-nav-link">Mis álbumes</Link>}
+          {/* Siempre visible: con sesión lista los álbumes de la cuenta; sin
+              sesión, los borradores de este dispositivo o la opción de entrar
+              con el correo del pedido / crear el primero. */}
+          <Link href="/mis-albumes" className="st-nav-link">Mis álbumes</Link>
           <Link href="/create" className="st-pill">Crear álbum</Link>
         </div>
       </nav>

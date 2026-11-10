@@ -91,3 +91,29 @@ export function getBookFromLocal(bookId: string): PixiaBook | null {
   if (typeof window === 'undefined') return null
   return (readLegacy()[bookId] as PixiaBook) ?? null
 }
+
+/**
+ * Todos los álbumes guardados en ESTE navegador (los que el cliente creó sin
+ * iniciar sesión). Para "Mis álbumes": quien no ha comprado no tiene cuenta,
+ * pero sí sus borradores acá.
+ */
+export async function listLocalBooks(): Promise<{ id: string; book: RawBook }[]> {
+  if (typeof window === 'undefined') return []
+  try {
+    const db = await openDb()
+    try {
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly')
+        const store = tx.objectStore(STORE)
+        const keysReq = store.getAllKeys()
+        const valsReq = store.getAll()
+        tx.oncomplete = () => resolve(keysReq.result.map((k, i) => ({ id: String(k), book: valsReq.result[i] as RawBook })))
+        tx.onerror = () => reject(tx.error)
+      })
+    } finally {
+      db.close()
+    }
+  } catch {
+    return Object.entries(readLegacy()).map(([id, book]) => ({ id, book }))
+  }
+}
