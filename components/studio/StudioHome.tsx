@@ -184,9 +184,9 @@ function FormatSlot({ format: f }: { format: AlbumFormat }) {
       <div className="st-holder">
         <div className="st-floor" />
         <div className="st-book">
-          <div className="st-back" style={f.id === '20x20' ? KIDS_CLOTH : undefined} />
+          <div className="st-back" />
           <div className="st-edge-t" /><div className="st-edge-b" /><div className="st-edge-r" />
-          <div className="st-spine" style={f.id === '20x20' ? KIDS_CLOTH : undefined} />
+          <div className="st-spine" />
           <div className="st-cover">
             <div className="st-face st-cover-front">
               <span className="st-grain" />
@@ -225,7 +225,7 @@ function FormatSlot({ format: f }: { format: AlbumFormat }) {
 }
 
 /**
- * Lomo de tela con el título del álbum (de arriba hacia abajo, como los
+ * Lomo impreso (mismo material de la cubierta) con el título del álbum (de arriba hacia abajo, como los
  * libros en español) y la marca Pixia al pie. Todo escala con el grosor del
  * libro (--t).
  */
@@ -238,7 +238,6 @@ function Spine({ title, style }: { title: string; style?: React.CSSProperties })
   )
 }
 
-const KIDS_CLOTH = { ['--tela' as string]: '#C99A86' } as React.CSSProperties
 const PROCESS_PHOTOS = ['playa', 'boda-paseo', 'boda-beso', 'aniversario', 'viaje-carretera', 'recuerdos', 'playa', 'boda-paseo']
 
 // ── Motor de escenas (portado del prototipo aprobado) ────────────────────────
@@ -309,7 +308,7 @@ function startScrollScenes(root: HTMLElement): () => void {
     const turn = ease(seg(p, 0, .3)), open = ease(seg(p, .32, .66)), zoom = ease(seg(p, .7, 1))
     const closedScale = mobile() ? 1.35 : 1.15
     const s = lerp(lerp(mobile() ? 1.1 : .92, closedScale, turn), 1, open) * lerp(1, mobile() ? 1.04 : 1.3, zoom)
-    // Empieza mostrando el lomo de tela y gira de frente hacia ti; abierto, sigue flotando (opción A).
+    // Empieza mostrando el lomo y gira de frente hacia ti; abierto, sigue flotando (opción A).
     const rx = lerp(14, 4, turn) * (1 - open), ry = lerp(42, 0, turn), rz = lerp(2, 0, turn)
     const tx = lerp(0, HW / 2, open)
     // Sube recién cuando el texto ya se desvaneció (el texto se va entre 3 % y 12 %).
