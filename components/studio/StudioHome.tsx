@@ -169,7 +169,7 @@ export default function StudioHome() {
       <section className="st-final" id="precios">
         <h2>Tu próximo álbum empieza<br />con una foto.</h2>
         <p>
-          Desde {formatCop(LOWEST_PRICE_COP)}. Envío gratis a toda Colombia. Garantía de {COMMERCIAL.warrantyMonths} meses.
+          Desde {formatCop(LOWEST_PRICE_COP)}. Envío gratis a toda Colombia. Garantía de {COMMERCIAL.warrantyDays} días.
         </p>
         <div className="st-ctas"><Link href="/create" className="st-btn primary">Crear mi álbum</Link></div>
       </section>

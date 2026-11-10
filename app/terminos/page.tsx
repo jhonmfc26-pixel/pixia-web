@@ -79,6 +79,7 @@ export default function TerminosPage() {
       <Section id="servicio" n={3} title="Cómo funciona el servicio">
         <List items={[
           <>Eliges el tipo de historia y el <Strong>tamaño del álbum</Strong> ({sizesText}), y subes tus fotos. El tamaño queda fijo al crear el álbum: si quieres otro, crea un álbum nuevo. Pixia las ordena y propone un diseño página por página usando herramientas automáticas (incluida inteligencia artificial). Puedes cambiar el diseño, el orden, la portada y los textos antes de pagar.</>,
+          <><Strong>Cuánto guardamos tu álbum:</Strong> uno sin comprar se guarda, y lo puedes seguir editando, durante <Strong>{COMMERCIAL.draftRetentionDays} días desde que lo creas</Strong>; después se borra junto con sus fotos. Uno comprado lo guardamos, con sus fotos y su archivo de impresión, hasta {COMMERCIAL.warrantyDays} días después de la entrega (el plazo de la garantía); después los borramos y conservamos solo los datos del pedido.</>,
           <><Strong>La vista previa es una representación digital.</Strong> Los colores en pantalla dependen del brillo y la calibración de cada dispositivo, por lo que el impreso puede verse ligeramente distinto. Los bordes de cada página tienen una pequeña zona de corte, por lo que una franja muy delgada del borde de las fotos a página completa puede quedar fuera.</>,
           <>Si una foto tiene baja resolución te lo advertimos cuando sea posible; si decides usarla, puede verse borrosa o pixelada en el impreso.</>,
           <>Los textos (título, nombres, fechas) se imprimen tal como los escribes. Revisa la ortografía antes de aprobar.</>,
@@ -131,13 +132,18 @@ export default function TerminosPage() {
 
       <Section id="garantia" n={8} title="Garantía">
         <p>
-          Tu álbum tiene la garantía legal de calidad e idoneidad del Estatuto del Consumidor. Pixia responde durante <Strong>{COMMERCIAL.warrantyMonths} meses desde la entrega</Strong> por
-          defectos de fabricación, por ejemplo:
+          <Strong>Revisa tu álbum el mismo día que lo recibes.</Strong> Si llega con un daño visible (tapa golpeada, humedad, rayones, cortes, páginas
+          rasgadas, empaque roto o una falla de impresión a simple vista), repórtalo dentro de los <Strong>{COMMERCIAL.transportDamageBusinessDays} días hábiles</Strong> siguientes
+          a la entrega, con fotos del álbum y del empaque. Así podemos reclamar a la transportadora y reponerte el álbum rápido. Si notas el daño al
+          recibirlo, déjalo anotado también en la guía de la transportadora.
+        </p>
+        <p>
+          Además, tu álbum tiene la garantía legal de calidad e idoneidad del Estatuto del Consumidor: Pixia responde durante <Strong>{COMMERCIAL.warrantyDays} días desde la entrega</Strong> por
+          defectos de fabricación, es decir, los que no vienen del uso, por ejemplo:
         </p>
         <List items={[
           'Fallas de impresión: rayas, manchas, páginas en blanco o colores notoriamente distintos del archivo aprobado (más allá de la variación normal entre pantalla e impreso).',
-          'Fallas de encuadernación o materiales: hojas que se sueltan, tapa despegada o páginas en desorden respecto al archivo aprobado.',
-          <>Daños del transporte (tapa golpeada, humedad, empaque roto): repórtalos dentro de los <Strong>{COMMERCIAL.transportDamageBusinessDays} días hábiles</Strong> siguientes a la entrega, con fotos del álbum y del empaque.</>,
+          'Fallas de encuadernación o materiales con un uso normal: hojas que se sueltan, tapa que se despega o páginas en desorden respecto al archivo aprobado.',
         ]} />
         <p>
           <Strong>Cómo la hacemos efectiva:</Strong> radica una solicitud de garantía en <Link className="underline" href="/soporte?tipo=garantia">pixiaa.com/soporte</Link> con tu número de orden y envíanos fotos del defecto. Te respondemos
@@ -149,7 +155,8 @@ export default function TerminosPage() {
           'Lo que estaba en la vista previa que aprobaste: errores de ortografía, fotos elegidas, orden, recortes o diseño.',
           'La baja calidad propia de una foto (desenfocada, oscura o de baja resolución).',
           'Variaciones leves de color entre la pantalla y el papel.',
-          'El desgaste por uso o los daños por mal manejo, humedad, calor o exposición prolongada al sol después de la entrega.',
+          'El desgaste normal por uso.',
+          'Los daños causados después de la entrega por uso indebido o accidentes: hojas rasgadas, dobladas, rayadas o pintadas, golpes, caídas, contacto con agua o líquidos, calor o exposición prolongada al sol (artículo 16 de la Ley 1480 de 2011). Si un daño no se reportó al recibir el álbum, revisaremos las fotos para establecer si es de fabricación o de uso.',
         ]} />
       </Section>
 

@@ -10,8 +10,8 @@
  * TERMS_VERSION: cada pedido guarda la versión que el cliente aceptó.
  */
 
-export const TERMS_VERSION = '2026-11-09.2' // .2: se suma el tamaño vertical 21×28 a la lista de precios (.1: 10 a 19 páginas pagan el precio base; .08.1 precio por tamaño)
-export const TERMS_UPDATED_LABEL = '6 de noviembre de 2026'
+export const TERMS_VERSION = '2026-11-10.2' // .2: garantía de fabricación 30 días; borradores y archivos se guardan 30 días (.1: daños visibles en 3 días hábiles)
+export const TERMS_UPDATED_LABEL = '9 de noviembre de 2026'
 
 export const LEGAL_ENTITY = {
   brand: 'Pixia',
@@ -38,10 +38,24 @@ export const COMMERCIAL = {
   shippingLabel: '1 a 5 días hábiles según tu ciudad',
   deliveryMaxBusinessDays: 8,
   deliveryLabel: 'hasta 8 días hábiles',
-  /** Garantía por defectos de impresión, encuadernación o materiales. */
-  warrantyMonths: 6,
-  /** Para reportar daños visibles del transporte, desde la entrega. */
-  transportDamageBusinessDays: 5,
+  /**
+   * Garantía por defectos de fabricación (impresión, encuadernación,
+   * materiales), desde la entrega. 30 días: decisión de Jhon (2026-11-09).
+   * Ley 1480 art. 8: vale el plazo que anuncia el vendedor (sin anuncio, 1
+   * año). También es el tiempo que se guardan las fotos y el archivo de
+   * impresión de un pedido entregado (ver lib/retention.ts y /privacidad).
+   */
+  warrantyDays: 30,
+  /** Un álbum sin comprar se guarda (y se puede seguir editando) estos días desde que se creó. */
+  draftRetentionDays: 30,
+  /**
+   * Para reportar daños visibles al recibir (golpes, humedad, rayones,
+   * cortes, fallas de impresión a simple vista), desde la entrega. Jhon,
+   * 2026-11-09: un álbum se revisa el mismo día que llega. Es un plazo para
+   * avisar (y reclamar a la transportadora), no para perder la garantía de
+   * fabricación: limitarla sería cláusula abusiva (art. 43 num. 1 y 3).
+   */
+  transportDamageBusinessDays: 3,
   /** Plazo para devolver dinero cuando proceda (Ley 2439 de 2024). */
   refundCalendarDays: 15,
   /** Respuesta a peticiones, quejas y reclamos. */

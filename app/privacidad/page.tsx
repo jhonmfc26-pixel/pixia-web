@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalDoc, Section, List, Strong, EntityBlock } from '@/components/legal/LegalDoc'
-import { LEGAL_ENTITY, SIC_URL, TERMS_UPDATED_LABEL } from '@/lib/legal'
+import { COMMERCIAL, LEGAL_ENTITY, SIC_URL, TERMS_UPDATED_LABEL } from '@/lib/legal'
 
 export const metadata: Metadata = {
   title: 'Política de tratamiento de datos personales',
@@ -106,8 +106,9 @@ export default function PrivacidadPage() {
 
       <Section id="conservacion" n={7} title="Cuánto tiempo los guardamos">
         <List items={[
-          'Tu cuenta, tus fotos y tus álbumes: mientras tu cuenta esté activa, para que puedas volver a verlos, o hasta que nos pidas borrarlos.',
-          'El archivo de impresión de un pedido: durante el periodo de garantía, para poder reimprimir si hace falta.',
+          `Un álbum que no compras y sus fotos: ${COMMERCIAL.draftRetentionDays} días desde que lo creas. Después se borran automáticamente.`,
+          `Un álbum que compras, sus fotos y su archivo de impresión: hasta ${COMMERCIAL.warrantyDays} días después de la entrega (el plazo de la garantía), para poder reimprimir si hace falta. Después se borran automáticamente.`,
+          'Tu cuenta (correo y nombre): mientras esté activa o hasta que nos pidas borrarla.',
           'Los datos del pedido y la facturación: durante el tiempo que exigen las normas contables, tributarias y comerciales.',
           'Las solicitudes de soporte y PQR: durante el tiempo necesario para atenderlas y demostrar que las atendimos.',
         ]} />
