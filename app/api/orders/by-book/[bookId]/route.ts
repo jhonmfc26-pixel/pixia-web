@@ -19,7 +19,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ book
   const { bookId } = await params
   const { data, error } = await supabaseAdmin
     .from('orders')
-    .select('reference, user_id, customer_email, print_status, paid_at, printing_at, shipped_at, delivered_at, shipping_carrier, tracking_number, tracking_url, shipping_city')
+    // '*' y no una lista: assets_purged_at (supabase/almacenamiento.sql) puede no existir todavía.
+    .select('*')
     .eq('book_id', bookId)
     .eq('payment_status', 'approved')
     .order('paid_at', { ascending: false })
@@ -43,6 +44,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ book
       tracking_number: data.tracking_number,
       tracking_url: data.tracking_url,
       shipping_city: data.shipping_city,
+      // Fotos y PDF borrados por la política de conservación (30 días después de la entrega).
+      assets_purged_at: data.assets_purged_at ?? null,
     },
   })
 }

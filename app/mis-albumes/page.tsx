@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { orderStage, type OrderStage } from '@/core/modules/album/orderLock'
 import { supabaseBrowser } from '@/lib/supabase-browser'
-import { listLocalBooks } from '@/core/engine/localBookStorage'
+import { listLocalBooks, deleteLocalBook } from '@/core/engine/localBookStorage'
+import { draftDaysLeft } from '@/lib/retention'
+import { COMMERCIAL } from '@/lib/legal'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import { countRealPages, validateAlbumStructure } from '@/core/modules/foldModel/validate'
@@ -66,6 +68,13 @@ async function loadLocalRows(): Promise<BlueprintRow[]> {
     try {
       const bp = normalizeBook(book, id)
       if (!bp.spreads?.length) continue
+      // Borrador vencido (política de 30 días): sus fotos ya se borraron del
+      // servidor, así que la copia local tampoco sirve.
+      const created = book.createdAt ?? book.identity?.createdAt ?? bp.createdAt
+      if (statusGroup(bp.status ?? 'draft') === 'draft' && draftDaysLeft(created, new Date(), COMMERCIAL.draftRetentionDays) <= 0) {
+        await deleteLocalBook(id)
+        continue
+      }
       rows.push({
         id: bp.id || id,
         cover: bp.cover as BlueprintRow['cover'],
@@ -76,7 +85,7 @@ async function loadLocalRows(): Promise<BlueprintRow[]> {
         page_count: bp.pageCount,
         format: bp.format,
         structure: bp.structure ?? null,
-        created_at: toIso(book.createdAt ?? bp.createdAt),
+        created_at: toIso(book.createdAt ?? book.identity?.createdAt ?? bp.createdAt),
         updated_at: toIso(book.updatedAt ?? bp.updatedAt ?? book.createdAt),
       })
     } catch { /* álbum local ilegible: se omite */ }
@@ -160,7 +169,9 @@ export default function MisAlbumesPage() {
       }
 
       // Más los borradores de este navegador que todavía no están en la cuenta.
-      const remote = (data ?? []) as BlueprintRow[]
+      // Los borradores vencidos los borra la limpieza diaria; mientras tanto no se muestran.
+      const remote = ((data ?? []) as BlueprintRow[]).filter(r =>
+        statusGroup(r.status) !== 'draft' || draftDaysLeft(r.created_at, new Date(), COMMERCIAL.draftRetentionDays) > 0)
       const remoteIds = new Set(remote.map(r => r.id))
       setAlbums([...remote, ...localRows.filter(r => !remoteIds.has(r.id))]
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at)))
@@ -359,9 +370,21 @@ export default function MisAlbumesPage() {
                         {shortSize(formatOfBook(row.format))} cm · {realPages(row) ?? '—'} páginas
                       </span>
                     </div>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
-                      {formatDate(row.updated_at)}
-                    </p>
+                    {group === 'draft' ? (() => {
+                      // Contador de la política de conservación: un borrador se guarda
+                      // (y se puede editar) 30 días desde que se creó.
+                      const left = draftDaysLeft(row.created_at, new Date(), COMMERCIAL.draftRetentionDays)
+                      const soon = left <= 7
+                      return (
+                        <p style={{ fontSize: '11px', color: soon ? '#fbbf24' : 'rgba(255,255,255,0.4)' }}>
+                          {left <= 1 ? 'Se borra mañana' : `Se borra en ${left} días`} si no lo compras · creado el {formatDate(row.created_at)}
+                        </p>
+                      )
+                    })() : (
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
+                        {formatDate(row.updated_at)}
+                      </p>
+                    )}
                   </div>
                 </button>
               )

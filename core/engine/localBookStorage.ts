@@ -117,3 +117,13 @@ export async function listLocalBooks(): Promise<{ id: string; book: RawBook }[]>
     return Object.entries(readLegacy()).map(([id, book]) => ({ id, book }))
   }
 }
+
+/** Borra la copia local (borrador vencido: sus fotos ya no existen en el servidor). */
+export async function deleteLocalBook(bookId: string): Promise<void> {
+  if (typeof window === 'undefined') return
+  try { await idb('readwrite', s => s.delete(bookId)) } catch { /* no importa */ }
+  try {
+    const legacy = readLegacy()
+    if (legacy[bookId]) { delete legacy[bookId]; localStorage.setItem(LEGACY_KEY, JSON.stringify(legacy)) }
+  } catch { /* no importa */ }
+}
