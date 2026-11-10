@@ -49,3 +49,26 @@ export async function sendPdfFailureAlert(job: QueueJob): Promise<boolean> {
     return false
   }
 }
+
+/** Alerta genérica por correo a Jhon (almacenamiento, limpieza). Mismo canal que la de PDF. */
+export async function sendAlert(subject: string, text: string): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY
+  const to = process.env.ALERT_EMAIL
+  const from = process.env.EMAIL_FROM || 'Pixia <onboarding@resend.dev>'
+  if (!apiKey || !to) {
+    console.error(`[pdf-render-container] ⚠️ ALERTA SIN ENVIAR (falta RESEND_API_KEY o ALERT_EMAIL): ${subject}`)
+    return false
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ from, to: [to], subject, text }),
+    })
+    if (!res.ok) console.error(`[pdf-render-container] Resend respondió ${res.status}:`, await res.text().catch(() => ''))
+    return res.ok
+  } catch (err) {
+    console.error('[pdf-render-container] Error enviando alerta:', err)
+    return false
+  }
+}

@@ -26,6 +26,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <nav className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
             <a href="/admin" className="hover:text-white">Pedidos</a>
             <Link href="/admin/pqr" className="hover:text-white">PQR</Link>
+            <Link href="/admin/almacenamiento" className="hover:text-white">Almacenamiento</Link>
             <span className="hidden truncate text-xs text-[var(--text-tertiary)] sm:inline">{admin.email}</span>
           </nav>
         </div>
