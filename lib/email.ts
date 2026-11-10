@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { COMMERCIAL } from '@/lib/legal'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -237,7 +238,7 @@ export function buildStatusEmail(d: StatusEmailData, opts: { siteUrl?: string; s
     delivered: {
       subject: `¡Tu álbum llegó! · ${d.reference}`,
       title: '¡Tu álbum llegó!',
-      body: `Hola ${name}, la transportadora nos confirma que ${album} fue entregado. Esperamos que lo disfrutes muchos años. Si al abrirlo encuentras cualquier defecto de impresión o encuadernación, o algún daño del transporte, escríbenos respondiendo este correo y lo resolvemos.`,
+      body: `Hola ${name}, la transportadora nos confirma que ${album} fue entregado. Esperamos que lo disfrutes muchos años. Revísalo hoy: si llegó con algún daño (golpes, humedad, rayones o una falla de impresión), escríbenos dentro de los próximos ${COMMERCIAL.transportDamageBusinessDays} días hábiles respondiendo este correo, con fotos del álbum y del empaque, y lo resolvemos.`,
     },
   }[d.kind]
 
