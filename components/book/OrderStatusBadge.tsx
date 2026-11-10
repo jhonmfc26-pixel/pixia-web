@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { ORDER_STAGE_LABEL, orderStage } from '@/core/modules/album/orderLock'
 import { PRINT_STATUS_CUSTOMER_LABEL, PRINT_STATUSES, isPrintStatus, statusIndex } from '@/lib/orderStatus'
+import { COMMERCIAL } from '@/lib/legal'
 
 interface OrderInfo {
   reference: string
@@ -16,6 +17,7 @@ interface OrderInfo {
   tracking_number: string | null
   tracking_url: string | null
   shipping_city: string | null
+  assets_purged_at?: string | null
 }
 
 const STEP_AT: Record<string, keyof OrderInfo> = {
@@ -54,6 +56,26 @@ export default function OrderStatusBadge({ bookId, blueprintStatus }: { bookId: 
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [open])
+
+  // Pedido archivado: sus fotos ya se borraron (política de conservación), el
+  // visor no tendría qué mostrar. Se tapa con un aviso claro.
+  if (info?.assets_purged_at) {
+    return (
+      <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 100, background: '#0f0f0f', color: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <div style={{ maxWidth: 420 }}>
+          <h1 style={{ fontFamily: 'Playfair Display, serif', fontSize: 26, fontWeight: 400, marginBottom: 12 }}>Este álbum se archivó</h1>
+          <p style={{ fontSize: 15, lineHeight: 1.6, color: 'rgba(255,255,255,0.6)' }}>
+            Tu pedido {info.reference} se entregó {info.delivered_at ? `el ${new Date(info.delivered_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.
+            Como dicen nuestros términos, las fotos y el archivo de impresión se guardan hasta {COMMERCIAL.warrantyDays} días después de la entrega y luego se borran.
+          </p>
+          <a href="/mis-albumes" style={{ display: 'inline-block', marginTop: 24, padding: '12px 24px', borderRadius: 10, background: '#fff', color: '#000', fontWeight: 600, fontSize: 14 }}>
+            Ir a Mis álbumes
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   const current = info && isPrintStatus(info.print_status) ? info.print_status : null
   const label = current ? `Pedido · ${PRINT_STATUS_CUSTOMER_LABEL[current]}` : ORDER_STAGE_LABEL[orderStage(blueprintStatus)]

@@ -1,6 +1,7 @@
 import express from 'express'
 import { renderInteriorPdf, renderCoverPdf } from './renderAlbum'
 import { createR2Client, signDownloadUrl, verifyDownloadToken } from './r2'
+import { runStorageCleanup, type CleanupMode } from './storage'
 import { createJobsClient } from './jobs'
 import { runSweep } from './queue'
 import type { AlbumStructure } from '@/core/modules/foldModel/types'
@@ -159,6 +160,28 @@ app.post('/process-pending', async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
   } finally {
     sweepRunning = false
+  }
+})
+
+// Almacenamiento: mide y limpia según la política de conservación (ver
+// storage.ts y lib/retention.ts). Cloud Scheduler lo llama una vez al día;
+// el admin puede pedir una medición (?mode=prueba) cuando quiera.
+let cleanupRunning = false
+app.post('/storage-cleanup', async (req, res) => {
+  if (!checkAuth(req)) return res.status(401).send('No autorizado')
+  if (cleanupRunning) return res.status(200).json({ skipped: 'ya hay una limpieza corriendo' })
+  const requested = (req.query.mode as string | undefined) ?? process.env.STORAGE_CLEANUP_MODE ?? 'prueba'
+  const mode: CleanupMode = requested === 'aplicada' ? 'aplicada' : 'prueba'
+  cleanupRunning = true
+  try {
+    const report = await runStorageCleanup(mode)
+    console.log('[pdf-render-container] almacenamiento:', JSON.stringify({ ...report, details: undefined }))
+    res.status(200).json(report)
+  } catch (err) {
+    console.error('[pdf-render-container] limpieza falló:', err)
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
+  } finally {
+    cleanupRunning = false
   }
 })
 

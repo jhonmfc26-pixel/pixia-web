@@ -65,6 +65,8 @@ firma la URL localmente (sin ida y vuelta) y el contenedor la valida en
 - `POST /render-cover` → igual, para la cubierta.
 - `GET /download?key=&exp=&sig=` → streamea el PDF si el token es válido.
 - `GET /sign?key=` (con Bearer) → diagnóstico, firma una URL suelta.
+- `POST /storage-cleanup?mode=prueba|aplicada` (con Bearer) → mide y limpia
+  el almacenamiento (ver «Limpieza de almacenamiento»).
 
 ## Build y prueba local (con Docker)
 
@@ -109,7 +111,9 @@ gcloud run deploy pixia-pdf-render --region us-central1 \
 ```
 
 Historial: v8 = trigger de PDF pagado (2026-11-03) · v9 = formato vertical,
-portada que cubre el sangrado y título sin palabras partidas (2026-11-09).
+portada que cubre el sangrado y título sin palabras partidas (2026-11-09) ·
+v10 = logo grande en la contraportada y limpieza de almacenamiento
+(2026-11-09, ver «Limpieza de almacenamiento»).
 
 ## Deploy a Google Cloud Run — paso a paso
 
@@ -300,6 +304,70 @@ Para reintentar a mano un job en `fallo` después de corregir la causa:
 UPDATE pdf_generation_jobs SET status = 'pendiente', attempt_count = 0, alerted_at = NULL
  WHERE blueprint_id = '<id del álbum>';
 ```
+
+## Limpieza de almacenamiento (desde v10)
+
+`POST /storage-cleanup?mode=prueba|aplicada` (con Bearer) mide los dos buckets
+de R2, aplica la política de `lib/retention.ts` y guarda un reporte en
+`storage_reports`, que se ve en **/admin/almacenamiento**:
+
+- Álbum sin comprar: se guarda 30 días desde que se creó; luego se borran su
+  fila y sus fotos.
+- Álbum comprado: fotos y PDF hasta 30 días después de la entrega; luego se
+  borran los archivos y se marca `orders.assets_purged_at`. El pedido queda.
+- Nada de menos de 30 días se borra; solo se tocan claves `users/` del bucket
+  de fotos; máximo 20.000 archivos por corrida (los más viejos primero).
+- `prueba` (por defecto) solo mide y dice qué se borraría. `aplicada` borra.
+- Alerta por correo (`ALERT_EMAIL`) cuando el uso pasa del 80 % del
+  presupuesto, cuando un borrado falla y cuando la corrida falla.
+
+### Puesta en marcha (una sola vez)
+
+```bash
+# 1. Supabase → SQL editor: correr supabase/almacenamiento.sql (idempotente).
+
+# 2. Credenciales R2 del bucket de FOTOS (el mismo que usa la app en R2_BUCKET).
+#    Cloudflare → R2 → Manage API tokens → token "Object Read & Write"
+#    limitado a ese bucket. Se pueden reusar las de la app.
+echo -n "ACCESS_KEY_ID" | gcloud secrets create R2_ASSETS_ACCESS_KEY_ID --data-file=-
+echo -n "SECRET"        | gcloud secrets create R2_ASSETS_SECRET_ACCESS_KEY --data-file=-
+#    (si el token es nuevo o distinto: darle acceso a la cuenta de servicio
+#     de Cloud Run igual que con los secretos del paso 6)
+
+# 3. Build + deploy v10 (desde main actualizado, en la RAÍZ del repo)
+git checkout main && git pull
+gcloud config set project project-d750839b-5664-4e5c-87b
+gcloud builds submit --config services/pdf-render-container/cloudbuild.yaml \
+  --substitutions _IMAGE_TAG=gcr.io/project-d750839b-5664-4e5c-87b/pdf-render-container:v10 .
+gcloud run deploy pixia-pdf-render --region us-central1 \
+  --image gcr.io/project-d750839b-5664-4e5c-87b/pdf-render-container:v10 \
+  --update-env-vars R2_ASSETS_BUCKET=<nombre del bucket de fotos>,STORAGE_BUDGET_GB=10,STORAGE_ALERT_PCT=80,STORAGE_CLEANUP_MODE=prueba \
+  --update-secrets R2_ASSETS_ACCESS_KEY_ID=R2_ASSETS_ACCESS_KEY_ID:latest,R2_ASSETS_SECRET_ACCESS_KEY=R2_ASSETS_SECRET_ACCESS_KEY:latest
+
+# 4. Cloud Scheduler: todos los días a las 3 a. m. hora Colombia
+gcloud scheduler jobs create http pixia-storage-cleanup \
+  --location us-central1 \
+  --schedule "0 3 * * *" --time-zone America/Bogota \
+  --http-method POST \
+  --uri https://pixia-pdf-render-316585315237.us-central1.run.app/storage-cleanup \
+  --headers "Authorization=Bearer $(gcloud secrets versions access latest --secret=PDF_CONTAINER_SECRET)" \
+  --attempt-deadline 300s
+
+# 5. Primera medición a mano (modo prueba: no borra nada)
+gcloud scheduler jobs run pixia-storage-cleanup --location us-central1
+```
+
+Revisar el reporte en /admin/almacenamiento («Por borrar»). Si lo que se
+borraría está bien, activar el borrado real:
+
+```bash
+gcloud run services update pixia-pdf-render --region us-central1 \
+  --update-env-vars STORAGE_CLEANUP_MODE=aplicada
+```
+
+Para volver a solo medir: lo mismo con `STORAGE_CLEANUP_MODE=prueba`.
+`STORAGE_BUDGET_GB` es el tamaño contra el que se calcula el % y la alerta
+(10 GB = lo gratis de R2; subirlo cuando se decida pagar más).
 
 ## Qué NO se pudo validar en esta sesión
 
