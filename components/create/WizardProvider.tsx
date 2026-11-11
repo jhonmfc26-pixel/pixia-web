@@ -7,6 +7,7 @@ import React, {
   useEffect,
 } from "react";
 import { isFormatId, suggestedFormat, getFormat, type AlbumFormatId } from "@/lib/formats";
+import type { CoverConfig } from "@/core/contracts/AlbumBlueprint";
 
 /* =======================
    TYPES
@@ -26,6 +27,11 @@ export type CoverDraft = {
   date: string;
   /** id (PhotoItem.id) de la foto de portada. Por id y no por posición: sobrevive a reordenar o quitar fotos. */
   photoId: string;
+  /** Diseño elegido en el paso 3. Sin valor = el del estilo por defecto de la ocasión. */
+  templateId?: string;
+  textPosition?: CoverConfig["textPosition"];
+  textAlign?: CoverConfig["textAlign"];
+  textColor?: CoverConfig["textColor"];
 };
 
 /** Pasos del asistente. La barra de progreso y el reducer salen de acá. */

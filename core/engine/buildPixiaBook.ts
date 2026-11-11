@@ -1,5 +1,5 @@
 import { ActId, NarrativeTone, PixiaBook } from '../domain/PixiaBook'
-import type { PhotoOrientation, MeaningRegion } from '../contracts/AlbumBlueprint'
+import type { PhotoOrientation, MeaningRegion, CoverConfig } from '../contracts/AlbumBlueprint'
 import { classifyOrientation } from '../modules/album/photoGeometry'
 import { formatOfBook, type BlueprintFormat } from '@/lib/formats'
 
@@ -11,6 +11,8 @@ export interface AlbumDraft {
   date?: string
   /** id de la foto elegida para la portada. */
   coverPhotoId?: string
+  /** Diseño de portada elegido en el paso 3 (estilo, posición y color del texto). */
+  coverDesign?: Partial<Pick<CoverConfig, 'templateId' | 'textPosition' | 'textAlign' | 'textColor'>>
   photos: {
     id: string
     src: string
@@ -319,6 +321,7 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
       subtitle: draft.subtitle?.trim() || undefined,
       date: draft.date?.trim() || undefined,
       photoId: draft.coverPhotoId,
+      ...draft.coverDesign,
     },
     editorial: {
       intent: 'memory',

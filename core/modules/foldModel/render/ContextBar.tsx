@@ -1,5 +1,5 @@
 'use client'
-import { Crop, LayoutGrid, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { LayoutGrid, RefreshCw, Star, Trash2 } from 'lucide-react'
 import { LAYOUTS } from '@/core/modules/album/layouts/registry'
 import type { Face } from '../types'
 import type { SelState } from './selectionTypes'
@@ -7,7 +7,6 @@ import type { SelState } from './selectionTypes'
 // ── Acciones de foto ──────────────────────────────────────────────────────────
 
 const PHOTO_ACTIONS = [
-  { id: 'reframe',   label: 'Reencuadrar', Icon: Crop      },
   { id: 'replace',   label: 'Cambiar',     Icon: RefreshCw },
   { id: 'highlight', label: 'Destacar',    Icon: Star      },
   { id: 'remove',    label: 'Quitar',      Icon: Trash2    },

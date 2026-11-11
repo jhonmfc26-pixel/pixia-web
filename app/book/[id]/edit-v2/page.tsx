@@ -24,7 +24,7 @@ import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructu
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { getLocalBook, updateLocalBook } from '@/core/engine/localBookStorage'
 import { isOrdered } from '@/core/modules/album/orderLock'
-import { Crop, LayoutGrid, PenLine, Plus, RefreshCw, Star, Trash2, Upload } from 'lucide-react'
+import { LayoutGrid, PenLine, Plus, RefreshCw, Star, Trash2, Upload } from 'lucide-react'
 import { LAYOUTS } from '@/core/modules/album/layouts/registry'
 import FoldStructureViewer from '@/core/modules/foldModel/render/FoldStructureViewer'
 import type { SelState } from '@/core/modules/foldModel/render/selectionTypes'
@@ -49,8 +49,9 @@ const UploadController = dynamic(() => import('./UploadController'), { ssr: fals
 
 // ── Popover contextual ────────────────────────────────────────────────────────
 
+// «Reencuadrar» salió (2026-11-10): estaba en la barra pero no hacía nada.
+// Volverá cuando el visor y el PDF respeten el encuadre manual.
 const PHOTO_ACTIONS = [
-  { id: 'reframe',   label: 'Reencuadrar', Icon: Crop      },
   { id: 'replace',   label: 'Cambiar',     Icon: RefreshCw },
   { id: 'highlight', label: 'Destacar',    Icon: Star      },
   { id: 'remove',    label: 'Quitar',      Icon: Trash2    },
@@ -174,6 +175,15 @@ function PhotoActionsPopover({ photoId, anchorRect, photoFace, onAction }: {
   // de viewport viejo. No recalcula anchorRect en sí (lo captura el padre al
   // seleccionar la foto), solo los límites de pantalla contra los que se clampea.
   const [, forceRecalc] = useState(0)
+  const popRef = useRef<HTMLDivElement>(null)
+  const [popW, setPopW] = useState(0)
+  useEffect(() => {
+    const el = popRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setPopW(el.offsetWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   useEffect(() => {
     const onViewportChange = () => forceRecalc(n => n + 1)
     window.addEventListener('resize', onViewportChange)
@@ -203,8 +213,15 @@ function PhotoActionsPopover({ photoId, anchorRect, photoFace, onAction }: {
   }
   const top = Math.min(window.innerHeight - H - GAP, Math.max(TOP_BAR + GAP, rawTop))
 
+  // Centrada sobre la foto, pero sin salirse de la pantalla: se clampea con
+  // el ancho REAL del popover (antes con 20px fijos, y en el celular vertical
+  // la mitad de la barra quedaba cortada cuando la foto estaba a un lado).
   const centerX = anchorRect.left + anchorRect.width / 2
-  const left = Math.max(20, Math.min(centerX, window.innerWidth - 20))
+  const half = popW / 2
+  const margin = 8
+  const left = popW > 0
+    ? Math.max(margin + half, Math.min(centerX, window.innerWidth - margin - half))
+    : Math.max(20, Math.min(centerX, window.innerWidth - 20))
 
   // Cupo disponible en la cara de la foto seleccionada — "Agregar" solo
   // tiene sentido si aún caben más fotos ahí (misma regla que FaceDesignPanel).
@@ -217,7 +234,7 @@ function PhotoActionsPopover({ photoId, anchorRect, photoFace, onAction }: {
   const visibleActions = PHOTO_ACTIONS.filter(a => a.id !== 'highlight' || canHighlight)
 
   return (
-    <div style={{ position: 'fixed', left: `${left}px`, top: `${top}px`, transform: 'translateX(-50%)', zIndex: 120, maxWidth: 'calc(100vw - 32px)' }}>
+    <div ref={popRef} style={{ position: 'fixed', left: `${left}px`, top: `${top}px`, transform: 'translateX(-50%)', zIndex: 120, maxWidth: 'calc(100vw - 16px)' }}>
       <div style={CHROM}>
         <div style={{ display: 'flex', alignItems: 'stretch' }}>
           <div style={{ display: 'flex', padding: '8px 4px' }}>
@@ -1497,26 +1514,41 @@ export default function EditV2Page() {
       {/* Pipeline de subida — carga solo en el navegador (ssr:false), no renderiza UI */}
       <UploadController ref={uploadControllerRef} sessionId={sessionId} setBook={setBook} showToast={showToast} />
 
-      {/* Barra superior */}
-      <div style={{
+      {/* Barra superior. En el celular vertical no cabía (el «Listo» quedaba
+          cortado): ahí se oculta el título y los botones van en corto. */}
+      <style>{`
+        .pixia-ed-bar { padding: 0 20px; gap: 12px; }
+        .pixia-ed-actions { gap: 10px; }
+        .pixia-ed-short { display: none; }
+        @media (max-width: 640px) {
+          .pixia-ed-bar { padding: 0 10px; gap: 8px; }
+          .pixia-ed-actions { gap: 6px; }
+          .pixia-ed-title, .pixia-ed-long { display: none; }
+          .pixia-ed-short { display: inline; }
+        }
+      `}</style>
+      <div className="pixia-ed-bar" style={{
         height: '56px', flexShrink: 0,
         background: 'rgba(10,10,10,0.95)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <button
           onClick={() => { window.location.href = `/book/${id}?spread=${currentFold + 1}` }}
-          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px', padding: '6px 0' }}
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px', padding: '6px 0', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           ← Volver
         </button>
 
-        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '15px', color: 'rgba(255,255,255,0.85)' }}>
-          Editor v2
+        <span className="pixia-ed-title" style={{
+          fontFamily: "'Playfair Display', serif", fontSize: '15px', color: 'rgba(255,255,255,0.85)',
+          minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {cover?.title || book.cover?.title || 'Tu álbum'}
         </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="pixia-ed-actions" style={{ display: 'flex', alignItems: 'center' }}>
           {/* Botón "+ Página nueva" — pliego completo (2 huecos) al final */}
           <button
             onClick={handleAddSpread}
@@ -1581,7 +1613,8 @@ export default function EditV2Page() {
             onMouseEnter={e => { if (cover) { e.currentTarget.style.background = 'rgba(232,85,58,0.15)'; e.currentTarget.style.color = '#E8553A' } }}
             onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
           >
-            Editar portada
+            <span className="pixia-ed-long">Editar portada</span>
+            <span className="pixia-ed-short">Portada</span>
           </button>
 
           {/* Botón "Listo" — guarda y navega */}
