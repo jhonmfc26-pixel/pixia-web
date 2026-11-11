@@ -171,6 +171,12 @@ export default function ResultPage() {
           subtitle: state.cover?.subtitle,
           date: state.cover?.date,
           coverPhotoId,
+          coverDesign: state.cover?.templateId ? {
+            templateId: state.cover.templateId,
+            textPosition: state.cover.textPosition,
+            textAlign: state.cover.textAlign,
+            textColor: state.cover.textColor,
+          } : undefined,
         })
 
         setPhase('guardando')

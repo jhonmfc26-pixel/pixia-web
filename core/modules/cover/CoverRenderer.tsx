@@ -40,6 +40,9 @@ export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeigh
   const overlay = (() => {
     switch (template.overlayStyle) {
       case 'gradient-bottom':
+        // La sombra va detrás del texto: si el cliente lo sube, la sombra sube con él.
+        if (config.textPosition === 'top') return 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 45%, transparent 70%)'
+        if (config.textPosition === 'center') return 'radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 60%, transparent 85%)'
         return 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 45%, transparent 70%)'
       case 'gradient-full':
         return 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 100%)'

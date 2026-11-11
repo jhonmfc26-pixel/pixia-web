@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { forwardRef, useImperativeHandle, useMemo, useRef, type ReactNode } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AlbumStyle, AlbumFormat, CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import { FacePageView, HeroSpreadPageView } from './SpreadFaces'
 import CoverPage from './pages/CoverPage'
@@ -120,6 +120,10 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
   // salto largo (usa flip(), que también anima pero con otra coreografía;
   // turnToPage() en cambio es instantáneo y se evita a propósito).
   const currentSpreadIdxRef = useRef(initialSpreadIdx)
+  // En el celular vertical el libro muestra UNA página a la vez: ahí no hay
+  // lomo en el medio de la pantalla y la sombra del hero-spread caía justo
+  // en la mitad de una página (Jhon, 2026-11-10).
+  const [twoPages, setTwoPages] = useState(!isMobile)
 
   useImperativeHandle(ref, () => ({
     goTo: (spreadIdx: number) => {
@@ -182,6 +186,21 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
 
   const initialPage = spreadIdxToPageIndex(initialSpreadIdx, spreads.length)
 
+  // react-pageflip registra los eventos DESPUÉS de cargar las páginas, así
+  // que el 'init' de la primera carga se pierde: la orientación se lee
+  // directo apenas existe el libro (el import es dinámico, puede tardar).
+  useEffect(() => {
+    let tries = 0
+    let timer: ReturnType<typeof setTimeout>
+    const read = () => {
+      const pf = bookRef.current?.pageFlip()
+      if (pf) { setTwoPages(pf.getOrientation() !== 'portrait'); return }
+      if (++tries < 40) timer = setTimeout(read, 100)
+    }
+    read()
+    return () => clearTimeout(timer)
+  }, [flipbookKey])
+
   return (
     <div style={{
       position: 'relative',
@@ -209,7 +228,8 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
           currentSpreadIdxRef.current = idx
           onFlip(idx)
         }}
-        onInit={() => {}}
+        onInit={(e: { object: PageFlipInstance }) => setTwoPages(e.object.getOrientation() !== 'portrait')}
+        onChangeOrientation={(e: { data: string }) => setTwoPages(e.data !== 'portrait')}
         className="" style={{}}
         startPage={initialPage}
         autoSize={false}
@@ -228,7 +248,7 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
       {/* Overlay global — solo para hero-spread: es UNA foto continua, no
           tiene dos caras propias donde poner la sombra por página. Los
           "paired" ya la llevan en su borde interior (viaja con la hoja). */}
-      {isCompositionCurrent && (
+      {isCompositionCurrent && twoPages && (
         <div style={{
           position: 'absolute', top: 0, bottom: 0, left: '50%', transform: 'translateX(-50%)',
           width: `${gutterWidth}px`, background: GUTTER_SHADOW, pointerEvents: 'none', zIndex: 25,

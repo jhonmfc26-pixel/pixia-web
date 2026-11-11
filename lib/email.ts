@@ -17,6 +17,17 @@ interface OrderConfirmationData {
 }
 
 /**
+ * Resend en modo de prueba (dominio sin verificar o EMAIL_FROM sin poner) solo
+ * deja enviar al correo del dueño de la cuenta: el admin muestra qué hacer.
+ */
+export function explainEmailError(msg: string): string {
+  if (/verify a domain|testing emails|own email address/i.test(msg)) {
+    return 'Resend está en modo de prueba y solo envía a tu propio correo. Hay que verificar el dominio pixiaa.com en Resend y poner EMAIL_FROM (por ejemplo "Pixia <hola@pixiaa.com>") en las variables de Cloudflare Pages.'
+  }
+  return msg
+}
+
+/**
  * Envía email de confirmación post-pago aprobado.
  * Si falla NO debe romper el webhook — el pago ya está confirmado en DB.
  */
@@ -181,7 +192,7 @@ PIXIA · Álbumes que perduran
 
     if (result.error) {
       console.error('[email] Resend error:', result.error)
-      return { ok: false, error: result.error.message }
+      return { ok: false, error: explainEmailError(result.error.message) }
     }
 
     const masked = `${data.customerEmail[0]}***@${data.customerEmail.split('@')[1] ?? ''}`
@@ -289,7 +300,7 @@ export async function sendOrderStatusEmail(d: StatusEmailData): Promise<{ ok: bo
     const result = await resend.emails.send({ from, to: d.customerEmail, subject, html, text, replyTo: process.env.EMAIL_SUPPORT || undefined })
     if (result.error) {
       console.error('[email] Resend error (estado):', result.error)
-      return { ok: false, error: result.error.message }
+      return { ok: false, error: explainEmailError(result.error.message) }
     }
     return { ok: true }
   } catch (err: unknown) {
@@ -366,7 +377,7 @@ async function sendRaw(to: string | string[], m: { subject: string; html: string
   const from = process.env.EMAIL_FROM || 'Pixia <onboarding@resend.dev>'
   try {
     const result = await resend.emails.send({ from, to, subject: m.subject, html: m.html, text: m.text, replyTo })
-    if (result.error) { console.error('[email] Resend error (pqr):', result.error); return { ok: false, error: result.error.message } }
+    if (result.error) { console.error('[email] Resend error (pqr):', result.error); return { ok: false, error: explainEmailError(result.error.message) } }
     return { ok: true as const }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'

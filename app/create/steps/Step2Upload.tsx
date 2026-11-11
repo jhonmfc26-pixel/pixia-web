@@ -25,6 +25,9 @@ import { estimateAlbumPages } from "@/core/modules/album/estimatePages";
 import { PAGES_INCLUDED, formatCop, getFormat } from "@/lib/formats";
 import { PRICING } from "@/lib/wompi";
 
+/** Fotos que se pueden marcar como favoritas (van más grandes en el álbum). */
+const MAX_FAVORITES = 5;
+
 // Genera thumbnail 150x150 base64 (~8-12KB por foto) para grids rápidos
 async function generateThumbnail(file: File, maxSize = 150): Promise<string | null> {
   try {
@@ -447,15 +450,21 @@ export default function Step2Upload() {
     });
   };
 
+  const [priorityLimitHit, setPriorityLimitHit] = useState(false);
   const togglePriority = (id: string) => {
     const prioritized = photos.filter((p) => p.priority).length;
+    const target = photos.find((p) => p.id === id);
+    if (target && !target.priority && prioritized >= MAX_FAVORITES) {
+      setPriorityLimitHit(true);
+      window.setTimeout(() => setPriorityLimitHit(false), 2500);
+      return;
+    }
 
     dispatch({
       type: "SET_PHOTOS",
       payload: photos.map((p) => {
         if (p.id !== id) return p;
-        if (!p.priority && prioritized >= 5) return p;
-        return { ...p, priority: !p.priority };
+                return { ...p, priority: !p.priority };
       }),
     });
   };
@@ -584,12 +593,6 @@ export default function Step2Upload() {
             <motion.span>{rounded}</motion.span> / {MAX_PHOTOS} fotos (mínimo {MIN_PHOTOS})
           </motion.p>
 
-          {priorityCount > 0 && (
-            <p className="text-xs text-pink-400">
-              ⭐ {priorityCount} foto{priorityCount > 1 ? "s" : ""} priorizada
-              {priorityCount > 1 ? "s" : ""}
-            </p>
-          )}
         </div>
       </motion.div>
 
@@ -703,13 +706,29 @@ export default function Step2Upload() {
       {photos.length > 0 && (
         <>
         <style>{SHIMMER_CSS}</style>
+        {/* Cómo destacar: siempre a la vista, no escondido en un hover que en
+            el celular no existe. */}
+        <div
+          className={`mt-8 flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-[13px] transition-colors ${
+            priorityLimitHit ? "border-amber-300/40 bg-amber-300/10 text-amber-100" : "border-white/10 bg-white/[0.04] text-white/70"
+          }`}
+          role="status"
+        >
+          <span className="flex items-center gap-2">
+            <Star className="h-4 w-4 shrink-0 text-[#E8553A]" />
+            {priorityLimitHit
+              ? `Máximo ${MAX_FAVORITES} favoritas. Quita una para elegir otra.`
+              : "Toca la estrella en tus fotos favoritas: irán más grandes en el álbum."}
+          </span>
+          <span className="shrink-0 tabular-nums text-white/50">{priorityCount}/{MAX_FAVORITES}</span>
+        </div>
         <Reorder.Group
           axis="x"
           values={photos}
           onReorder={(newOrder) =>
             dispatch({ type: "SET_PHOTOS", payload: newOrder })
           }
-          className="grid grid-cols-3 md:grid-cols-5 gap-4 mt-8"
+          className="grid grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 mt-4"
         >
           <AnimatePresence>
             {photos.map((item) => (
@@ -720,7 +739,7 @@ export default function Step2Upload() {
                 className={`relative group w-full h-24 rounded-lg overflow-hidden cursor-grab active:cursor-grabbing
                   ${
                     item.priority
-                      ? "ring-2 ring-pink-500 shadow-[0_0_20px_rgba(236,72,153,0.6)]"
+                      ? "ring-2 ring-[#E8553A] shadow-[0_0_16px_rgba(232,85,58,0.45)]"
                       : ""
                   }`}
               >
@@ -741,17 +760,20 @@ export default function Step2Upload() {
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => togglePriority(item.id)}
-                  className={`absolute bottom-1.5 right-1.5 z-10 w-6 h-6 rounded-full
+                  aria-pressed={!!item.priority}
+                  aria-label={item.priority ? "Quitar de favoritas" : "Marcar como favorita"}
+                  className={`absolute bottom-1 right-1 z-10 w-8 h-8 rounded-full
                     backdrop-blur flex items-center justify-center transition
                     ${
                       item.priority
-                        ? "bg-pink-500 text-white shadow-[0_0_12px_rgba(236,72,153,0.9)]"
-                        : "bg-black/50 text-white/70 opacity-0 group-hover:opacity-100"
+                        ? "bg-[#E8553A] text-white shadow-[0_0_10px_rgba(232,85,58,0.8)]"
+                        : "bg-black/55 text-white/90 hover:bg-black/75"
                     }`}
                 >
                   <Star
-                    className={`w-3.5 h-3.5 ${
+                    className={`w-4 h-4 ${
                       item.priority ? "fill-white" : ""
                     }`}
                   />

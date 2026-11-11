@@ -20,8 +20,6 @@ interface PageThumbnailStripProps {
   bottomBarHeight: number
 }
 
-const HIDE_DELAY_MS = 500
-const HOVER_ZONE_HEIGHT = 28
 const STRIP_HEIGHT = 116
 const THUMB_H = 60
 const TRACK_H = 16   // alto del área de arrastre (hit-area) de la scrollbar — la barra visible es más fina, dentro de esto
@@ -32,80 +30,39 @@ const TRACK_H = 16   // alto del área de arrastre (hit-area) de la scrollbar �
  * ViewerSpread: cada caller arma su propia lista de `items` (con SU sistema
  * de navegación real — goTo/currentFold) y esta solo dibuja/gestiona la UI.
  *
- * Visibilidad (desktop) por "hold": la tira se revela y se queda revelada
- * mientras CUALQUIERA de estas señales esté activa — mouse sobre el
- * contenedor (que hace de franja de detección chica cuando está cerrado, y
- * de tira completa cuando está abierto — mismo elemento, un solo par de
- * mouseenter/mouseleave, ver comentario junto a isHeld) o un arrastre en
- * curso (de las miniaturas o de la scrollbar propia). Recién cuando NINGUNA
- * está activa arranca el delay de ocultamiento — así nunca se cierra a media
- * interacción, solo al soltar todo y alejar el mouse. Un wheel event en
- * cualquier parte también revela momentáneamente (estas vistas no tienen
- * scroll de página real).
+ * Se abre y se cierra SOLO con el botón flotante (grid), igual en celular y
+ * en computador (decisión de Jhon, 2026-11-10): antes en computador se abría
+ * sola con la rueda del mouse o al acercarse al borde, y molestaba. Tocar una
+ * miniatura navega; en el celular además la cierra. Escape la cierra.
  *
  * Navegación rápida en álbumes largos: scrollbar horizontal propia (fina,
  * arrastrable de punta a punta, coral mientras se arrastra) además del
  * scroll por rueda/arrastre directo sobre las miniaturas, más botones ‹‹/››
  * para saltar a la primera/última página con un clic.
- *
- * Móvil (sin hover): un botón flotante (grid) que abre/cierra la tira; tocar
- * una miniatura navega Y la cierra.
  */
 export default function PageThumbnailStrip({ items, currentIndex, onSelect, bottomBarHeight }: PageThumbnailStripProps) {
   const [isDesktop, setIsDesktop] = useState(true)
-  const [revealed, setRevealed] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   const [barDragging, setBarDragging] = useState(false)
 
   useEffect(() => {
+    // Solo en el navegador (en el servidor no hay matchMedia).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDesktop(window.matchMedia('(hover: hover) and (pointer: fine)').matches)
   }, [])
 
-  // ── Sistema de "hold" — reemplaza el viejo cálculo de distancia al borde,
-  // que no cubría el área real de la tira ya abierta (por eso se cerraba
-  // justo al intentar usarla). Cada fuente de interacción prende su propia
-  // bandera; mientras alguna esté prendida, jamás se programa el ocultado.
-  //
-  // OJO: el hover y el "hold por arrastre" son DOS banderas separadas
-  // (holdStrip / holdDrag) sobre el MISMO elemento contenedor — a propósito.
-  // Una primera versión de esto tenía una franja invisible aparte (para
-  // detectar la cercanía antes de abrir) superpuesta al área de la tira ya
-  // abierta, alternando pointer-events entre las dos — eso hacía que el
-  // mouseenter/mouseleave de la franja dejara de dispararse en cuanto se
-  // volvía inerte, atascando su bandera en `true` para siempre y la tira
-  // nunca se volvía a cerrar. Ahora es UN solo elemento (crece de una franja
-  // chica a la tira completa) con un solo par de mouseenter/mouseleave —
-  // sin costura entre dos hitboxes, sin bandera que se pueda atascar.
-  const holdStrip = useRef(false)
-  const holdDrag = useRef(false)
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const isHeld = () => holdStrip.current || holdDrag.current
-
-  const reveal = () => {
-    if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null }
-    setRevealed(true)
-  }
-  // "Soltar" una señal de hold — solo programa el ocultado si NINGUNA otra
-  // señal sigue activa (nunca oculta a media interacción).
-  const release = () => {
-    if (isHeld()) return
-    if (hideTimer.current) clearTimeout(hideTimer.current)
-    hideTimer.current = setTimeout(() => setRevealed(false), HIDE_DELAY_MS)
-  }
-
   useEffect(() => {
-    if (!isDesktop) return
-    const onWheel = () => { reveal(); release() }
-    window.addEventListener('wheel', onWheel, { passive: true })
-    return () => {
-      window.removeEventListener('wheel', onWheel)
-      if (hideTimer.current) clearTimeout(hideTimer.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDesktop])
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
 
-  const open = isDesktop ? revealed : mobileOpen
+  // Antes servían para que la tira no se ocultara a media interacción; ahora
+  // solo se cierra con el botón, así que no hacen nada.
+  const holdDrag = useRef(false)
+  const reveal = () => {}
+  const release = () => {}
 
   // ── Scroll horizontal de las miniaturas (rueda + arrastre directo) ────────
   const stripRef = useRef<HTMLDivElement>(null)
@@ -115,7 +72,6 @@ export default function PageThumbnailStrip({ items, currentIndex, onSelect, bott
     const el = stripRef.current
     if (!el) return
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY
-    e.stopPropagation() // no reactivar el wheel de revelado de arriba — ya está revelada
   }
   // Sin setPointerCapture acá a propósito (a diferencia de la scrollbar más
   // abajo): este pointerdown también burbujea desde el click de CADA botón
@@ -194,7 +150,7 @@ export default function PageThumbnailStrip({ items, currentIndex, onSelect, bott
 
   const handleSelect = (i: number) => {
     onSelect(i)
-    if (!isDesktop) setMobileOpen(false)
+    if (!isDesktop) setOpen(false)
   }
 
   const jumpToStart = () => handleSelect(0)
@@ -204,17 +160,19 @@ export default function PageThumbnailStrip({ items, currentIndex, onSelect, bott
 
   return (
     <>
-      {/* Botón móvil — reemplaza el gesto de hover que no existe en touch */}
-      {!isDesktop && (
+      {/* Botón que abre y cierra la tira (celular y computador) */}
+      {(
         <button
-          onClick={() => setMobileOpen(v => !v)}
-          aria-label={mobileOpen ? 'Cerrar miniaturas' : 'Ver miniaturas de páginas'}
+          onClick={() => setOpen(v => !v)}
+          aria-label={open ? 'Cerrar miniaturas' : 'Ver todas las páginas'}
+          aria-expanded={open}
+          title={open ? 'Cerrar miniaturas' : 'Ver todas las páginas'}
           style={{
             position: 'fixed', right: '16px',
             bottom: `calc(${bottomBarHeight}px + 12px + env(safe-area-inset-bottom, 0px))`,
             width: '40px', height: '40px', borderRadius: '50%',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: mobileOpen ? '#E8553A' : 'rgba(20,20,20,0.85)',
+            background: open ? '#E8553A' : 'rgba(20,20,20,0.85)',
             border: '1px solid rgba(255,255,255,0.14)',
             color: '#fff', cursor: 'pointer',
             zIndex: 131,
@@ -226,32 +184,12 @@ export default function PageThumbnailStrip({ items, currentIndex, onSelect, bott
         </button>
       )}
 
-      {/*
-        Un solo elemento hace de "franja de detección" (chico, invisible,
-        HOVER_ZONE_HEIGHT) Y de tira revelada (STRIP_HEIGHT) — nunca dos
-        hitboxes superpuestas con pointer-events alternando entre ellas (ver
-        comentario junto a isHeld). Mientras cerrado, es transparente y solo
-        ocupa HOVER_ZONE_HEIGHT — el contenido real vive en un hijo con su
-        propio fade/slide, así que crecer no se siente como un salto brusco.
-      */}
       <div
-        onMouseEnter={isDesktop ? () => { holdStrip.current = true; reveal() } : undefined}
-        onMouseLeave={isDesktop ? () => { holdStrip.current = false; release() } : undefined}
         style={{
           position: 'fixed', left: 0, right: 0, bottom: anchorBottom,
-          // Desktop cerrado: solo la franja de detección. Abierto (desktop o
-          // móvil): la tira completa. Móvil cerrado: nada — ahí no hay hover,
-          // el gesto es el botón flotante, así que no hace falta una hitbox
-          // inerte tapando contenido del viewer/editor detrás.
-          height: open ? `${STRIP_HEIGHT}px` : isDesktop ? `${HOVER_ZONE_HEIGHT}px` : '0px',
+          height: open ? `${STRIP_HEIGHT}px` : '0px',
           zIndex: 130,
-          pointerEvents: open || isDesktop ? 'auto' : 'none',
-          // Sin overflow:hidden a propósito — el contenido interior ya se
-          // esconde solo (opacity:0 + translateY fuera de pantalla) cuando
-          // está cerrado, así que no hace falta recortarlo contra el alto
-          // chico de la franja. Si hubiera overflow:hidden acá, el alto del
-          // contenedor cambiaría de golpe (sin transición) al abrir/cerrar y
-          // recortaría la animación de deslizamiento del hijo a media carrera.
+          pointerEvents: open ? 'auto' : 'none',
           display: 'flex', alignItems: 'flex-end',
         }}
       >
@@ -314,9 +252,13 @@ export default function PageThumbnailStrip({ items, currentIndex, onSelect, bott
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                     }}
                   >
+                    {/* Ancho y alto explícitos: con aspect-ratio + alto, Safari (iPhone)
+                        calculaba el ancho desde el contenido y las miniaturas
+                        quedaban muy separadas, una por pantalla. */}
                     <div style={{
                       height: `${THUMB_H}px`,
-                      aspectRatio: `${item.aspectRatio}`,
+                      width: `${Math.round(THUMB_H * item.aspectRatio)}px`,
+                      position: 'relative',
                       borderRadius: '3px', overflow: 'hidden',
                       boxShadow: isActive ? '0 0 0 2px #E8553A, 0 4px 12px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.35)',
                       opacity: isActive ? 1 : 0.72,
