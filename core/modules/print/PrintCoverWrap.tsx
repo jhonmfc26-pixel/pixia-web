@@ -7,7 +7,7 @@ import {
 } from './spine'
 import CoverRenderer from '@/core/modules/cover/CoverRenderer'
 import BackCoverPage from '@/core/modules/viewer/pages/BackCoverPage'
-import { getTemplateById } from '@/core/modules/cover/coverTemplates'
+import { resolveCover, caseColors } from '@/core/modules/cover/coverDesign'
 
 /**
  * Dimensiones físicas (mm) de la cubierta extendida completa.
@@ -68,7 +68,8 @@ function coverFormatOf(profile: PrintProfile): '20x20' | '30x30' | 'a4' {
 
 export default function PrintCoverWrap({ cover, coverPhoto, title, pageCount, profile }: PrintCoverWrapProps) {
   const { spineWidthMm, panelWidthMm, widthMm, heightMm } = getCoverWrapDimensionsMm(profile, pageCount)
-  const template = getTemplateById(cover.templateId)
+  const resolved = resolveCover(cover)
+  const caseC = caseColors(cover)
 
   return (
     <div style={{
@@ -77,10 +78,10 @@ export default function PrintCoverWrap({ cover, coverPhoto, title, pageCount, pr
       display: 'flex',
       position: 'relative',
       overflow: 'hidden',
-      background: '#111111', // visible solo si el lomo es tan angosto que ni el color de contra/porta lo cubre — no debería pasar, pero es una red de seguridad, no un negro puro "roto"
+      background: caseC.bg, // visible solo si el lomo es tan angosto que ni el color de contra/porta lo cubre — no debería pasar, pero es una red de seguridad, no un negro puro "roto"
     }}>
       <div style={{ width: `${panelWidthMm}mm`, height: '100%', flexShrink: 0 }}>
-        <BackCoverPage />
+        <BackCoverPage cover={cover} />
       </div>
 
       <div style={{ width: `${spineWidthMm}mm`, height: '100%', flexShrink: 0 }}>
@@ -88,7 +89,9 @@ export default function PrintCoverWrap({ cover, coverPhoto, title, pageCount, pr
           title={title}
           spineWidthMm={spineWidthMm}
           spineHeightMm={heightMm}
-          fontFamily={template?.titleFont ?? 'Playfair Display'}
+          fontFamily={resolved.font.family}
+          uppercase={resolved.font.uppercase}
+          colors={caseC}
         />
       </div>
 
@@ -127,11 +130,13 @@ export default function PrintCoverWrap({ cover, coverPhoto, title, pageCount, pr
  * flex-end + paddingBottom), no centrados verticalmente — con margen
  * inferior prudente para que no queden pegados al borde.
  */
-function SpineTitle({ title, spineWidthMm, spineHeightMm, fontFamily }: {
+function SpineTitle({ title, spineWidthMm, spineHeightMm, fontFamily, uppercase, colors }: {
   title: string
   spineWidthMm: number
   spineHeightMm: number
   fontFamily: string
+  uppercase?: boolean
+  colors: { bg: string; fg: string; logoFilter?: string }
 }) {
   if (spineWidthMm < SPINE_MIN_WIDTH_FOR_LOGO_MM) return null
 
@@ -144,7 +149,7 @@ function SpineTitle({ title, spineWidthMm, spineHeightMm, fontFamily }: {
   return (
     <div style={{
       width: '100%', height: '100%',
-      background: '#111111',
+      background: colors.bg,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end',
       gap: `${Math.max(2, spineWidthMm * 0.3)}mm`,
       boxSizing: 'border-box',
@@ -160,7 +165,9 @@ function SpineTitle({ title, spineWidthMm, spineHeightMm, fontFamily }: {
           fontSize: `${fontSizeMm}mm`,
           fontWeight: 400,
           letterSpacing: '0.04em',
-          color: 'rgba(255,255,255,0.92)',
+          color: colors.fg,
+          opacity: 0.92,
+          textTransform: uppercase ? 'uppercase' : 'none',
           whiteSpace: 'nowrap',
         }}>
           {title}
@@ -177,6 +184,7 @@ function SpineTitle({ title, spineWidthMm, spineHeightMm, fontFamily }: {
           width: `${Math.min(spineWidthMm * 0.5, 6)}mm`,
           height: 'auto',
           opacity: 0.55,
+          filter: colors.logoFilter,
           flexShrink: 0,
         }}
       />

@@ -12,7 +12,7 @@ export interface AlbumDraft {
   /** id de la foto elegida para la portada. */
   coverPhotoId?: string
   /** Diseño de portada elegido en el paso 3 (estilo, posición y color del texto). */
-  coverDesign?: Partial<Pick<CoverConfig, 'templateId' | 'textPosition' | 'textAlign' | 'textColor'>>
+  coverDesign?: Partial<Omit<CoverConfig, 'photoId' | 'title' | 'subtitle' | 'date'>>
   photos: {
     id: string
     src: string

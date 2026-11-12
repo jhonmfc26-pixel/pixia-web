@@ -89,6 +89,22 @@ export interface CoverConfig {
   textPosition: 'top' | 'center' | 'bottom'
   textAlign: 'left' | 'center' | 'right'
   textColor: 'auto' | 'light' | 'dark'
+  // ── Estudio de portada (2026-11-12). Todo opcional: sin estos campos la
+  //    portada se ve como antes. Ver core/modules/cover/coverDesign.ts.
+  /** 'photo' = foto a sangre (por defecto); 'graphic' = color + ilustración, sin foto. */
+  kind?: 'photo' | 'graphic'
+  /** Id de COVER_FONTS. Sin valor = la fuente de la plantilla. */
+  fontId?: string
+  /** Color del título y textos (#RRGGBB). Tiene prioridad sobre textColor. */
+  fg?: string
+  /** Fondo de la tapa gráfica y color del lomo y la contraportada (#RRGGBB). */
+  bg?: string
+  /** Color de detalles de la ilustración (#RRGGBB). */
+  accent?: string
+  /** Id de COVER_ART (solo tapa gráfica). */
+  artId?: string
+  /** Tamaño del título relativo a la plantilla (0.82 / 1 / 1.18). */
+  titleScale?: number
 }
 
 export interface AlbumBlueprint {

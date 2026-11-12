@@ -166,7 +166,7 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
           'cover',
         ))
       } else if (s.kind === 'back') {
-        items.push(wrapPage(<BackCoverPage />, 'back'))
+        items.push(wrapPage(<BackCoverPage cover={cover} />, 'back'))
       } else if (s.kind === 'paired') {
         items.push(wrapPage(<FacePageView face={s.left} photosById={photosById} side="left" style={style} />, s.left.id))
         items.push(wrapPage(<FacePageView face={s.right} photosById={photosById} side="right" style={style} />, s.right.id))

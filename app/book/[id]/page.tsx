@@ -156,7 +156,7 @@ export default function BookPage() {
         }
       }
       if (s.kind === 'back') {
-        return { key: 'back', label: `${i + 1}`, aspectRatio: pageAspect, render: <BackCoverPage /> }
+        return { key: 'back', label: `${i + 1}`, aspectRatio: pageAspect, render: <BackCoverPage cover={book.cover} /> }
       }
       if (s.kind === 'paired') {
         return {
@@ -399,7 +399,7 @@ export default function BookPage() {
           </div>
         )
       case 'back':
-        return <div style={panelStyle}><BackCoverPage /></div>
+        return <div style={panelStyle}><BackCoverPage cover={book.cover} /></div>
       case 'paired':
         return (
           <>
@@ -491,15 +491,18 @@ export default function BookPage() {
           <OrderStatusBadge bookId={id} blueprintStatus={book.status} />
         ) : (
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* En la portada, «Editar» abre el estudio de portada (plantillas,
+              letras, colores, tapa sin foto, lomo y contraportada). */}
           <button
-            onClick={() => router.push(`/book/${id}/edit-v2?spread=${displayIdx}`)}
+            onClick={() => router.push(displayIdx === 0 ? `/book/${id}/edit-v2?portada=1` : `/book/${id}/edit-v2?spread=${displayIdx}`)}
             style={{
               fontSize: '12px', padding: '6px 14px', borderRadius: '6px',
-              border: '1px solid rgba(255,255,255,0.15)',
-              background: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+              border: displayIdx === 0 ? '1px solid rgba(232,85,58,0.7)' : '1px solid rgba(255,255,255,0.15)',
+              background: displayIdx === 0 ? 'rgba(232,85,58,0.12)' : 'none',
+              color: displayIdx === 0 ? '#fff' : 'rgba(255,255,255,0.7)', cursor: 'pointer', whiteSpace: 'nowrap',
             }}
           >
-            Editar
+            {displayIdx === 0 ? 'Editar portada' : 'Editar'}
           </button>
           <button
             onClick={() => router.push(`/checkout/${id}`)}

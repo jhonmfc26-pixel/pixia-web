@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import type { AlbumBlueprint, CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
-import CoverEditor from '@/core/modules/cover/CoverEditor'
+import CoverStudio from '@/core/modules/cover/CoverStudio'
 import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import type { AlbumStructure, DedicationContent, Face } from '@/core/modules/foldModel/types'
@@ -18,7 +18,7 @@ import { getBag } from '@/core/modules/foldModel/getBag'
 import { getHeroSlotIndex, pageLayoutsFor } from '@/core/modules/album/layoutFit'
 import { aspectOfFormat, setPageAspect, SQUARE } from '@/core/modules/album/pageGeometry'
 import { PageAspectContext } from '@/core/modules/viewer/PageAspectContext'
-import { hasDedication } from '@/core/modules/foldModel/validate'
+import { hasDedication, countRealPages } from '@/core/modules/foldModel/validate'
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import { supabaseBrowser } from '@/lib/supabase-browser'
@@ -797,12 +797,21 @@ export default function EditV2Page() {
     })
   }
   const [coverEditorOpen, setCoverEditorOpen] = useState(false)
+  // /book/<id>/edit-v2?portada=1 abre directo el estudio de portada (desde el
+  // visor o al terminar de crear): al pulsar «Listo» ahí se guarda y se vuelve
+  // al álbum, sin pasar por el editor de páginas.
+  const studioDeepLink = searchParams.get('portada') === '1'
+  const studioOpenedRef = useRef(false)
 
   useEffect(() => {
     if (!book || coverInitialized.current) return
     coverInitialized.current = true
     setCover(book.cover)
-  }, [book])
+    if (studioDeepLink && !studioOpenedRef.current) {
+      studioOpenedRef.current = true
+      setCoverEditorOpen(true)
+    }
+  }, [book, studioDeepLink])
 
   // ── Mapa de fotos ───────────────────────────────────────────────────────────
   const photosById = useMemo(() => {
@@ -854,10 +863,6 @@ export default function EditV2Page() {
   // solo las que ya están en alguna cara.
   const heroPhotos = useMemo(() => [...photosById.values()], [photosById])
 
-  const coverPhotoUrl = useMemo(() => {
-    const photo = (cover?.photoId && photosById.get(cover.photoId)) || heroPhotos[0]
-    return photo?.url
-  }, [cover, photosById, heroPhotos])
 
   // ── Bolsa derivada ──────────────────────────────────────────────────────────
   const [bagOpen, setBagOpen] = useState(false)
@@ -1079,7 +1084,9 @@ export default function EditV2Page() {
       if (savedOk) {
         showToast('Guardado', false, 1200)
         // De vuelta a la numeración compartida con el viewer (portada = 0).
-        setTimeout(() => { window.location.href = `/book/${id}?spread=${currentFold + 1}` }, 1000)
+        // Desde «Personalizar portada» se vuelve a la portada.
+        const spread = studioDeepLink ? 0 : currentFold + 1
+        setTimeout(() => { window.location.href = `/book/${id}?spread=${spread}` }, 1000)
       } else {
         showToast('No se pudo guardar, reintenta', true, 4000)
       }
@@ -1636,17 +1643,19 @@ export default function EditV2Page() {
         </div>
       </div>
 
-      {/* Editor de portada — reusa CoverEditor tal cual, sin tocarlo */}
+      {/* Estudio de portada (2026-11-12) — reemplaza al CoverEditor */}
       {coverEditorOpen && cover && (
-        <CoverEditor
+        <CoverStudio
           config={cover}
           occasion={book.occasion}
           format={book.format || '30x30'}
-          heroPhotos={heroPhotos}
-          photoUrl={coverPhotoUrl}
-          photosById={photosById}
-          onUpdate={setCover}
-          onClose={() => setCoverEditorOpen(false)}
+          photos={heroPhotos}
+          pageCount={structure ? countRealPages(structure) : 20}
+          onChange={setCover}
+          onClose={() => {
+            setCoverEditorOpen(false)
+            if (studioDeepLink) void handleDone()
+          }}
         />
       )}
 

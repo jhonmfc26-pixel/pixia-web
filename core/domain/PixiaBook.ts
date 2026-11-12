@@ -17,6 +17,13 @@ export interface PixiaBook {
     textPosition?: 'top' | 'center' | 'bottom'
     textAlign?: 'left' | 'center' | 'right'
     textColor?: 'auto' | 'light' | 'dark'
+    kind?: 'photo' | 'graphic'
+    fontId?: string
+    fg?: string
+    bg?: string
+    accent?: string
+    artId?: string
+    titleScale?: number
   }
   editorial: {
     intent: string; tone: NarrativeTone; summary: string

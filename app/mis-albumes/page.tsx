@@ -13,12 +13,14 @@ import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import { countRealPages, validateAlbumStructure } from '@/core/modules/foldModel/validate'
 import type { AlbumStructure } from '@/core/modules/foldModel/types'
-import type { BlueprintStatus, OccasionType } from '@/core/contracts/AlbumBlueprint'
+import type { BlueprintStatus, CoverConfig, OccasionType } from '@/core/contracts/AlbumBlueprint'
+import CoverRenderer from '@/core/modules/cover/CoverRenderer'
+import { resolveCover } from '@/core/modules/cover/coverDesign'
 import type { PhotoAsset, Spread } from '@/core/contracts/AlbumBlueprint'
 
 interface BlueprintRow {
   id: string
-  cover: { photoId: string; title: string }
+  cover: { photoId: string; title: string; kind?: 'photo' | 'graphic' } & Partial<CoverConfig>
   spreads: Spread[]
   narrative: { title: string; summary: string; tone: string }
   status: BlueprintStatus
@@ -332,7 +334,14 @@ export default function MisAlbumesPage() {
                 >
                   {/* Imagen de portada */}
                   <div style={{ width: '100%', aspectRatio: '3/2', background: '#1a1a1a', position: 'relative' }}>
-                    {imgUrl ? (
+                    {row.cover?.kind === 'graphic' ? (
+                      // Tapa gráfica (sin foto): se dibuja la tapa real, centrada sobre su color.
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: resolveCover(row.cover as CoverConfig).bg }}>
+                        <div style={{ height: '86%', aspectRatio: row.format === 'a4' ? '3 / 4' : '1', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}>
+                          <CoverRenderer config={row.cover as CoverConfig} format={row.format === 'a4' ? 'a4' : row.format === '20x20' ? '20x20' : '30x30'} />
+                        </div>
+                      </div>
+                    ) : imgUrl ? (
                       <img
                         src={imgUrl}
                         alt=""
