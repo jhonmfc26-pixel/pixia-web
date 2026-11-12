@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getAdmin } from '@/lib/admin/auth'
+import { emailFrom, emailInTestMode } from '@/lib/emailFrom'
 
 export const metadata: Metadata = {
   title: 'Pixia · Admin',
@@ -31,6 +32,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </nav>
         </div>
       </header>
+      {emailInTestMode() && (
+        <div className="border-b border-amber-400/30 bg-amber-500/10">
+          <p className="mx-auto max-w-7xl px-4 py-2.5 text-sm leading-relaxed text-amber-100 sm:px-6">
+            <strong>Los correos a clientes no están saliendo.</strong> La web envía desde <code>{emailFrom()}</code>, la dirección de prueba
+            de Resend, que solo entrega a tu propio correo. La variable <code>EMAIL_FROM</code> no está llegando a esta versión de la web:
+            revísala en Cloudflare (entorno <em>Production</em>) y vuelve a desplegar.
+          </p>
+        </div>
+      )}
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
     </div>
   )

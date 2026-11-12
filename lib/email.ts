@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { emailFrom } from './emailFrom'
 import { COMMERCIAL } from '@/lib/legal'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -32,7 +33,7 @@ export function explainEmailError(msg: string): string {
  * Si falla NO debe romper el webhook — el pago ya está confirmado en DB.
  */
 export async function sendOrderConfirmation(data: OrderConfirmationData): Promise<{ ok: boolean; error?: string }> {
-  const from = process.env.EMAIL_FROM || 'Pixia <onboarding@resend.dev>'
+  const from = emailFrom()
   const support = process.env.EMAIL_SUPPORT || 'soporte@pixiaa.com'
 
   const formatCop = (n: number) =>
@@ -294,7 +295,7 @@ export function buildStatusEmail(d: StatusEmailData, opts: { siteUrl?: string; s
 
 /** Envía el correo de estado. Nunca lanza: el cambio de estado ya quedó guardado. */
 export async function sendOrderStatusEmail(d: StatusEmailData): Promise<{ ok: boolean; error?: string }> {
-  const from = process.env.EMAIL_FROM || 'Pixia <onboarding@resend.dev>'
+  const from = emailFrom()
   const { subject, html, text } = buildStatusEmail(d)
   try {
     const result = await resend.emails.send({ from, to: d.customerEmail, subject, html, text, replyTo: process.env.EMAIL_SUPPORT || undefined })
@@ -374,7 +375,7 @@ export function buildPqrResponseEmail(d: PqrEmailData) {
 }
 
 async function sendRaw(to: string | string[], m: { subject: string; html: string; text: string }, replyTo?: string) {
-  const from = process.env.EMAIL_FROM || 'Pixia <onboarding@resend.dev>'
+  const from = emailFrom()
   try {
     const result = await resend.emails.send({ from, to, subject: m.subject, html: m.html, text: m.text, replyTo })
     if (result.error) { console.error('[email] Resend error (pqr):', result.error); return { ok: false, error: explainEmailError(result.error.message) } }
