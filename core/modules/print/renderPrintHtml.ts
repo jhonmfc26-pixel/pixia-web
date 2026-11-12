@@ -1,14 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactElement } from 'react'
+import { GOOGLE_FONTS_URL } from '@/core/modules/cover/fonts'
 
-// Misma línea de @import que app/globals.css. Este documento se renderiza
-// standalone en Puppeteer (page.setContent), no hereda el <head> de la app
-// real — hay que repetir las fuentes acá. Si se agrega una tipografía nueva
-// a globals.css (ej. para un template de portada nuevo), hay que espejarla
-// acá también — no hay forma limpia de compartir un <style> de Next con un
-// documento que Next nunca sirve.
-export const GOOGLE_FONTS_IMPORT =
-  "@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&family=Parisienne&family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');"
+// Las mismas fuentes que carga la web (app/layout.tsx), desde una sola URL
+// (core/modules/cover/fonts.ts). Este documento se renderiza standalone en
+// Puppeteer (page.setContent) y no hereda el <head> de la app.
+export const GOOGLE_FONTS_IMPORT = `@import url('${GOOGLE_FONTS_URL}');`
 
 /**
  * Envuelve el markup SSR de una página física (o de la cubierta) en un

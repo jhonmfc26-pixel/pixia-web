@@ -1,9 +1,17 @@
-interface BackCoverPageProps { style?: string }
+import type { CoverConfig } from '@/core/contracts/AlbumBlueprint'
+import { caseColors } from '@/core/modules/cover/coverDesign'
 
-export default function BackCoverPage({ style: _ }: BackCoverPageProps) {
+interface BackCoverPageProps {
+  style?: string
+  /** La contraportada toma el color de la tapa elegido en el estudio de portada. Sin cover: la de siempre (#111). */
+  cover?: CoverConfig
+}
+
+export default function BackCoverPage({ cover }: BackCoverPageProps) {
+  const c = caseColors(cover)
   return (
     <div style={{
-      width: '100%', height: '100%', position: 'relative', background: '#111111',
+      width: '100%', height: '100%', position: 'relative', background: c.bg,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       // Todo en % del ancho de la contraportada (cqw): el mismo diseño en el
       // visor (cientos de px) y en el PDF (213–303 mm).
@@ -24,7 +32,7 @@ export default function BackCoverPage({ style: _ }: BackCoverPageProps) {
       <img
         src="https://assets.pixiaa.com/logo-pixia.png"
         alt="Pixia"
-        style={{ width: '26cqw', height: 'auto', opacity: 0.92 }}
+        style={{ width: '26cqw', height: 'auto', opacity: 0.92, filter: c.logoFilter }}
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
       />
       <span style={{
@@ -32,7 +40,8 @@ export default function BackCoverPage({ style: _ }: BackCoverPageProps) {
         fontSize: '2.4cqw',
         letterSpacing: '0.35em',
         paddingLeft: '0.35em',
-        color: 'rgba(255,255,255,0.45)',
+        color: c.fg,
+        opacity: 0.55,
         textTransform: 'uppercase',
         fontFamily: 'system-ui, sans-serif',
       }}>

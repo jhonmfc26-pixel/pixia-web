@@ -52,6 +52,16 @@ export function mapLegacyClaudeLayout(layout: string | undefined): LayoutId {
  * @param raw  Book crudo de localStorage (puede ser cualquier formato histórico)
  * @param idOverride  Si se provee, sobreescribe el id del book (útil cuando el editor lee con id del URL)
  */
+/** Campos del estudio de portada: se copian solo si vienen (álbumes viejos no los tienen). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function designFields(cover: any) {
+  const out: Record<string, unknown> = {}
+  for (const k of ['kind', 'fontId', 'fg', 'bg', 'accent', 'artId', 'titleScale'] as const) {
+    if (cover?.[k] !== undefined && cover?.[k] !== null && cover?.[k] !== '') out[k] = cover[k]
+  }
+  return out
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
   // Formato nuevo: ya es AlbumBlueprint, solo parchar cover y hidratar Maps
@@ -92,6 +102,7 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
         textPosition: cover.textPosition || defaultTemplate.defaultPosition,
         textAlign: cover.textAlign || defaultTemplate.defaultAlign,
         textColor: cover.textColor || 'auto',
+        ...designFields(cover),
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       layoutConfig: Array.isArray(raw.layoutConfig) ? new Map(raw.layoutConfig as any) : new Map(),
@@ -163,6 +174,7 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
       textPosition: rawCover.textPosition || defaultTemplate.defaultPosition,
       textAlign: rawCover.textAlign || defaultTemplate.defaultAlign,
       textColor: rawCover.textColor || 'auto',
+      ...designFields(rawCover),
     },
     spreads,
     narrative: {

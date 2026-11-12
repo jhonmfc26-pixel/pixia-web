@@ -171,11 +171,19 @@ export default function ResultPage() {
           subtitle: state.cover?.subtitle,
           date: state.cover?.date,
           coverPhotoId,
+          // Diseño elegido en el paso 3 (plantilla con foto o gráfica, etc.).
           coverDesign: state.cover?.templateId ? {
             templateId: state.cover.templateId,
             textPosition: state.cover.textPosition,
             textAlign: state.cover.textAlign,
             textColor: state.cover.textColor,
+            kind: state.cover.kind,
+            fontId: state.cover.fontId,
+            fg: state.cover.fg,
+            bg: state.cover.bg,
+            accent: state.cover.accent,
+            artId: state.cover.artId,
+            titleScale: state.cover.titleScale,
           } : undefined,
         })
 

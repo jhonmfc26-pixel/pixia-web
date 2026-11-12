@@ -32,6 +32,13 @@ export type CoverDraft = {
   textPosition?: CoverConfig["textPosition"];
   textAlign?: CoverConfig["textAlign"];
   textColor?: CoverConfig["textColor"];
+  kind?: CoverConfig["kind"];
+  fontId?: string;
+  fg?: string;
+  bg?: string;
+  accent?: string;
+  artId?: string;
+  titleScale?: number;
 };
 
 /** Pasos del asistente. La barra de progreso y el reducer salen de acá. */
