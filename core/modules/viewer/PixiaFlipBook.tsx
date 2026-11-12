@@ -124,6 +124,10 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
   // lomo en el medio de la pantalla y la sombra del hero-spread caía justo
   // en la mitad de una página (Jhon, 2026-11-10).
   const [twoPages, setTwoPages] = useState(!isMobile)
+  // Mientras una hoja va pasando, la sombra del lomo del hero-spread quedaba
+  // ENCIMA de la hoja que gira (se veía una raya en el medio de la página que
+  // pasa). Solo se dibuja con el libro quieto (estado 'read' de pageflip).
+  const [turning, setTurning] = useState(false)
 
   useImperativeHandle(ref, () => ({
     goTo: (spreadIdx: number) => {
@@ -230,6 +234,7 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
         }}
         onInit={(e: { object: PageFlipInstance }) => setTwoPages(e.object.getOrientation() !== 'portrait')}
         onChangeOrientation={(e: { data: string }) => setTwoPages(e.data !== 'portrait')}
+        onChangeState={(e: { data: string }) => setTurning(e.data !== 'read')}
         className="" style={{}}
         startPage={initialPage}
         autoSize={false}
@@ -252,6 +257,7 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
         <div style={{
           position: 'absolute', top: 0, bottom: 0, left: '50%', transform: 'translateX(-50%)',
           width: `${gutterWidth}px`, background: GUTTER_SHADOW, pointerEvents: 'none', zIndex: 25,
+          opacity: turning ? 0 : 1, transition: turning ? 'none' : 'opacity 200ms ease-out',
         }} />
       )}
     </div>
