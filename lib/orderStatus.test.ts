@@ -51,3 +51,19 @@ test('correos de impresión y entrega', () => {
   assert.match(d.subject, /llegó/)
   assert.match(d.html, /mis-albumes/)
 })
+
+test('correo de confirmación: lo que escribe el cliente va escapado en el HTML', async () => {
+  const { buildOrderConfirmationEmail } = await import('./email')
+  const m = buildOrderConfirmationEmail({
+    reference: 'PIXIA-ABC-1', customerName: '<img src=x onerror=alert(1)>Ana', customerEmail: 'ana@x.co', totalCop: 189000, pagesTotal: 24,
+    formatLabel: 'Grande 30 × 30 cm', shippingAddress: 'Calle 1 <b>#2</b> & "apto" 3', shippingCity: '<script>x</script>Barranquilla', shippingState: "Atlántico's",
+  }, { support: 'soporte@pixiaa.com' })
+  assert.equal(m.subject, 'Pedido confirmado: PIXIA-ABC-1')
+  assert.ok(!/<img|<script|<b>/.test(m.html), 'no debe quedar HTML del cliente sin escapar')
+  assert.match(m.html, /Hola &lt;img src=x onerror=alert\(1\)&gt;Ana, recibimos tu pago/)
+  assert.match(m.html, /Calle 1 &lt;b&gt;#2&lt;\/b&gt; &amp; &quot;apto&quot; 3/)
+  assert.match(m.html, /Atlántico&#39;s/)
+  // El texto plano va tal cual lo escribió.
+  assert.match(m.text, /Calle 1 <b>#2<\/b> & "apto" 3/)
+  assert.match(m.text, /Grande 30 × 30 cm, 24 páginas/)
+})
