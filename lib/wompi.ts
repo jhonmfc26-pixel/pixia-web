@@ -4,8 +4,8 @@
  */
 
 import { DEFAULT_FORMAT_ID, PAGES_INCLUDED, getFormat, type AlbumFormatId } from '@/lib/formats'
+import { wompiApiUrl } from '@/lib/wompiConfig'
 
-const WOMPI_API_URL = process.env.WOMPI_API_URL || 'https://sandbox.wompi.co/v1'
 
 export interface WompiTransactionStatus {
   id: string
@@ -94,7 +94,8 @@ export async function fetchTransactionStatus(
   transactionId: string
 ): Promise<WompiTransactionStatus | null> {
   try {
-    const response = await fetch(`${WOMPI_API_URL}/transactions/${transactionId}`, {
+    // Producción o sandbox según la llave privada (ver wompiApiUrl).
+    const response = await fetch(`${wompiApiUrl()}/transactions/${encodeURIComponent(transactionId)}`, {
       headers: {
         Authorization: `Bearer ${process.env.WOMPI_PRIVATE_KEY}`,
       },
