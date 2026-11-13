@@ -40,7 +40,7 @@ export interface SweepResult {
 
 type Queue = Pick<JobsClient,
   'claimNext' | 'expireExhausted' | 'listUnalertedFailures' | 'markQueueFailure' | 'markAlerted' |
-  'loadBlueprint' | 'reconcileApprovedOrders' | 'markInteriorReady' | 'markCoverReady'>
+  'loadPrintSource' | 'reconcileApprovedOrders' | 'markInteriorReady' | 'markCoverReady'>
 
 export async function runSweep(deps: {
   jobs: Queue
@@ -113,7 +113,8 @@ async function processJob(
   console.log(`[queue] Generando PDF de orden ${order} (álbum ${albumId}, intento ${job.attempt_count}/${MAX_ATTEMPTS})`)
 
   try {
-    const raw = await jobs.loadBlueprint(albumId)
+    // La copia que se cobró con la orden, no la fila del álbum como esté hoy.
+    const raw = await jobs.loadPrintSource(albumId, order)
     const built = build(raw, albumId)
     if (!built.ok) throw new PermanentError(built.reason)
     for (const w of built.warnings) console.warn(`[queue] ${albumId}: ${w}`)

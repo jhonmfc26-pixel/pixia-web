@@ -2,20 +2,17 @@ import { TERMS_VERSION } from '@/lib/legal'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { generateIntegrityHash, calculateOrderTotal, generateOrderReference } from '@/lib/wompi'
-import { formatOfBook, MIN_ALBUM_PAGES, PAGES_INCLUDED } from '@/lib/formats'
+import { PAGES_INCLUDED } from '@/lib/formats'
 import { rateLimit } from '@/core/middleware/rateLimiter'
-import { normalizeBook } from '@/core/modules/album/normalizeBook'
-import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
-import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
-import { countRealPages } from '@/core/modules/foldModel/validate'
-import type { AlbumStructure } from '@/core/modules/foldModel/types'
+import { blueprintInsertColumns, matchesWhatClientSaw, resolveOrderAlbum, type StoredBlueprint } from '@/lib/orderAlbum'
 
 export const runtime = 'edge'
 
 interface CreateOrderRequest {
   bookId: string
-  bookSnapshot: unknown   // AlbumBlueprint completo
+  bookSnapshot: unknown   // AlbumBlueprint completo (solo se usa si el álbum todavía no está guardado)
   sessionId?: string
+  /** Páginas que el checkout le mostró al cliente: tienen que coincidir con las que se cobran. */
   pagesTotal: number
   /** Versión de los términos que el cliente aceptó en el checkout. */
   termsVersion?: string
@@ -39,14 +36,16 @@ export async function POST(req: NextRequest) {
   const limited = await rateLimit(req, '/api/orders')
   if (limited) return limited
 
-  // Extraer user_id del JWT si viene — no bloquea si falta o es inválido
+  // Sin sesión no hay orden: el álbum tiene que quedar guardado en la cuenta de
+  // quien paga (es lo que se imprime). userId sale SIEMPRE del token, nunca del body.
   const authHeader = req.headers.get('authorization') ?? ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
-  let userId: string | null = null
-  if (token) {
-    const { data, error } = await supabaseAdmin.auth.getUser(token)
-    if (!error && data?.user) userId = data.user.id
+  if (!token) return NextResponse.json({ error: 'Inicia sesión para continuar con el pago.' }, { status: 401 })
+  const { data: auth, error: authError } = await supabaseAdmin.auth.getUser(token)
+  if (authError || !auth?.user) {
+    return NextResponse.json({ error: 'Tu sesión expiró. Inicia sesión de nuevo para pagar.' }, { status: 401 })
   }
+  const userId = auth.user.id
 
   try {
     const body = (await req.json()) as CreateOrderRequest
@@ -68,69 +67,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Debes aceptar los términos y condiciones vigentes. Recarga la página e inténtalo de nuevo.' }, { status: 400 })
     }
 
-    // Leer el blueprint existente UNA vez — sirve tanto para el chequeo de
-    // ownership como para la structure real de precio (ver abajo). Falla
-    // cerrado: si la consulta misma revienta, no se sigue adelante — mejor
-    // un 500 que crear una orden sin poder verificar de quién es el álbum.
-    let existingBp: { structure: unknown; user_id: string | null } | null = null
-    try {
-      const { data, error: existingErr } = await supabaseAdmin
-        .from('blueprints')
-        .select('structure, user_id')
-        .eq('id', body.bookId)
-        .maybeSingle()
-      if (existingErr) throw existingErr
-      existingBp = data
-    } catch (e) {
-      console.error('[orders/create] Error verificando el blueprint:', e)
+    // El álbum guardado en la cuenta. Falla cerrado: si la consulta revienta no
+    // se sigue — mejor un 500 que cobrar sin saber de quién es ni qué contiene.
+    const { data: row, error: rowError } = await supabaseAdmin
+      .from('blueprints').select('*').eq('id', body.bookId).maybeSingle()
+    if (rowError) {
+      console.error('[orders/create] Error leyendo el blueprint:', rowError.message)
       return NextResponse.json({ error: 'No se pudo verificar el álbum' }, { status: 500 })
     }
 
-    // Ownership: solo se puede crear una orden sobre un blueprint propio (o
-    // uno que todavía no tiene dueño — primer checkout, ver caso c en
-    // persist). userId sale SIEMPRE del token, nunca del body — mismo
-    // chequeo que /api/blueprints/persist, misma razón: bookId viaja en la
-    // URL, no es secreto, y supabaseAdmin bypassa RLS.
-    if (existingBp?.user_id && existingBp.user_id !== userId) {
-      console.warn('[orders/create] Intento de crear orden sobre blueprint ajeno — solicitante:', userId)
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    // El álbum que se cobra se arma en el servidor (ver lib/orderAlbum.ts):
+    // dueño, que no esté ya pagado, páginas reales, formato y fotos subidas.
+    // Si ya está guardado manda la fila; lo que envía el navegador solo sirve
+    // para un álbum que todavía no se guardó nunca.
+    const album = resolveOrderAlbum({ row: row as StoredBlueprint | null, snapshot: body.bookSnapshot, bookId: body.bookId, userId })
+    if (!album.ok) {
+      if (album.status === 403) console.warn('[orders/create] Intento de crear orden sobre blueprint ajeno — solicitante:', userId)
+      return NextResponse.json({ error: album.error }, { status: album.status })
     }
+    const { snapshot, pages: realPageCount, format: albumFormat } = album
 
-    // Calcular precio en el servidor (NO confiar en cliente) — y NO confiar
-    // tampoco en body.pagesTotal, que es un entero suelto que cualquiera
-    // puede cambiar con un solo campo del body. El número de páginas real
-    // se deriva de una AlbumStructure válida, nunca de un número.
-    //
-    // 1. Preferir la structure YA PERSISTIDA en Supabase — no viaja en este
-    //    request, quien llama al endpoint no puede falsificarla.
-    let realStructure: AlbumStructure | null = null
-    if (existingBp?.structure && validateAlbumStructure(existingBp.structure).ok) {
-      realStructure = existingBp.structure as AlbumStructure
-    }
-
-    // 2. Si todavía no hay nada persistido (álbum recién creado, primer
-    //    checkout sin pasar por edit-v2 ni por el sync de auth/callback),
-    //    derivarla del snapshot que manda el cliente — sigue siendo mucho
-    //    más difícil de falsificar barato que un entero: tiene que ser una
-    //    structure consistente (folds/faces bien formados).
-    const blueprintFromSnapshot = normalizeBook(body.bookSnapshot, body.bookId)
-    if (!realStructure) {
-      realStructure = blueprintFromSnapshot.structure && validateAlbumStructure(blueprintFromSnapshot.structure).ok
-        ? blueprintFromSnapshot.structure
-        : foldsFromBlueprint(blueprintFromSnapshot).structure
-    }
-
-    // Formato: el del álbum que se va a guardar e imprimir (el snapshot se
-    // persiste abajo con este mismo formato), así lo que se cobra y lo que
-    // se imprime nunca difieren. Un formato que todavía no se vende no se cobra.
-    const albumFormat = formatOfBook(blueprintFromSnapshot.format)
-    if (!albumFormat.available) {
-      return NextResponse.json({ error: `El formato ${albumFormat.sizeLabel} todavía no está disponible.` }, { status: 400 })
-    }
-
-    const realPageCount = countRealPages(realStructure)
-    if (realPageCount < MIN_ALBUM_PAGES) {
-      return NextResponse.json({ error: `Tu álbum tiene ${realPageCount} páginas y el mínimo para imprimirlo es ${MIN_ALBUM_PAGES}.` }, { status: 400 })
+    // Lo que el cliente vio en el checkout es lo que se cobra. Si el álbum
+    // cambió desde que abrió la página (otra pestaña), que la recargue.
+    const clientFormat = (body.bookSnapshot as { format?: unknown } | null)?.format
+    if (!matchesWhatClientSaw(album, { pagesTotal: body.pagesTotal, format: clientFormat })) {
+      return NextResponse.json({ error: 'Tu álbum cambió desde que abriste esta página. Recárgala para ver el precio actualizado.' }, { status: 409 })
     }
     // Menos páginas de las incluidas: el precio es el mismo y el cliente tuvo
     // que confirmarlo en el checkout con ESTE número de páginas.
@@ -139,6 +100,24 @@ export async function POST(req: NextRequest) {
     }
     const pricing = calculateOrderTotal(realPageCount, albumFormat.id)
 
+    // Primero el álbum, después la orden: una orden sin álbum guardado no se
+    // puede imprimir. Si esto falla no se crea nada y el cliente no paga.
+    //  - Álbum nuevo: se guarda completo, a nombre de quien paga.
+    //  - Álbum sin dueño: se reescribe con esta copia y pasa a ser de quien paga.
+    //  - Álbum ya guardado en su cuenta: NO se reescribe su contenido; solo se
+    //    fija la estructura cobrada (por si faltaba o era inválida).
+    const now = new Date().toISOString()
+    const columns = blueprintInsertColumns(snapshot, { userId, sessionId: body.sessionId ?? '' })
+    const blueprints = supabaseAdmin.from('blueprints')
+    const write =
+      album.save === 'create' ? await blueprints.insert({ ...columns, updated_at: now })
+      : album.save === 'claim' ? await blueprints.update({ ...columns, updated_at: now }).eq('id', body.bookId).is('user_id', null)
+      : await blueprints.update({ structure: snapshot.structure, updated_at: now }).eq('id', body.bookId).eq('user_id', userId)
+    if (write.error) {
+      console.error('[orders/create] No se pudo guardar el álbum:', write.error.message)
+      return NextResponse.json({ error: 'No pudimos guardar tu álbum. Inténtalo de nuevo en un momento.' }, { status: 500 })
+    }
+
     const reference = generateOrderReference(body.bookId)
 
     const { data: order, error } = await supabaseAdmin
@@ -146,7 +125,9 @@ export async function POST(req: NextRequest) {
       .insert({
         reference,
         book_id: body.bookId,
-        book_snapshot: body.bookSnapshot,
+        // La copia exacta que se cobró, armada en el servidor. Al aprobarse el
+        // pago el álbum se congela con ella (webhook → frozenBlueprintColumns).
+        book_snapshot: snapshot,
         user_id: userId,
         customer_email: body.customer.email,
         customer_phone: body.customer.phone,
@@ -174,62 +155,6 @@ export async function POST(req: NextRequest) {
     if (error || !order) {
       console.error('[orders/create] DB error:', error)
       return NextResponse.json({ error: 'No se pudo crear la orden' }, { status: 500 })
-    }
-
-    // Upsert de seguridad: si el blueprint no fue guardado en el callback
-    // (ej. el usuario fue directo al checkout sin magic link previo), lo
-    // guardamos aquí con el user_id ya conocido.
-    if (userId && body.bookSnapshot) {
-      try {
-        const blueprint = normalizeBook(body.bookSnapshot, body.bookId)
-        console.log('[orders/create] Intentando upsert blueprint con id:', body.bookId, 'userId:', userId)
-        console.log('[orders/create] Shape del blueprint normalizado:', {
-          id: blueprint.id,
-          occasion: blueprint.occasion,
-          hasCover: !!blueprint.cover,
-          hasSpreads: Array.isArray(blueprint.spreads),
-          spreadsCount: blueprint.spreads?.length,
-        })
-        const { error: bpError } = await supabaseAdmin
-          .from('blueprints')
-          .upsert({
-            id: blueprint.id,
-            user_id: userId,
-            session_id: body.sessionId ?? blueprint.sessionId ?? '',
-            status: blueprint.status ?? 'draft',
-            occasion: blueprint.occasion,
-            format: blueprint.format,
-            style: blueprint.style,
-            page_count: blueprint.pageCount,
-            cover: blueprint.cover,
-            spreads: blueprint.spreads,
-            // Congela el álbum tal como se cobró y como lo vio el cliente: la
-            // impresión lee esta structure. Sin esto, si el motor de diseños
-            // cambia entre la compra y la impresión, se imprimiría distinto.
-            structure: realStructure,
-            narrative: blueprint.narrative,
-            ai_generated: blueprint.aiGenerated ?? false,
-            version: blueprint.version ?? 1,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'id' })
-        if (bpError) throw bpError
-      } catch (err: unknown) {
-        const e = err as { message?: string; code?: string; details?: string; hint?: string; stack?: string }
-        console.error('[orders/create] ERROR UPSERT BLUEPRINT:', {
-          message: e?.message,
-          code: e?.code,
-          details: e?.details,
-          hint: e?.hint,
-          stack: e?.stack?.split('\n').slice(0, 3),
-        })
-        // No bloquear la orden — el blueprint es valor agregado, no crítico
-      }
-    } else if (existingBp && !existingBp.structure) {
-      // Sin sesión no se reescribe el blueprint, pero igual se congela la
-      // structure cobrada si todavía no había ninguna guardada.
-      const { error: stError } = await supabaseAdmin
-        .from('blueprints').update({ structure: realStructure }).eq('id', body.bookId).is('structure', null)
-      if (stError) console.error('[orders/create] no se pudo congelar la structure:', stError.message)
     }
 
     // Wompi requiere el monto en centavos

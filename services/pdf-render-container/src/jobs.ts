@@ -1,3 +1,4 @@
+import { isOrderSnapshot } from '@/lib/orderAlbum'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -29,7 +30,12 @@ export interface OrderRef {
  * dev) sí se encola, porque esa prueba no es el PDF de la orden pagada.
  */
 export function findOrdersMissingJob(orders: OrderRef[], jobByBook: Map<string, string | null>): OrderRef[] {
+  // `orders` viene de la más antigua a la más nueva: si un álbum tiene dos
+  // pagos, se imprime el del primero (el segundo se devuelve).
+  const seen = new Set<string>()
   return orders.filter((o) => {
+    if (seen.has(o.book_id)) return false
+    seen.add(o.book_id)
     if (!jobByBook.has(o.book_id)) return true
     return jobByBook.get(o.book_id) == null
   })
@@ -150,6 +156,22 @@ export class JobsClient {
   }
 
   /**
+   * Lo que se imprime para un pedido: la copia exacta del álbum que se cobró
+   * (orders.book_snapshot, armada en el servidor al crear la orden — ver
+   * lib/orderAlbum.ts). Así el PDF no depende de cómo esté hoy la fila del
+   * álbum. Órdenes anteriores a esa copia, o trabajos sin orden: la fila.
+   */
+  async loadPrintSource(blueprintId: string, orderReference: string | null): Promise<unknown> {
+    if (orderReference) {
+      const { data, error } = await this.supabase.from('orders').select('book_snapshot').eq('reference', orderReference).maybeSingle()
+      if (error) throw new Error(`No se pudo leer la orden "${orderReference}": ${error.message}`)
+      if (isOrderSnapshot(data?.book_snapshot)) return data.book_snapshot
+      console.warn(`[pdf-render-container] Orden ${orderReference} sin copia del álbum cobrado — se usa la fila del álbum`)
+    }
+    return this.loadBlueprint(blueprintId)
+  }
+
+  /**
    * Segunda red de seguridad: órdenes aprobadas en los últimos `days` días
    * cuyo álbum no tiene job de esa orden (el webhook no pudo encolar y Wompi
    * tampoco reintentó). Las encola en 'pendiente'. Devuelve las referencias.
@@ -162,6 +184,7 @@ export class JobsClient {
       .eq('payment_status', 'approved')
       .not('book_id', 'is', null)
       .gte('paid_at', since)
+      .order('paid_at', { ascending: true })
     if (error) throw new Error(`reconcile (orders) falló: ${error.message}`)
     if (!orders || orders.length === 0) return []
 

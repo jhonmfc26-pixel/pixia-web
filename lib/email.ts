@@ -387,6 +387,17 @@ async function sendRaw(to: string | string[], m: { subject: string; html: string
   }
 }
 
+/** Aviso interno al equipo (ALERT_EMAIL o, si falta, ADMIN_EMAILS). Nunca lanza. */
+export async function sendTeamAlert(subject: string, lines: string[]) {
+  const team = (process.env.ALERT_EMAIL || process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim()).filter(Boolean)
+  if (team.length === 0) { console.error('[email] Alerta sin destinatario (falta ALERT_EMAIL):', subject); return { ok: false as const, error: 'sin destinatario' } }
+  return sendRaw(team, {
+    subject: `[Pixia] ${subject}`,
+    html: lines.map(l => `<p>${esc(l)}</p>`).join(''),
+    text: lines.join('\n\n'),
+  })
+}
+
 /** Constancia al cliente + aviso interno al equipo. Nunca lanza. */
 export async function sendPqrReceivedEmails(d: PqrEmailData) {
   const customer = await sendRaw(d.email, buildPqrReceiptEmail(d), process.env.EMAIL_SUPPORT || undefined)

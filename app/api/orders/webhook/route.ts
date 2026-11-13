@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { formatOfBook } from '@/lib/formats'
 import { supabaseAdmin } from '@/lib/supabase'
 import { validateWebhookSignature, fetchTransactionStatus } from '@/lib/wompi'
-import { sendOrderConfirmation } from '@/lib/email'
+import { sendOrderConfirmation, sendTeamAlert } from '@/lib/email'
 import { enqueuePdfJob } from '@/lib/pdfQueue'
+import { frozenBlueprintColumns } from '@/lib/orderAlbum'
+import { isOrdered } from '@/core/modules/album/orderLock'
 
 export const runtime = 'edge'
 
@@ -108,21 +110,25 @@ export async function POST(req: NextRequest) {
   const newStatus = mapWompiStatus(verified.status)
   if (existingOrder.payment_status === newStatus) {
     // Reintento sobre una orden ya aprobada: si la vez anterior no se pudo
-    // encolar el PDF (por eso respondimos 500 y Wompi reintenta), este es
-    // el momento de recuperarlo. Nunca pisa un job ya existente de esta orden.
+    // congelar el álbum o encolar el PDF (por eso respondimos 500 y Wompi
+    // reintenta), este es el momento de recuperarlo. Nunca pisa lo ya hecho.
     if (newStatus === 'approved' && existingOrder.book_id) {
-      const queued = await enqueuePdfJob({ blueprintId: existingOrder.book_id, orderReference: verified.reference, overwrite: false })
-      if (!queued.ok) {
-        console.error('[webhook] No se pudo encolar el PDF (reintento):', verified.reference, queued.error)
-        return NextResponse.json({ error: 'No se pudo encolar el PDF' }, { status: 500 })
-      }
-      if (queued.enqueued) console.log('[webhook] PDF encolado en reintento:', verified.reference)
+      const ready = await prepareForPrint(existingOrder.book_id, verified.reference, { firstTime: false })
+      if (!ready) return NextResponse.json({ error: 'No se pudo preparar el pedido para imprimir' }, { status: 500 })
     }
     console.log('[webhook] Orden ya está en estado', newStatus, '- skip')
     return NextResponse.json({ received: true, status: 'already-processed' }, { status: 200 })
   }
 
-  // 8. Actualizar orden
+  // Un pago aprobado no retrocede: solo puede pasar a anulado (reembolso).
+  if (existingOrder.payment_status === 'approved' && newStatus !== 'voided') {
+    console.warn('[webhook] Orden aprobada, se ignora el cambio a', newStatus, '-', verified.reference)
+    return NextResponse.json({ received: true, status: 'already-approved' }, { status: 200 })
+  }
+
+  // 8. Actualizar orden — solo si sigue en el estado que leímos. Si dos avisos
+  // del mismo pago llegan a la vez, uno solo pasa de acá: el otro no vuelve a
+  // encolar el PDF ni a mandar el correo.
   const updates: Record<string, unknown> = {
     payment_status: newStatus,
     wompi_transaction_id: verified.id,
@@ -134,47 +140,43 @@ export async function POST(req: NextRequest) {
     updates.print_status = 'paid'
   }
 
-  const { error: updateError } = await supabaseAdmin
+  const { data: changed, error: updateError } = await supabaseAdmin
     .from('orders')
     .update(updates)
     .eq('reference', verified.reference)
-
-  if (!updateError && newStatus === 'approved' && existingOrder.book_id) {
-    try {
-      await supabaseAdmin
-        .from('blueprints')
-        .update({ status: 'ordered', updated_at: new Date().toISOString() })
-        .eq('id', existingOrder.book_id)
-    } catch (err) {
-      // La orden ya quedó aprobada — el blueprint se reconcilia manualmente si hace falta
-      console.error('[webhook] No se pudo actualizar blueprint a ordered:', err)
-    }
-  }
+    .eq('payment_status', existingOrder.payment_status)
+    .select('id')
 
   if (updateError) {
     console.error('[webhook] Error actualizando orden:', updateError)
     return NextResponse.json({ error: 'Error en DB' }, { status: 500 })
   }
+  if (!changed || changed.length === 0) {
+    console.log('[webhook] Otro aviso ya procesó esta orden - skip:', verified.reference)
+    return NextResponse.json({ received: true, status: 'already-processed' }, { status: 200 })
+  }
 
   console.log('[webhook] Orden actualizada:', verified.reference, '→', newStatus)
 
-  // Encolar el PDF de impresión. Solo encola — la generación la hace el
-  // barrido del contenedor (POST /process-pending). Si falla, igual mandamos
-  // el email (el pago es real) pero respondemos 500 para que Wompi
-  // reintente y el bloque de idempotencia de arriba lo encole. El barrido
-  // además reconcilia órdenes aprobadas sin job, como segunda red.
-  let enqueueFailed = false
+  // Pago que estaba aprobado y Wompi anuló (reembolso): que nadie lo mande a imprimir.
+  if (existingOrder.payment_status === 'approved' && newStatus === 'voided') {
+    await sendTeamAlert(`Pago anulado · ${verified.reference}`, [
+      `Wompi anuló el pago del pedido ${verified.reference}, que ya estaba aprobado.`,
+      'Si todavía no se imprimió, no lo envíes a la imprenta.',
+    ])
+  }
+
+  // Pago aprobado: congelar el álbum y encolar su PDF. Solo encola — la
+  // generación la hace el barrido del contenedor (POST /process-pending). Si
+  // algo de esto falla, igual mandamos el email (el pago es real) pero
+  // respondemos 500 para que Wompi reintente y el bloque de idempotencia de
+  // arriba lo recupere. El barrido además reconcilia órdenes aprobadas sin job.
+  let prepareFailed = false
   if (newStatus === 'approved') {
     if (!existingOrder.book_id) {
       console.error('[webhook] Orden aprobada SIN book_id — no se puede generar PDF:', verified.reference)
     } else {
-      const queued = await enqueuePdfJob({ blueprintId: existingOrder.book_id, orderReference: verified.reference, overwrite: true })
-      if (queued.ok) {
-        console.log('[webhook] PDF encolado:', verified.reference)
-      } else {
-        enqueueFailed = true
-        console.error('[webhook] No se pudo encolar el PDF:', verified.reference, queued.error)
-      }
+      prepareFailed = !(await prepareForPrint(existingOrder.book_id, verified.reference, { firstTime: true }))
     }
   }
 
@@ -210,9 +212,88 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (enqueueFailed) {
-    return NextResponse.json({ error: 'Orden aprobada pero no se pudo encolar el PDF' }, { status: 500 })
+  if (prepareFailed) {
+    return NextResponse.json({ error: 'Orden aprobada pero no se pudo preparar para imprimir' }, { status: 500 })
   }
 
   return NextResponse.json({ received: true, status: newStatus }, { status: 200 })
+}
+
+/**
+ * Deja listo para imprimir el álbum de un pedido recién aprobado: lo congela
+ * con la copia que se cobró y encola su PDF. Se puede llamar varias veces (los
+ * reintentos de Wompi): nunca repite ni pisa lo que ya quedó hecho.
+ *
+ * Devuelve false si algo falló y hay que reintentar.
+ */
+async function prepareForPrint(bookId: string, reference: string, opts: { firstTime: boolean }): Promise<boolean> {
+  // ¿Hay otro pedido pagado ANTES de este mismo álbum? Entonces este es un
+  // pago doble: el álbum y su PDF son los del primero y no se tocan; se avisa
+  // al equipo para devolver la plata.
+  const { data: paidOrders, error: paidError } = await supabaseAdmin
+    .from('orders')
+    .select('reference')
+    .eq('book_id', bookId)
+    .eq('payment_status', 'approved')
+    .order('paid_at', { ascending: true })
+    .limit(1)
+  if (paidError) {
+    console.error('[webhook] No se pudieron leer los pedidos del álbum', bookId, '-', paidError.message)
+    return false
+  }
+  const first = paidOrders?.[0]?.reference
+  if (first && first !== reference) {
+    console.error('[webhook] PAGO DOBLE del álbum', bookId, '-', reference, 'y', first)
+    if (opts.firstTime) {
+      await sendTeamAlert(`Pago doble del mismo álbum · ${reference}`, [
+        `El álbum ${bookId} ya tenía un pedido pagado (${first}) y entró otro pago: ${reference}.`,
+        'Se imprime una sola vez (el primer pedido). Revisa en /admin y devuelve el segundo pago desde Wompi.',
+      ])
+    }
+    return true
+  }
+
+  if (!(await freezeBlueprint(bookId, reference))) return false
+
+  const queued = await enqueuePdfJob({ blueprintId: bookId, orderReference: reference, overwrite: opts.firstTime })
+  if (!queued.ok) {
+    console.error('[webhook] No se pudo encolar el PDF:', reference, queued.error)
+    return false
+  }
+  if (queued.enqueued) console.log('[webhook] PDF encolado:', reference)
+  return true
+}
+
+/**
+ * Pagado = congelado, con la copia exacta que se cobró (orders.book_snapshot,
+ * armada en el servidor al crear la orden — ver lib/orderAlbum.ts). Si el
+ * cliente editó el álbum entre crear la orden y pagar, acá vuelve a lo que
+ * pagó: nunca se imprimen más páginas ni otro tamaño que los cobrados.
+ *
+ * Un álbum que ya está congelado no se vuelve a tocar. Devuelve false si no
+ * se pudo congelar (la orden igual quedó aprobada; Wompi reintenta).
+ */
+async function freezeBlueprint(bookId: string, reference: string): Promise<boolean> {
+  try {
+    const { data: current, error: readError } = await supabaseAdmin
+      .from('blueprints').select('status').eq('id', bookId).maybeSingle()
+    if (readError) throw new Error(readError.message)
+    if (!current) throw new Error('el álbum no existe')
+    if (isOrdered(current.status)) return true
+
+    const { data: paid, error: orderError } = await supabaseAdmin
+      .from('orders').select('book_snapshot').eq('reference', reference).single()
+    if (orderError) throw new Error(orderError.message)
+    const frozen = frozenBlueprintColumns(paid?.book_snapshot)
+    if (!frozen) console.warn('[webhook] Orden sin copia del álbum cobrado, solo se marca el estado:', reference)
+    const { error } = await supabaseAdmin
+      .from('blueprints')
+      .update({ ...(frozen ?? {}), status: 'ordered', updated_at: new Date().toISOString() })
+      .eq('id', bookId)
+    if (error) throw new Error(error.message)
+    return true
+  } catch (err) {
+    console.error('[webhook] No se pudo congelar el álbum', bookId, '-', err)
+    return false
+  }
 }
