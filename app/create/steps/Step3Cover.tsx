@@ -208,7 +208,7 @@ export default function Step3Cover() {
               <span aria-hidden className="mt-0.5 text-[15px] text-[var(--brand-coral)]">✦</span>
               <p className="text-[13px] leading-relaxed text-white/75">
                 <strong className="font-medium text-white">Después la puedes personalizar toda:</strong> más letras, colores,
-                ilustraciones, el lomo y la contraportada. Cuando veas tu álbum, toca <span className="text-white">Editar portada</span>.
+                ilustraciones y el lomo. Cuando veas tu álbum, toca <span className="text-white">Editar portada</span>.
               </p>
             </div>
           </div>

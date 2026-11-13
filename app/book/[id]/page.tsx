@@ -512,7 +512,7 @@ function BookPageInner() {
         ) : (
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {/* En la portada, «Editar» abre el estudio de portada (plantillas,
-              letras, colores, tapa sin foto, lomo y contraportada). */}
+              letras, colores, tapa sin foto y lomo). */}
           <button
             onClick={() => router.push(displayIdx === 0 ? `/book/${id}/edit-v2?portada=1` : `/book/${id}/edit-v2?spread=${displayIdx}`)}
             style={{
@@ -547,7 +547,7 @@ function BookPageInner() {
         }}>
           <span aria-hidden style={{ position: 'absolute', top: '-6px', right: '48px', width: '10px', height: '10px', background: '#1c1b1a', borderLeft: '1px solid rgba(232,85,58,0.45)', borderTop: '1px solid rgba(232,85,58,0.45)', transform: 'rotate(45deg)' }} />
           <strong style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Personaliza tu portada</strong>
-          Letras, colores, ilustraciones, el lomo y la contraportada: todo en <em style={{ fontStyle: 'normal', color: '#E8553A' }}>Editar portada</em>.
+          Letras, colores, ilustraciones y el lomo: todo en <em style={{ fontStyle: 'normal', color: '#E8553A' }}>Editar portada</em>.
           <div style={{ marginTop: '10px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button onClick={dismissCoverTip} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: '12px', cursor: 'pointer' }}>Entendido</button>
             <button onClick={() => { dismissCoverTip(); router.push(`/book/${id}/edit-v2?portada=1`) }} style={{ background: '#E8553A', border: 'none', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Personalizar</button>
