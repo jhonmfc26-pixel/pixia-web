@@ -28,13 +28,20 @@ export default function BackCoverPage({ cover }: BackCoverPageProps) {
           contraportada (≈45 mm en 30×30, ≈32 mm en 21×28 y 20×20) y queda a
           más de 300 dpi en todos los formatos. Antes: 24 mm de imagen al 50 %
           de opacidad, una "P" de ~14 mm casi invisible (Jhon, 2026-11-09). */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="https://assets.pixiaa.com/logo-pixia.png"
-        alt="Pixia"
-        style={{ width: '26cqw', height: 'auto', opacity: 0.92, filter: c.logoFilter }}
-        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-      />
+      <div style={{ position: 'relative', width: '26cqw', height: '26cqw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* Placa solo cuando el logo coral se perdería sobre el fondo (tapa
+            coral o rosada); el logo siempre conserva sus colores. */}
+        {c.logoPlate && (
+          <div style={{ position: 'absolute', width: '19cqw', height: '19cqw', borderRadius: '50%', background: c.logoPlate }} />
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://assets.pixiaa.com/logo-pixia.png"
+          alt="Pixia"
+          style={{ position: 'relative', width: '100%', height: 'auto', opacity: c.logoPlate ? 1 : 0.92 }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+      </div>
       <span style={{
         marginTop: '-2.5cqw',
         fontSize: '2.4cqw',

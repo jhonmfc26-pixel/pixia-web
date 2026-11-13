@@ -10,7 +10,7 @@ import { buildPixiaBookWithAI } from '../../../core/engine/buildPixiaBook'
 import { saveBookToLocal } from '../../../core/engine/localBookStorage'
 import { useWizard } from '../../../components/create/WizardProvider'
 import { MIN_PHOTOS, MAX_PHOTOS } from '@/core/modules/upload/limits'
-import { readPhotoAnalysis, readR2Photos, mergeR2Photos } from '@/core/modules/upload/photoSession'
+import { readPhotoAnalysis, readR2Photos, readR2Displays, mergeR2Photos } from '@/core/modules/upload/photoSession'
 import { useUpload } from '@/core/modules/upload/useUpload'
 import { useSession } from '@/core/modules/session/useSession'
 
@@ -95,6 +95,7 @@ export default function ResultPage() {
         // Todo se empareja por el id de la foto (ver photoSession.ts).
         const analysis = readPhotoAnalysis()
         const r2Map = readR2Photos()
+        const r2Displays = readR2Displays()
 
         // Orden cronológico por fecha de captura (EXIF); sin fecha, al final
         // en el orden en que se eligieron.
@@ -118,6 +119,7 @@ export default function ResultPage() {
           const uploaded = await uploadPhotos(missing.map(p => ({ file: p.file, photoId: p.id })))
           for (const u of uploaded) r2Map.set(u.photoId, u.url)
           mergeR2Photos(uploaded, new Set(state.photos.map(p => p.id)))
+          for (const u of uploaded) if (u.thumbnailUrl && u.thumbnailUrl !== u.url) r2Displays.set(u.photoId, u.thumbnailUrl)
           setPhase('fotos')
         }
 
@@ -136,8 +138,9 @@ export default function ResultPage() {
               id: p.id,
               src,
               url: src,
-              // En R2 la miniatura es la misma URL (no se carga el base64 al libro).
-              thumbnailUrl: r2Url ?? (meta?.thumbnail || ''),
+              // Versión liviana para el visor (users/<sesión>/display/); si no
+              // hay, la misma URL. Nunca el base64 de análisis: el visor la usaría.
+              thumbnailUrl: (r2Url && r2Displays.get(p.id)) || r2Url || (meta?.thumbnail || ''),
               r2Key: '',
               width: meta?.width ?? 0,
               height: meta?.height ?? 0,

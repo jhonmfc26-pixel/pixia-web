@@ -176,9 +176,15 @@ export default function Step3Cover() {
                 );
               })}
             </div>
-            <p className="mt-3 text-[12px] leading-relaxed text-white/45">
-              Más letras, colores, ilustraciones y la tapa completa con lomo en <span className="text-white/70">Editar portada</span>, cuando veas tu álbum.
-            </p>
+            {/* Que el cliente sepa que esto es solo el comienzo: lo completo
+                está en el estudio de portada, después de crear el álbum. */}
+            <div className="mt-3 flex gap-3 rounded-xl border border-[var(--brand-coral)]/30 bg-[var(--brand-coral)]/[0.08] px-3.5 py-3">
+              <span aria-hidden className="mt-0.5 text-[15px] text-[var(--brand-coral)]">✦</span>
+              <p className="text-[13px] leading-relaxed text-white/75">
+                <strong className="font-medium text-white">Después la puedes personalizar toda:</strong> más letras, colores,
+                ilustraciones, el lomo y la contraportada. Cuando veas tu álbum, toca <span className="text-white">Editar portada</span>.
+              </p>
+            </div>
           </div>
 
           <label className="block">

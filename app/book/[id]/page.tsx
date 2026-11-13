@@ -2,6 +2,7 @@
 
 export const runtime = 'edge'
 
+import { PhotoQualityContext } from '@/core/modules/viewer/PhotoQualityContext'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 
@@ -50,7 +51,16 @@ const GUTTER_SHADOW =
 
 // ── Viewer principal ──────────────────────────────────────────────────────────
 
+/** El visor dibuja la versión liviana de cada foto (ver PhotoQualityContext). */
 export default function BookPage() {
+  return (
+    <PhotoQualityContext.Provider value="display">
+      <BookPageInner />
+    </PhotoQualityContext.Provider>
+  )
+}
+
+function BookPageInner() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -192,6 +202,16 @@ export default function BookPage() {
     return () => window.removeEventListener('resize', check)
   }, [])
   const topBarH = compact ? 44 : 56
+  // Guía «Personaliza tu portada»: se muestra hasta que el cliente la cierra
+  // (preferencia de este navegador, nada más).
+  const [coverTipSeen, setCoverTipSeen] = useState(true)
+  useEffect(() => {
+    try { setCoverTipSeen(localStorage.getItem('pixia.coverTipSeen') === '1') } catch { setCoverTipSeen(false) }
+  }, [])
+  const dismissCoverTip = () => {
+    setCoverTipSeen(true)
+    try { localStorage.setItem('pixia.coverTipSeen', '1') } catch { /* sin almacenamiento: solo se oculta */ }
+  }
   const bottomBarH = compact ? 0 : 48
 
   useEffect(() => {
@@ -307,14 +327,14 @@ export default function BookPage() {
     // Inmediato: N-1 y N+1
     for (const offset of [-1, 1]) {
       const s = spreads[spreadIdx + offset]
-      if (s) preload(getSpreadUrls(s, photosById, coverPhoto))
+      if (s) preload(getSpreadUrls(s, photosById, coverPhoto, 'display'))
     }
 
     // Diferido 300ms: N-2 y N+2
     const t = setTimeout(() => {
       for (const offset of [-2, 2]) {
         const s = spreads[spreadIdx + offset]
-        if (s) preload(getSpreadUrls(s, photosById, coverPhoto))
+        if (s) preload(getSpreadUrls(s, photosById, coverPhoto, 'display'))
       }
     }, 300)
     return () => clearTimeout(t)
@@ -502,7 +522,7 @@ export default function BookPage() {
               color: displayIdx === 0 ? '#fff' : 'rgba(255,255,255,0.7)', cursor: 'pointer', whiteSpace: 'nowrap',
             }}
           >
-            {displayIdx === 0 ? 'Editar portada' : 'Editar'}
+            {displayIdx === 0 ? (compact ? 'Portada' : 'Editar portada') : 'Editar'}
           </button>
           <button
             onClick={() => router.push(`/checkout/${id}`)}
@@ -517,6 +537,23 @@ export default function BookPage() {
         </div>
         )}
       </div>
+
+      {/* Guía de una sola vez: dónde se personaliza la portada. */}
+      {!ordered && displayIdx === 0 && !coverTipSeen && (
+        <div role="note" style={{
+          position: 'fixed', top: `${topBarH + 10}px`, right: '12px', zIndex: 70, maxWidth: '280px',
+          background: '#1c1b1a', color: '#fff', borderRadius: '12px', padding: '12px 14px',
+          border: '1px solid rgba(232,85,58,0.45)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6)', fontSize: '13px', lineHeight: 1.45,
+        }}>
+          <span aria-hidden style={{ position: 'absolute', top: '-6px', right: '48px', width: '10px', height: '10px', background: '#1c1b1a', borderLeft: '1px solid rgba(232,85,58,0.45)', borderTop: '1px solid rgba(232,85,58,0.45)', transform: 'rotate(45deg)' }} />
+          <strong style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Personaliza tu portada</strong>
+          Letras, colores, ilustraciones, el lomo y la contraportada: todo en <em style={{ fontStyle: 'normal', color: '#E8553A' }}>Editar portada</em>.
+          <div style={{ marginTop: '10px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button onClick={dismissCoverTip} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: '12px', cursor: 'pointer' }}>Entendido</button>
+            <button onClick={() => { dismissCoverTip(); router.push(`/book/${id}/edit-v2?portada=1`) }} style={{ background: '#E8553A', border: 'none', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Personalizar</button>
+          </div>
+        </div>
+      )}
 
       {/* Área del pliego */}
       <div

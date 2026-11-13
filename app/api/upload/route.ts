@@ -156,7 +156,22 @@ export async function POST(req: NextRequest) {
     }
 
     const url = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}`
-    return NextResponse.json({ url, key, photoId })
+
+    // Versión liviana para el visor (opcional): misma sesión, carpeta display/.
+    // Si falla, no pasa nada: el visor usa la original.
+    let displayUrl: string | undefined
+    const display = formData.get('display')
+    if (display instanceof File && display.size > 0 && display.size <= MAX_FILE_BYTES) {
+      const dBuf = await display.arrayBuffer()
+      const dType = detectImageType(dBuf)
+      if (dType) {
+        const dKey = `users/${sessionId}/display/${photoId}.jpg`
+        const dRes = await signedR2Put(endpoint, bucket, dKey, dBuf, dType, accessKeyId, secretAccessKey)
+        if (dRes.ok) displayUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${dKey}`
+        else console.error('[Upload] R2 display error:', dRes.status)
+      }
+    }
+    return NextResponse.json({ url, key, photoId, displayUrl })
 
   } catch (error) {
     console.error('[Upload] Error:', error)

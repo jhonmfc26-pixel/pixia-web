@@ -2,6 +2,7 @@
 
 export const runtime = 'edge'
 
+import { PhotoQualityContext } from '@/core/modules/viewer/PhotoQualityContext'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
@@ -635,7 +636,16 @@ function LoginRequiredScreen({ bookId }: { bookId: string }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+/** El editor dibuja la versión liviana de cada foto (ver PhotoQualityContext). */
 export default function EditV2Page() {
+  return (
+    <PhotoQualityContext.Provider value="display">
+      <EditV2PageInner />
+    </PhotoQualityContext.Provider>
+  )
+}
+
+function EditV2PageInner() {
   const params = useParams()
   const searchParams = useSearchParams()
   const id = params.id as string

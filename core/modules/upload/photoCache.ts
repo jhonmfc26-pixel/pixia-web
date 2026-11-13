@@ -19,6 +19,8 @@ export interface PhotoCacheEntry {
   // ── Upload (no versionado) ──────────────────────────────────────────────────
   r2Key?: string
   url?: string
+  /** Versión liviana para el visor (users/<sesión>/display/...). */
+  displayUrl?: string
   // ── Análisis (versionado) ───────────────────────────────────────────────────
   orientation?: 'landscape' | 'portrait' | 'square'
   score?: {
@@ -55,8 +57,8 @@ export function getPhotoCacheEntry(file: File): PhotoCacheEntry | null {
     if (entry.analysisVersion === ANALYSIS_VERSION) return entry
 
     // Versión stale: el análisis debe rehacerse, pero conservar datos de upload
-    const { r2Key, url } = entry
-    if (r2Key || url) return { r2Key, url }
+    const { r2Key, url, displayUrl } = entry
+    if (r2Key || url) return { r2Key, url, displayUrl }
     return null
   } catch {
     return null

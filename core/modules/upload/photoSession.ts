@@ -97,9 +97,23 @@ export function readR2Photos(): Map<string, string> {
   )
 }
 
-export function mergeR2Photos(uploaded: { photoId: string; url: string }[], keepIds: Set<string>): void {
+/** Versión liviana para el visor de cada foto subida (si la tiene). */
+export function readR2Displays(): Map<string, string> {
+  return new Map(
+    readList<{ photoId: string; display?: string }>(R2_KEY)
+      .filter(p => p?.photoId && p?.display)
+      .map(p => [p.photoId, p.display as string]),
+  )
+}
+
+export function mergeR2Photos(uploaded: { photoId: string; url: string; thumbnailUrl?: string }[], keepIds: Set<string>): void {
   const map = readR2Photos()
-  for (const u of uploaded) map.set(u.photoId, u.url)
-  const list = [...map.entries()].filter(([id]) => keepIds.has(id)).map(([photoId, url]) => ({ photoId, url }))
+  const displays = readR2Displays()
+  for (const u of uploaded) {
+    map.set(u.photoId, u.url)
+    if (u.thumbnailUrl && u.thumbnailUrl !== u.url) displays.set(u.photoId, u.thumbnailUrl)
+  }
+  const list = [...map.entries()].filter(([id]) => keepIds.has(id))
+    .map(([photoId, url]) => ({ photoId, url, ...(displays.get(photoId) ? { display: displays.get(photoId) } : {}) }))
   setItemSafe(R2_KEY, JSON.stringify(list))
 }

@@ -41,7 +41,7 @@ export function useUpload(sessionId: string) {
           photoId: item.photoId,
           r2Key: hit.r2Key,
           url: hit.url,
-          thumbnailUrl: hit.url,
+          thumbnailUrl: hit.displayUrl || hit.url,
         })
         console.log('[Upload] CACHE HIT:', item.file.name, '→', hit.url.slice(0, 60) + '...')
       } else {
@@ -87,8 +87,10 @@ export function useUpload(sessionId: string) {
         batch.map(async ({ file, photoId }, batchIdx) => {
           // Comprimir en Web Worker (off-thread) — no bloquea el main thread
           let uploadBody: Blob = file
+          let displayBody: Blob | undefined
           try {
             const compressed = await compressInWorker(file)
+            displayBody = compressed.displayBlob
             if (compressed.savedRatio > 0) {
               uploadBody = compressed.blob
               const beforeMb = (compressed.sizeBefore / 1024 / 1024).toFixed(2)
@@ -109,6 +111,7 @@ export function useUpload(sessionId: string) {
           formData.append('file', uploadBody, file.name)
           formData.append('sessionId', sessionId)
           formData.append('photoId', photoId)
+          if (displayBody) formData.append('display', displayBody, 'display.jpg')
           const res = await fetch('/api/upload', {
             method: 'POST',
             body: formData,
@@ -122,7 +125,8 @@ export function useUpload(sessionId: string) {
             photoId,
             r2Key: data.key,
             url: data.url,
-            thumbnailUrl: data.url,
+            // Versión liviana para el visor; el PDF siempre usa `url`.
+            thumbnailUrl: data.displayUrl || data.url,
           } as UploadedPhoto
         })
       )
@@ -133,6 +137,7 @@ export function useUpload(sessionId: string) {
           updatePhotoCacheEntry(batch[idx].file, {
             r2Key: result.value.r2Key,
             url: result.value.url,
+            displayUrl: result.value.thumbnailUrl !== result.value.url ? result.value.thumbnailUrl : undefined,
           })
           const uploadedMb = (actualUploadSizes[idx] / 1024 / 1024).toFixed(2)
           const originalMb = (batch[idx].file.size / 1024 / 1024).toFixed(2)

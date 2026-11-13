@@ -12,6 +12,7 @@ import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { SelState } from './selectionTypes'
 import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
 import PixiaImage from '@/components/ui/PixiaImage'
+import { photoSrc, usePhotoQuality } from '@/core/modules/viewer/PhotoQualityContext'
 
 // ── Render de cara genérica con selección ─────────────────────────────────────
 // Face selection is handled by the parent panel (FoldStructureViewer).
@@ -42,6 +43,7 @@ function DraggableSlot({ slot, photoId, photo, isSelected, hasSel, isDropTarget,
   isDragged: boolean
   onSel: (rect: DOMRect) => void
 }) {
+  const quality = usePhotoQuality()
   const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({
     id: photoId ?? `__empty-${slot}`,
     disabled: !photoId,
@@ -75,7 +77,8 @@ function DraggableSlot({ slot, photoId, photo, isSelected, hasSel, isDropTarget,
     >
       {photo && (
         <PixiaImage
-          src={photo.url || photo.thumbnailUrl}
+          src={photoSrc(photo, quality)}
+          fallbackSrc={photo.url}
           alt=""
           draggable={false}
           style={{
@@ -239,6 +242,7 @@ function HeroSpreadHalf({ photo, half }: {
   photo: PhotoAsset | undefined
   half: 'left' | 'right'
 }) {
+  const quality = usePhotoQuality()
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: '#E4E0D8' }}>
       <div style={{
@@ -248,7 +252,8 @@ function HeroSpreadHalf({ photo, half }: {
       }}>
         {photo && (
           <PixiaImage
-            src={photo.url || photo.thumbnailUrl}
+            src={photoSrc(photo, quality)}
+            fallbackSrc={photo.url}
             alt=""
             draggable={false}
             style={{

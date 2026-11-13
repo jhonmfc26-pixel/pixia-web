@@ -15,7 +15,7 @@ export interface CompressedUpload {
   height: number
 }
 
-const MAX_DIMENSION = 3000  // px - suficiente para 30×30 cm a 250 dpi
+const MAX_DIMENSION = 6000  // px - imprenta: fotos que cruzan la doble página (ver compressWorker.ts)
 const QUALITY = 0.85        // JPEG quality - visualmente idéntico al original
 
 export async function compressForUpload(file: File): Promise<CompressedUpload> {

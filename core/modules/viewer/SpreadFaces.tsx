@@ -9,6 +9,7 @@ import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
 import { manualCoverStyle, aspectOf } from '@/core/modules/viewer/manualCover'
 import PixiaImage from '@/components/ui/PixiaImage'
 import { usePageAspect } from './PageAspectContext'
+import { photoSrc, usePhotoQuality } from './PhotoQualityContext'
 
 // Margen de página para el estilo 'con-margen' — valor de diseño elegido acá:
 // no hay ninguna convención previa que reutilizar (CoverPage.tsx declara la
@@ -52,6 +53,7 @@ export function FacePageView({ face, photosById, side, style = 'sin-margen' }: {
   style?: AlbumStyle
 }) {
   const aspect = usePageAspect()
+  const quality = usePhotoQuality()
   let content: ReactNode
   // disableMargin (hoy solo hero-spread, ver registry.ts) es la señal
   // autoritativa de "esto nunca lleva margen de página" — acá nunca se
@@ -98,7 +100,8 @@ export function FacePageView({ face, photosById, side, style = 'sin-margen' }: {
                 >
                   {photo && (
                     <PixiaImage
-                      src={photo.url || photo.thumbnailUrl}
+                      src={photoSrc(photo, quality)}
+                      fallbackSrc={photo.url}
                       alt=""
                       draggable={false}
                       style={{
@@ -151,6 +154,7 @@ export function HeroSpreadPageView({ face, photosById, half }: {
 }) {
   const photo = photosById.get(face.photoIds[0])
   const aspect = usePageAspect()
+  const quality = usePhotoQuality()
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: '#E4E0D8' }}>
       <div style={{
@@ -160,7 +164,8 @@ export function HeroSpreadPageView({ face, photosById, half }: {
       }}>
         {photo && (
           <PixiaImage
-            src={photo.url || photo.thumbnailUrl}
+            src={photoSrc(photo, quality)}
+            fallbackSrc={photo.url}
             alt=""
             draggable={false}
             style={{

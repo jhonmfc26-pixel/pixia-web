@@ -35,6 +35,11 @@ function BrokenImagePlaceholder({ className, style }: { className?: string; styl
 interface PixiaImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'onError' | 'src'> {
   /** Igual que <img src>, pero acepta undefined/'' (foto sin URL) — se trata como fallo directo, sin reintentar. */
   src: string | undefined
+  /**
+   * Si `src` falla del todo, se prueba esta antes de mostrar el placeholder.
+   * El visor pasa acá la foto original por si la versión liviana no existe.
+   */
+  fallbackSrc?: string
 }
 
 /**
@@ -45,7 +50,11 @@ interface PixiaImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'onE
  * draggable, etc.) y los pasa tal cual — object-fit/object-position y demás
  * estilos de cada caller no cambian.
  */
-export default function PixiaImage({ src, style, className, alt = '', ...rest }: PixiaImageProps) {
+export default function PixiaImage({ src: primarySrc, fallbackSrc, style, className, alt = '', ...rest }: PixiaImageProps) {
+  // Para qué src se activó el respaldo: si cambia la foto, vuelve a la principal sola.
+  const [fallbackFor, setFallbackFor] = useState<string | undefined>(undefined)
+  const useFallback = !!fallbackSrc && fallbackFor === primarySrc
+  const src = useFallback ? fallbackSrc : primarySrc
   const [attempt, setAttempt] = useState(0)
   const [failed, setFailed] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -76,6 +85,8 @@ export default function PixiaImage({ src, style, className, alt = '', ...rest }:
       onError={() => {
         if (attempt < MAX_RETRIES) {
           timerRef.current = setTimeout(() => setAttempt(a => a + 1), RETRY_DELAY_MS)
+        } else if (fallbackSrc && !useFallback && fallbackSrc !== primarySrc) {
+          setFallbackFor(primarySrc)
         } else {
           setFailed(true)
         }

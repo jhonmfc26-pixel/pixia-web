@@ -23,6 +23,16 @@ test('extrae claves de URLs y JSON', () => {
   assert.deepEqual(extractPhotoKeys({ url: 'https://assets.pixiaa.com/logo-pixia.png' }), [])
 })
 
+test('la versión liviana del visor (display/) se reconoce y se protege igual que la original', () => {
+  const display = `users/${S1}/display/a.jpg`
+  assert.deepEqual(extractPhotoKeys({ thumbnailUrl: `https://assets.pixiaa.com/${display}` }), [display])
+  const plan = planCleanup({
+    blueprints: [bp('vigente', 5, [key(S1, 'a'), display])], orders: [], pdfs: [],
+    photos: [obj(key(S1, 'a'), 40), obj(display, 40)],
+  }, NOW, CFG)
+  assert.equal(plan.deletePhotos.length, 0)
+})
+
 test('borrador de menos de 30 días: se guarda; de más: se borra con sus fotos', () => {
   const plan = planCleanup({
     blueprints: [bp('nuevo', 10, [key(S1, 'a')]), bp('viejo', 45, [key(S2, 'b')])],
