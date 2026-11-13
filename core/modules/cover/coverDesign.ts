@@ -121,7 +121,11 @@ export function readableOn(bg: string, preferred?: string): string {
 
 // ── Resolución ───────────────────────────────────────────────────────────
 
-export type CoverLayout = 'poster' | 'centered' | 'framed'
+/** Campos de diseño de la portada (lo que se guarda además de foto y textos). */
+export const DESIGN_KEYS = ['templateId', 'textPosition', 'textAlign', 'textColor', 'kind', 'fontId', 'fg', 'bg', 'accent', 'artId', 'titleScale', 'designId', 'artUrl', 'artAspect', 'layout'] as const
+export type DesignKey = typeof DESIGN_KEYS[number]
+
+export type CoverLayout = 'poster' | 'centered' | 'framed' | 'full'
 
 export interface ResolvedCover {
   kind: 'photo' | 'graphic'
@@ -135,6 +139,9 @@ export interface ResolvedCover {
   bg: string
   accent: string
   artId?: string
+  /** Arte subido desde el admin (catálogo); tiene prioridad sobre artId. */
+  artUrl?: string
+  artAspect?: number
   layout: CoverLayout
   position: CoverConfig['textPosition']
   align: CoverConfig['textAlign']
@@ -195,8 +202,10 @@ export function resolveCover(config: CoverConfig): ResolvedCover {
     titleSize: fitTitle(config.title ?? '', maxTitle, font),
     subtitleSize: template.subtitleSize,
     fg, bg, accent,
-    artId: kind === 'graphic' ? (config.artId ?? template.artId) : undefined,
-    layout: template.layout ?? 'poster',
+    artId: kind === 'graphic' && !config.artUrl ? (config.artId ?? template.artId) : undefined,
+    artUrl: kind === 'graphic' ? config.artUrl : undefined,
+    artAspect: config.artAspect,
+    layout: config.layout ?? template.layout ?? 'poster',
     position: config.textPosition ?? template.defaultPosition,
     align: config.textAlign ?? template.defaultAlign,
     overlay: template.overlayStyle,
@@ -218,6 +227,10 @@ export function applyTemplate(config: CoverConfig, t: CoverTemplate): CoverConfi
     accent: undefined,
     artId: undefined,
     titleScale: undefined,
+    designId: undefined,
+    artUrl: undefined,
+    artAspect: undefined,
+    layout: undefined,
     textColor: 'auto',
   }
 }

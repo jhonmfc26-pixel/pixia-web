@@ -24,7 +24,7 @@ export interface CoverTemplate {
   /** Ilustración por defecto (tapa gráfica). */
   artId?: string
   /** Composición de la tapa gráfica. */
-  layout?: 'poster' | 'centered' | 'framed'
+  layout?: 'poster' | 'centered' | 'framed' | 'full'
 }
 
 export const COVER_TEMPLATES: CoverTemplate[] = [
@@ -212,6 +212,8 @@ export const COVER_TEMPLATES: CoverTemplate[] = [
   { id: 'graphic-home', occasion: 'familia', name: 'Hogar', titleFont: '', titleSize: 13, titleWeight: 400, subtitleSize: 3.6, defaultPosition: 'bottom', defaultAlign: 'center', overlayStyle: 'none', letterSpacing: '0', showDivider: false, kind: 'graphic', fontId: 'dmserif', paletteId: 'arena', artId: 'hogar', layout: 'centered' },
   { id: 'graphic-sun', occasion: 'familia', name: 'Sol', titleFont: '', titleSize: 9.5, titleWeight: 400, subtitleSize: 3.2, defaultPosition: 'center', defaultAlign: 'center', overlayStyle: 'none', letterSpacing: '0', showDivider: false, kind: 'graphic', fontId: 'josefin', paletteId: 'terracota', artId: 'sol', layout: 'framed' },
   { id: 'graphic-paw', occasion: 'mascota', name: 'Huella', titleFont: '', titleSize: 16, titleWeight: 400, subtitleSize: 3.6, defaultPosition: 'top', defaultAlign: 'center', overlayStyle: 'none', letterSpacing: '0', showDivider: false, kind: 'graphic', fontId: 'anton', paletteId: 'mostaza', artId: 'huella', layout: 'poster' },
+  // Base de los diseños del catálogo (cover_designs): todo lo demás viene en el CoverConfig.
+  { id: 'catalog', occasion: 'viaje', name: 'Catálogo', titleFont: '', titleSize: 18, titleWeight: 400, subtitleSize: 3.6, defaultPosition: 'top', defaultAlign: 'center', overlayStyle: 'none', letterSpacing: '0', showDivider: false, kind: 'graphic', fontId: 'bebas', layout: 'poster' },
 ]
 
 export function getTemplatesForOccasion(occasion: OccasionType): CoverTemplate[] {
@@ -222,7 +224,7 @@ export function getTemplatesForOccasion(occasion: OccasionType): CoverTemplate[]
 
 /** Galería del estudio: todas las de un tipo, primero las de la ocasión. */
 export function galleryTemplates(occasion: OccasionType, kind: 'photo' | 'graphic'): CoverTemplate[] {
-  const all = COVER_TEMPLATES.filter(t => (t.kind ?? 'photo') === kind)
+  const all = COVER_TEMPLATES.filter(t => (t.kind ?? 'photo') === kind && t.id !== 'catalog')
   return [...all.filter(t => t.occasion === occasion), ...all.filter(t => t.occasion !== occasion)]
 }
 

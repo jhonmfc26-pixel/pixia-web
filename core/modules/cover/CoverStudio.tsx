@@ -17,6 +17,8 @@ import CoverRenderer from './CoverRenderer'
 import { galleryTemplates } from './coverTemplates'
 import { COVER_FONTS, COVER_PALETTES, TITLE_SCALES, applyTemplate, resolveCover, isHex } from './coverDesign'
 import { CoverArtSvg, artForOccasion } from './coverArt'
+import { useCoverDesigns } from './useCoverDesigns'
+import { countryInTitle, designToCover, normalizeCountry, sortDesigns, type CoverDesign } from '@/lib/coverDesigns'
 import PrintCoverWrap, { getCoverWrapDimensionsMm } from '@/core/modules/print/PrintCoverWrap'
 import { getBookPrintProfile } from '@/core/modules/print/printProfiles'
 
@@ -164,6 +166,19 @@ function TemplatesPanel({ config, occasion, format, photo, kind, setKind, onPick
   kind: 'photo' | 'graphic'; setKind: (k: 'photo' | 'graphic') => void; onPick: (c: CoverConfig) => void
 }) {
   const list = galleryTemplates(occasion, kind)
+  const designs = useCoverDesigns()
+  // Viajes: diseños por país. Se sugiere el país que aparece en el título.
+  const countries = useMemo(() => [...new Set(designs.filter(d => d.occasion === 'viaje' && d.country).map(d => d.country as string))].sort(), [designs])
+  const [country, setCountry] = useState<string | undefined>(undefined)
+  const activeCountry = country ?? (occasion === 'viaje' ? countryInTitle(config.title ?? '', countries) : undefined)
+  const shown = useMemo(() => {
+    const sorted = sortDesigns(designs, occasion, activeCountry)
+    if (!activeCountry) return sorted
+    const c = normalizeCountry(activeCountry)
+    // Con un país elegido: solo viajes de ese país y los que sirven para cualquier destino.
+    return sorted.filter(d => d.occasion === 'viaje' && (!d.country || normalizeCountry(d.country) === c))
+  }, [designs, occasion, activeCountry])
+  const pickDesign = (d: CoverDesign) => onPick({ ...config, ...designToCover(d) })
   return (
     <div>
       <div className="mb-4 grid grid-cols-2 rounded-xl border border-white/10 bg-white/[0.03] p-1 text-[13px]">
@@ -177,9 +192,42 @@ function TemplatesPanel({ config, occasion, format, photo, kind, setKind, onPick
       {kind === 'graphic' && (
         <p className="mb-3 text-[12px] leading-relaxed text-white/45">Color, ilustración y tu título en grande. Después puedes cambiar los colores y el dibujo.</p>
       )}
+      {kind === 'graphic' && occasion === 'viaje' && countries.length > 0 && (
+        <div className="mb-3">
+          <span className="mb-2 block text-[13px] text-white/60">¿A dónde fue el viaje?</span>
+          <div className="flex flex-wrap gap-1.5">
+            {[undefined, ...countries].map(c => {
+              const on = (c ? normalizeCountry(c) : undefined) === (activeCountry ? normalizeCountry(activeCountry) : undefined)
+              return (
+                <button key={c ?? 'todos'} onClick={() => setCountry(c ?? '')} aria-pressed={on}
+                  className={`rounded-full px-3 py-1.5 text-[12px] transition ${on ? 'bg-[var(--brand-coral)] text-white' : 'text-white/65 ring-1 ring-white/15 hover:text-white'}`}>
+                  {c ?? 'Todos'}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {kind === 'graphic' && shown.length > 0 && (
+        <div className="mb-3 grid grid-cols-3 gap-2.5">
+          {shown.map(d => {
+            const on = config.designId === d.id
+            const preview = { ...config, subtitle: '', date: '', ...designToCover(d) }
+            return (
+              <button key={d.id} onClick={() => pickDesign(d)} aria-pressed={on}
+                className={`rounded-lg p-1 text-center transition ${on ? 'bg-[var(--brand-coral)]/15 ring-2 ring-[var(--brand-coral)]' : 'ring-1 ring-white/10 hover:ring-white/30'}`}>
+                <div className="pointer-events-none overflow-hidden rounded-[3px]">
+                  <CoverRenderer config={preview} format={format} />
+                </div>
+                <span className={`mt-1 block truncate text-[11px] ${on ? 'text-[var(--brand-coral)]' : 'text-white/50'}`}>{d.name}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-2.5">
         {list.map(t => {
-          const on = t.id === config.templateId
+          const on = t.id === config.templateId && !config.designId
           const preview = applyTemplate({ ...config, subtitle: '', date: '' }, t)
           return (
             <button key={t.id} onClick={() => onPick({ ...applyTemplate(config, t), photoId: config.photoId })} aria-pressed={on}
@@ -403,9 +451,9 @@ function ArtPanel({ config, occasion, set }: { config: CoverConfig; occasion: Oc
       <Label>Ilustración</Label>
       <div className="grid grid-cols-3 gap-2.5">
         {artForOccasion(occasion).map(a => {
-          const on = r.artId === a.id
+          const on = !r.artUrl && r.artId === a.id
           return (
-            <button key={a.id} onClick={() => set({ artId: a.id })} aria-pressed={on}
+            <button key={a.id} onClick={() => set({ artId: a.id, artUrl: undefined, artAspect: undefined, designId: undefined, layout: config.layout === 'full' ? 'poster' : config.layout })} aria-pressed={on}
               className={`flex flex-col items-center gap-1 rounded-xl p-2 transition ${on ? 'ring-2 ring-[var(--brand-coral)]' : 'ring-1 ring-white/10 hover:ring-white/30'}`}
               style={{ background: r.bg }}>
               <CoverArtSvg id={a.id} colors={{ fg: r.fg, accent: r.accent, bg: r.bg }} style={{ width: '100%', aspectRatio: '1' }} />

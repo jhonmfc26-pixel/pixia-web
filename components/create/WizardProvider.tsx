@@ -39,6 +39,10 @@ export type CoverDraft = {
   accent?: string;
   artId?: string;
   titleScale?: number;
+  designId?: string;
+  artUrl?: string;
+  artAspect?: number;
+  layout?: CoverConfig["layout"];
 };
 
 /** Pasos del asistente. La barra de progreso y el reducer salen de acá. */

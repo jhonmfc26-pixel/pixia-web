@@ -170,18 +170,49 @@ function GraphicCover({ r, config, aspect }: { r: ResolvedCover; config: CoverCo
   // Alto disponible para el dibujo en cqw (la portada mide 100/aspect cqw de alto).
   const heightCqw = 100 / aspect
 
+  // Dibujo: el arte del catálogo (imagen) o una ilustración propia (SVG).
+  // La imagen va con max-width/max-height y no con object-fit: así Chromium
+  // conserva el PNG/JPG original en el PDF (ver manualCover.ts).
+  const artBox = (style: CSSProperties) => r.artUrl
+    ? (
+      <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={r.artUrl} alt="" style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }} />
+      </div>
+    )
+    : r.artId ? <CoverArtSvg id={r.artId} colors={colors} style={style} /> : null
+
+  if (r.layout === 'full') {
+    // Arte de tapa completa (lo entrega el diseñador con espacio para el título).
+    return (
+      <>
+        {r.artUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={r.artUrl} alt="" style={manualCoverStyle(r.artAspect ?? aspect, aspect, 'center center')} />
+        )}
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+          justifyContent: r.position === 'top' ? 'flex-start' : r.position === 'center' ? 'center' : 'flex-end',
+          padding: '7cqw 6cqw', boxSizing: 'border-box',
+        }}>
+          {textBlock}
+        </div>
+      </>
+    )
+  }
+
   if (r.layout === 'framed') {
     return (
       <div style={{ position: 'absolute', inset: '5cqw', border: `0.35cqw solid ${r.fg}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4cqw', padding: '6cqw 6cqw', boxSizing: 'border-box' }}>
         <div style={{ position: 'absolute', inset: '1.6cqw', border: `0.15cqw solid ${r.fg}`, opacity: 0.45, pointerEvents: 'none' }} />
-        {r.artId && <CoverArtSvg id={r.artId} colors={colors} style={{ width: '30cqw', height: '30cqw' }} />}
+        {artBox({ width: '30cqw', height: '30cqw' })}
         {textBlock}
       </div>
     )
   }
 
   if (r.layout === 'centered') {
-    const art = r.artId && <CoverArtSvg id={r.artId} colors={colors} style={{ width: '52cqw', height: `${Math.min(52, heightCqw * 0.5)}cqw` }} />
+    const art = artBox({ width: '52cqw', height: `${Math.min(52, heightCqw * 0.5)}cqw` })
     return (
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5cqw', padding: '8cqw 7cqw', boxSizing: 'border-box' }}>
         {titleFirst ? <>{textBlock}{art}</> : <>{art}{textBlock}</>}
@@ -194,7 +225,7 @@ function GraphicCover({ r, config, aspect }: { r: ResolvedCover; config: CoverCo
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '7cqw 6cqw 6cqw', boxSizing: 'border-box', gap: '3cqw' }}>
       {titleFirst && textBlock}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {r.artId && <CoverArtSvg id={r.artId} colors={colors} style={{ width: '100%', height: '100%', maxWidth: '80cqw' }} />}
+        {artBox({ width: '100%', height: '100%', maxWidth: r.artUrl ? '88cqw' : '80cqw' })}
       </div>
       {!titleFirst && textBlock}
     </div>

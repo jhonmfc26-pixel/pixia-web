@@ -5,7 +5,9 @@ import { useWizard, type CoverDraft } from "@/components/create/WizardProvider";
 import ContinueButton from "@/components/create/ContinueButton";
 import CoverPage from "@/core/modules/viewer/pages/CoverPage";
 import { getDefaultTemplate, galleryTemplates, type CoverTemplate } from "@/core/modules/cover/coverTemplates";
-import { applyTemplate, resolveCover } from "@/core/modules/cover/coverDesign";
+import { applyTemplate, resolveCover, DESIGN_KEYS } from "@/core/modules/cover/coverDesign";
+import { useCoverDesigns } from "@/core/modules/cover/useCoverDesigns";
+import { countryInTitle, designToCover, sortDesigns, type CoverDesign } from "@/lib/coverDesigns";
 import { occasionFromStory, titleForOccasion } from "@/core/engine/buildPixiaBook";
 import { readPhotoAnalysis, type PhotoAnalysisEntry } from "@/core/modules/upload/photoSession";
 import { getFormat } from "@/lib/formats";
@@ -19,8 +21,6 @@ import type { CoverConfig, OccasionType, PhotoAsset } from "@/core/contracts/Alb
 
 const LIMITS = { title: 40, subtitle: 40, date: 32 };
 
-/** Campos de diseño que el paso 3 guarda en el borrador (ver CoverDraft). */
-const DESIGN_KEYS = ["templateId", "textPosition", "textAlign", "textColor", "kind", "fontId", "fg", "bg", "accent", "artId", "titleScale"] as const;
 
 const PLACEHOLDERS: Record<string, { subtitle: string; date: string }> = {
   wedding: { subtitle: "Laura & Andrés", date: "Villa de Leyva · 14.06.2026" },
@@ -105,7 +105,21 @@ export default function Step3Cover() {
   const config: CoverConfig = { ...base, ...design };
   const kind = resolveCover(config).kind;
   const [galleryKind, setGalleryKind] = useState<"photo" | "graphic">(kind);
-  const gallery = useMemo(() => galleryTemplates(occasion, galleryKind).slice(0, 8), [occasion, galleryKind]);
+  // Catálogo del admin primero (en viajes, los del país que aparece en el
+  // título), después las plantillas propias; 8 en total.
+  const designs = useCoverDesigns();
+  const titleForMatch = cover.title || "";
+  const catalog = useMemo(() => {
+    if (galleryKind !== "graphic") return [];
+    const countries = designs.filter((d) => d.country).map((d) => d.country as string);
+    const country = story === "trip" || story === "honeymoon" ? countryInTitle(titleForMatch, countries) : undefined;
+    return sortDesigns(designs, occasion, country).filter((d) => d.occasion === occasion).slice(0, 6);
+  }, [designs, galleryKind, occasion, story, titleForMatch]);
+  const gallery = useMemo(() => galleryTemplates(occasion, galleryKind).slice(0, 8 - catalog.length), [occasion, galleryKind, catalog.length]);
+  const pickDesign = (d: CoverDesign) => {
+    const next = { ...config, ...designToCover(d) };
+    update(Object.fromEntries(DESIGN_KEYS.map((k) => [k, next[k]])) as Partial<CoverDraft>);
+  };
   const pickTemplate = (t: CoverTemplate) => {
     const next = applyTemplate(config, t);
     update(Object.fromEntries(DESIGN_KEYS.map((k) => [k, next[k]])) as Partial<CoverDraft>);
@@ -159,8 +173,20 @@ export default function Step3Cover() {
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2">
+              {catalog.map((d) => {
+                const on = config.designId === d.id;
+                return (
+                  <button key={d.id} type="button" onClick={() => pickDesign(d)} aria-pressed={on}
+                    className={`rounded-lg p-1 text-center transition ${on ? "bg-[var(--brand-coral)]/15 ring-2 ring-[var(--brand-coral)]" : "ring-1 ring-white/10 hover:ring-white/30"}`}>
+                    <div className="pointer-events-none overflow-hidden rounded-[4px]">
+                      <CoverPage photo={photo} cover={{ ...config, subtitle: "", date: "", ...designToCover(d) }} style="con-margen" format={format.blueprintFormat} />
+                    </div>
+                    <span className={`mt-1 block truncate text-[11px] ${on ? "text-[var(--brand-coral)]" : "text-white/50"}`}>{d.name}</span>
+                  </button>
+                );
+              })}
               {gallery.map((t) => {
-                const on = t.id === config.templateId;
+                const on = t.id === config.templateId && !config.designId;
                 return (
                   <button key={t.id} type="button" onClick={() => pickTemplate(t)} aria-pressed={on}
                     className={`rounded-lg p-1 text-center transition ${on ? "bg-[var(--brand-coral)]/15 ring-2 ring-[var(--brand-coral)]" : "ring-1 ring-white/10 hover:ring-white/30"}`}>
