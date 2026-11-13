@@ -22,8 +22,16 @@ CREATE TABLE IF NOT EXISTS cover_designs (
   text_position TEXT NOT NULL DEFAULT 'top',
   text_align    TEXT NOT NULL DEFAULT 'center',
   active        BOOLEAN NOT NULL DEFAULT true,
-  sort          INTEGER NOT NULL DEFAULT 0
+  sort          INTEGER NOT NULL DEFAULT 0,
+  title_in_art  BOOLEAN NOT NULL DEFAULT false,
+  text_x        REAL,
+  text_y        REAL
 );
+
+-- Para tablas creadas antes de 2026-11-12 (sin estas columnas):
+ALTER TABLE cover_designs ADD COLUMN IF NOT EXISTS title_in_art BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cover_designs ADD COLUMN IF NOT EXISTS text_x REAL;
+ALTER TABLE cover_designs ADD COLUMN IF NOT EXISTS text_y REAL;
 
 CREATE INDEX IF NOT EXISTS cover_designs_occasion_idx ON cover_designs (occasion, active, sort);
 

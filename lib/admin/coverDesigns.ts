@@ -14,6 +14,11 @@ export async function listAllDesigns(): Promise<CoverDesign[]> {
   return (data ?? []) as CoverDesign[]
 }
 
+const pct = (v: FormDataEntryValue | null): number | null => {
+  const n = Number.parseFloat(String(v ?? ''))
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null
+}
+
 const pick = <T extends string>(v: FormDataEntryValue | null, allowed: readonly T[], def: T): T =>
   (typeof v === 'string' && (allowed as readonly string[]).includes(v) ? v : def) as T
 
@@ -57,6 +62,9 @@ export async function createDesign(form: FormData): Promise<{ ok: true } | { ok:
     text_position: pick(form.get('text_position'), ['top', 'center', 'bottom'] as const, 'top'),
     text_align: pick(form.get('text_align'), ['left', 'center', 'right'] as const, 'center'),
     sort: Number.parseInt(String(form.get('sort') ?? '0'), 10) || 0,
+    title_in_art: form.get('title_in_art') === '1',
+    text_x: pct(form.get('text_x')),
+    text_y: pct(form.get('text_y')),
   }
   const { error } = await supabaseAdmin.from('cover_designs').insert(row)
   if (error) return { ok: false, error: error.message }

@@ -122,7 +122,7 @@ export function readableOn(bg: string, preferred?: string): string {
 // ── Resolución ───────────────────────────────────────────────────────────
 
 /** Campos de diseño de la portada (lo que se guarda además de foto y textos). */
-export const DESIGN_KEYS = ['templateId', 'textPosition', 'textAlign', 'textColor', 'kind', 'fontId', 'fg', 'bg', 'accent', 'artId', 'titleScale', 'designId', 'artUrl', 'artAspect', 'layout'] as const
+export const DESIGN_KEYS = ['templateId', 'textPosition', 'textAlign', 'textColor', 'kind', 'fontId', 'fg', 'bg', 'accent', 'artId', 'titleScale', 'designId', 'artUrl', 'artAspect', 'layout', 'textX', 'textY', 'titleInArt'] as const
 export type DesignKey = typeof DESIGN_KEYS[number]
 
 export type CoverLayout = 'poster' | 'centered' | 'framed' | 'full'
@@ -143,6 +143,10 @@ export interface ResolvedCover {
   artUrl?: string
   artAspect?: number
   layout: CoverLayout
+  /** Texto movido a mano (% de la portada), solo donde el texto va sobre una imagen. */
+  textX?: number
+  textY?: number
+  titleInArt: boolean
   position: CoverConfig['textPosition']
   align: CoverConfig['textAlign']
   overlay: CoverTemplate['overlayStyle']
@@ -181,7 +185,9 @@ export function resolveCover(config: CoverConfig): ResolvedCover {
   let fg: string
   if (kind === 'graphic') {
     bg = isHex(config.bg) ? config.bg : palette?.bg ?? '#F3ECE0'
-    fg = readableOn(bg, isHex(config.fg) ? config.fg : palette?.fg)
+    // El color que el cliente (o el admin) eligió se respeta siempre; el
+    // estudio avisa si se lee poco. Solo sin elección se garantiza contraste.
+    fg = isHex(config.fg) ? config.fg : readableOn(bg, palette?.fg)
   } else {
     bg = isHex(config.bg) ? config.bg : LEGACY_CASE_COLOR
     fg = isHex(config.fg) ? config.fg
@@ -206,6 +212,8 @@ export function resolveCover(config: CoverConfig): ResolvedCover {
     artUrl: kind === 'graphic' ? config.artUrl : undefined,
     artAspect: config.artAspect,
     layout: config.layout ?? template.layout ?? 'poster',
+    ...(freeText(config, kind) ? { textX: config.textX, textY: config.textY } : {}),
+    titleInArt: !!config.titleInArt,
     position: config.textPosition ?? template.defaultPosition,
     align: config.textAlign ?? template.defaultAlign,
     overlay: template.overlayStyle,
@@ -231,8 +239,23 @@ export function applyTemplate(config: CoverConfig, t: CoverTemplate): CoverConfi
     artUrl: undefined,
     artAspect: undefined,
     layout: undefined,
+    textX: undefined,
+    textY: undefined,
+    titleInArt: undefined,
     textColor: 'auto',
   }
+}
+
+/** ¿Este diseño deja mover el texto a mano? Solo cuando el texto va sobre una imagen. */
+export function canDragText(config: CoverConfig): boolean {
+  const t = getTemplateById(config.templateId)
+  const kind = config.kind ?? t?.kind ?? 'photo'
+  return kind === 'photo' || (config.layout ?? t?.layout) === 'full'
+}
+
+const inRange = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100
+function freeText(config: CoverConfig, kind: 'photo' | 'graphic'): boolean {
+  return inRange(config.textX) && inRange(config.textY) && (kind === 'photo' || config.layout === 'full')
 }
 
 // ── Lomo y contraportada ────────────────────────────────────────────────

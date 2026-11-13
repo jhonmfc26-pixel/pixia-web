@@ -214,7 +214,10 @@ export default function Step3Cover() {
           </div>
 
           <label className="block">
-            <span className="mb-2 block text-sm text-white/70">Título</span>
+            <span className="mb-2 block text-sm text-white/70">{config.titleInArt ? "Nombre del álbum" : "Título"}</span>
+            {config.titleInArt && (
+              <span className="mb-2 block text-[12px] text-white/45">Este diseño ya trae el título dibujado: este nombre va en el lomo. Si quieres, agrega el año en «Fecha o lugar».</span>
+            )}
             <input className={field} value={cover.title} maxLength={LIMITS.title}
               placeholder={titleForOccasion(story)} onChange={(e) => update({ title: e.target.value })} />
           </label>

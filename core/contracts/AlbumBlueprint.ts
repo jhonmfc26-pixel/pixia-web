@@ -114,6 +114,15 @@ export interface CoverConfig {
   artAspect?: number
   /** Composición: la de la plantilla si no viene. 'full' = el arte cubre toda la tapa. */
   layout?: 'poster' | 'centered' | 'framed' | 'full'
+  /**
+   * Texto movido a mano (arrastrándolo en el estudio): centro del bloque de
+   * texto en % del ancho (textX) y del alto (textY) de la portada. Solo en
+   * portadas con foto y en arte de tapa completa. Sin valor = textPosition.
+   */
+  textX?: number
+  textY?: number
+  /** El arte ya trae el título dibujado (ej. la palabra «PERÚ»): no se escribe encima. */
+  titleInArt?: boolean
 }
 
 export interface AlbumBlueprint {

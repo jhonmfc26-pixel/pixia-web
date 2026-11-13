@@ -66,18 +66,34 @@ export default function CoverRenderer({ config, photoUrl, photoFallbackUrl, phot
           } : undefined} />
       )}
       {overlay !== 'none' && <div style={{ position: 'absolute', inset: 0, background: overlay }} />}
-      <div style={{
-        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-        justifyContent: r.position === 'top' ? 'flex-start' : r.position === 'center' ? 'center' : 'flex-end',
-        alignItems: r.align === 'left' ? 'flex-start' : r.align === 'right' ? 'flex-end' : 'center',
-        padding: '6cqw 5cqw', textAlign: r.align,
-      }}>
+      <div style={textLayerStyle(r, '6cqw 5cqw')} data-cover-text="">
         <Title r={r} text={config.title} shadow={`0 2px 12px ${shadowColor}`} />
         {r.showDivider && config.subtitle && <Divider color={r.fg} />}
         <Lines r={r} config={config} />
       </div>
     </div>
   )
+}
+
+const alignItemsOf = (a: ResolvedCover['align']) => (a === 'left' ? 'flex-start' : a === 'right' ? 'flex-end' : 'center')
+
+/**
+ * Capa del texto sobre una imagen. Si el cliente lo arrastró (textX/textY),
+ * el bloque se centra en ese punto; si no, va arriba/centro/abajo.
+ * `data-cover-text` marca el bloque que el estudio deja arrastrar.
+ */
+function textLayerStyle(r: ResolvedCover, padding: string): CSSProperties {
+  if (r.textX !== undefined && r.textY !== undefined) {
+    return {
+      position: 'absolute', left: `${r.textX}%`, top: `${r.textY}%`, transform: 'translate(-50%, -50%)',
+      width: '88cqw', display: 'flex', flexDirection: 'column', alignItems: alignItemsOf(r.align), textAlign: r.align,
+    }
+  }
+  return {
+    position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+    justifyContent: r.position === 'top' ? 'flex-start' : r.position === 'center' ? 'center' : 'flex-end',
+    alignItems: alignItemsOf(r.align), padding, textAlign: r.align, boxSizing: 'border-box',
+  }
 }
 
 function isLight(hex: string) {
@@ -104,6 +120,8 @@ function photoOverlay(r: ResolvedCover): string {
 }
 
 function Title({ r, text, shadow }: { r: ResolvedCover; text: string; shadow?: string }) {
+  // El arte ya trae el título dibujado: no se escribe encima (el título sigue en el lomo).
+  if (r.titleInArt) return null
   return (
     <h1 style={{
       fontFamily: `'${r.font.family}', ${r.font.fallback}`,
@@ -190,12 +208,10 @@ function GraphicCover({ r, config, aspect }: { r: ResolvedCover; config: CoverCo
           // eslint-disable-next-line @next/next/no-img-element
           <img src={r.artUrl} alt="" style={manualCoverStyle(r.artAspect ?? aspect, aspect, 'center center')} />
         )}
-        <div style={{
-          position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-          justifyContent: r.position === 'top' ? 'flex-start' : r.position === 'center' ? 'center' : 'flex-end',
-          padding: '7cqw 6cqw', boxSizing: 'border-box',
-        }}>
-          {textBlock}
+        <div style={textLayerStyle(r, '7cqw 6cqw')} data-cover-text="">
+          <Title r={r} text={config.title} />
+          {r.showDivider && config.subtitle && <Divider color={r.fg} />}
+          <Lines r={r} config={config} />
         </div>
       </>
     )
