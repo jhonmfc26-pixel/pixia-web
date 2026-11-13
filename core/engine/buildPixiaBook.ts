@@ -196,23 +196,6 @@ export async function buildPixiaBook(draft: AlbumDraft): Promise<PixiaBook> {
 }
 
 
-// TODO: reactivar solo para análisis offline del taste dataset,
-// nunca en el flujo de generación del usuario.
-//
-// async function _editorialApiCall(draft: AlbumDraft) {
-//   const response = await fetch('/api/editorial', {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json' },
-//     body: JSON.stringify({
-//       photoDescriptions: ...,
-//       story: draft.story || 'boda',
-//       style: draft.style || 'cinematico',
-//       emotion: draft.emotion || 'romantica',
-//     }),
-//   })
-//   return response.json()
-// }
-
 /**
  * Ids del paso 1 (wedding, honeymoon, trip, anniversary, kids, other) → ocasión de
  * las plantillas de portada. Antes no se mapeaba y toda portada salía con la

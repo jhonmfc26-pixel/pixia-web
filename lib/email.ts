@@ -34,7 +34,33 @@ export function explainEmailError(msg: string): string {
  */
 export async function sendOrderConfirmation(data: OrderConfirmationData): Promise<{ ok: boolean; error?: string }> {
   const from = emailFrom()
-  const support = process.env.EMAIL_SUPPORT || 'soporte@pixiaa.com'
+  const { subject, html, text } = buildOrderConfirmationEmail(data)
+
+  try {
+    const result = await resend.emails.send({ from, to: data.customerEmail, subject, html, text })
+
+    if (result.error) {
+      console.error('[email] Resend error:', result.error)
+      return { ok: false, error: explainEmailError(result.error.message) }
+    }
+
+    const masked = `${data.customerEmail[0]}***@${data.customerEmail.split('@')[1] ?? ''}`
+    console.log('[email] Confirmación enviada a', masked, '- id:', result.data?.id)
+    return { ok: true }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[email] Exception:', msg)
+    return { ok: false, error: msg }
+  }
+}
+
+/**
+ * Asunto, HTML y texto del correo de confirmación. Puro (sin enviar) para poder
+ * probarlo. Nombre y dirección los escribe el cliente en el checkout: en el
+ * HTML van siempre escapados.
+ */
+export function buildOrderConfirmationEmail(data: OrderConfirmationData, opts: { support?: string } = {}) {
+  const support = opts.support ?? (process.env.EMAIL_SUPPORT || 'soporte@pixiaa.com')
 
   const formatCop = (n: number) =>
     new Intl.NumberFormat('es-CO', {
@@ -64,7 +90,7 @@ export async function sendOrderConfirmation(data: OrderConfirmationData): Promis
                       ¡Pedido confirmado!
                     </h1>
                     <p style="margin:0;font-size:15px;color:rgba(255,255,255,0.7);line-height:1.5;">
-                      Hola ${data.customerName}, recibimos tu pago.
+                      Hola ${esc(data.customerName)}, recibimos tu pago.
                     </p>
                   </td>
                 </tr>
@@ -80,7 +106,7 @@ export async function sendOrderConfirmation(data: OrderConfirmationData): Promis
                             Número de orden
                           </div>
                           <div style="font-family:monospace;font-size:14px;color:#fff;">
-                            ${data.reference}
+                            ${esc(data.reference)}
                           </div>
                         </td>
                       </tr>
@@ -117,8 +143,8 @@ export async function sendOrderConfirmation(data: OrderConfirmationData): Promis
                             Dirección de envío
                           </div>
                           <div style="font-size:14px;color:#fff;line-height:1.5;">
-                            ${data.shippingAddress}<br>
-                            ${data.shippingCity}, ${data.shippingState}
+                            ${esc(data.shippingAddress)}<br>
+                            ${esc(data.shippingCity)}, ${esc(data.shippingState)}
                           </div>
                         </td>
                       </tr>
@@ -145,7 +171,7 @@ export async function sendOrderConfirmation(data: OrderConfirmationData): Promis
                 <tr>
                   <td align="center" style="padding:24px 32px 40px 32px;border-top:1px solid rgba(255,255,255,0.08);">
                     <p style="margin:0 0 8px 0;font-size:13px;color:rgba(255,255,255,0.5);line-height:1.6;">
-                      ¿Dudas? Escríbenos a <a href="mailto:${support}" style="color:rgba(255,255,255,0.7);text-decoration:underline;">${support}</a>
+                      ¿Dudas? Escríbenos a <a href="mailto:${esc(support)}" style="color:rgba(255,255,255,0.7);text-decoration:underline;">${esc(support)}</a>
                     </p>
                     <p style="margin:16px 0 0 0;font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:0.1em;">
                       PIXIA · Álbumes que perduran
@@ -182,28 +208,7 @@ Recibirás otro email con el número de seguimiento cuando se despache (5-10 dí
 PIXIA · Álbumes que perduran
   `.trim()
 
-  try {
-    const result = await resend.emails.send({
-      from,
-      to: data.customerEmail,
-      subject: `Pedido confirmado: ${data.reference}`,
-      html,
-      text,
-    })
-
-    if (result.error) {
-      console.error('[email] Resend error:', result.error)
-      return { ok: false, error: explainEmailError(result.error.message) }
-    }
-
-    const masked = `${data.customerEmail[0]}***@${data.customerEmail.split('@')[1] ?? ''}`
-    console.log('[email] Confirmación enviada a', masked, '- id:', result.data?.id)
-    return { ok: true }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    console.error('[email] Exception:', msg)
-    return { ok: false, error: msg }
-  }
+  return { subject: `Pedido confirmado: ${data.reference}`, html, text }
 }
 
 // ── Correos de estado post-venta (en impresión / enviado / entregado) ───────
