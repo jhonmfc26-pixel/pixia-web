@@ -21,7 +21,7 @@ const okBuild: Build = () => ({
   ok: true,
   warnings: [],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  input: { structure: { folds: [{}] } as any, photos: {}, cover: {} as any, coverPhoto: undefined, format: '30x30' },
+  input: { structure: { folds: [] } as any, photos: {}, cover: {} as any, coverPhoto: undefined, format: '30x30' },
 })
 
 function fakeEngine(opts: { failInterior?: string } = {}): RenderEngine & { uploads: string[] } {

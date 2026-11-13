@@ -1,4 +1,5 @@
 import { buildPrintJobInput } from '@/core/modules/print/buildPrintJobInput'
+import { findUnprintablePhotos, describeUnprintable } from '@/core/modules/print/printablePhotos'
 import { renderInteriorPdf, renderCoverPdf } from './renderAlbum'
 import { sendPdfFailureAlert } from './alert'
 import type { JobsClient, QueueJob } from './jobs'
@@ -117,6 +118,9 @@ async function processJob(
     const built = build(raw, albumId)
     if (!built.ok) throw new PermanentError(built.reason)
     for (const w of built.warnings) console.warn(`[queue] ${albumId}: ${w}`)
+    // Fotos que no quedaron subidas: no se arregla reintentando — directo a 'fallo' y alerta.
+    const unprintable = findUnprintablePhotos(built.input)
+    if (unprintable.length > 0) throw new PermanentError(describeUnprintable(unprintable))
     const { structure, photos, cover, coverPhoto, format } = built.input
 
     const interior = await engine.renderInterior(structure, new Map(Object.entries(photos)), format, baseUrl)

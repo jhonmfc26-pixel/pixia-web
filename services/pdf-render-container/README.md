@@ -260,6 +260,27 @@ contenedor también consume intentos. Un job `generando_pdf` con
 La cola solo toma jobs con `order_reference` — las pruebas de la ruta dev
 (sin orden) nunca se procesan solas.
 
+### Un PDF incompleto no sale
+
+Antes de entregar un PDF se comprueba que se puede imprimir tal cual:
+
+- **Fotos sin subir** (`core/modules/print/printablePhotos.ts`): si una foto
+  colocada en el álbum no está en el almacenamiento (quedó como copia dentro
+  del álbum o vacía), el job pasa directo a `fallo` y llega la alerta. No se
+  arregla reintentando: el cliente tiene que volver a subirla.
+- **Fotos o fuentes que no cargan** (`src/renderAlbum.ts`): si al armar el
+  PDF alguna imagen, fuente u hoja de estilos falla, no se genera. El error
+  dice cuál fue; la cola reintenta (suele ser algo pasajero de red) y, si
+  sigue fallando, alerta.
+- **Dominios permitidos** (`src/printHosts.ts`): Chromium solo descarga de
+  `assets.pixiaa.com`, del dominio de `PRINT_BASE_URL` y de Google Fonts. Si el
+  almacenamiento cambia de dirección, se agrega sin tocar código:
+
+  ```bash
+  gcloud run services update pixia-pdf-render --region us-central1 \
+    --update-env-vars PRINT_EXTRA_HOSTS="fotos.ejemplo.com"
+  ```
+
 Tests de la lógica (sin Chromium ni Supabase), desde la raíz:
 ```bash
 npx tsx --test services/pdf-render-container/test/queue.test.ts
