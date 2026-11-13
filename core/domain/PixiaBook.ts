@@ -24,6 +24,10 @@ export interface PixiaBook {
     accent?: string
     artId?: string
     titleScale?: number
+    designId?: string
+    artUrl?: string
+    artAspect?: number
+    layout?: 'poster' | 'centered' | 'framed' | 'full'
   }
   editorial: {
     intent: string; tone: NarrativeTone; summary: string

@@ -56,7 +56,7 @@ export function mapLegacyClaudeLayout(layout: string | undefined): LayoutId {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function designFields(cover: any) {
   const out: Record<string, unknown> = {}
-  for (const k of ['kind', 'fontId', 'fg', 'bg', 'accent', 'artId', 'titleScale'] as const) {
+  for (const k of ['kind', 'fontId', 'fg', 'bg', 'accent', 'artId', 'titleScale', 'designId', 'artUrl', 'artAspect', 'layout'] as const) {
     if (cover?.[k] !== undefined && cover?.[k] !== null && cover?.[k] !== '') out[k] = cover[k]
   }
   return out

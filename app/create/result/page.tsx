@@ -10,6 +10,7 @@ import { buildPixiaBookWithAI } from '../../../core/engine/buildPixiaBook'
 import { saveBookToLocal } from '../../../core/engine/localBookStorage'
 import { useWizard } from '../../../components/create/WizardProvider'
 import { MIN_PHOTOS, MAX_PHOTOS } from '@/core/modules/upload/limits'
+import { DESIGN_KEYS } from '@/core/modules/cover/coverDesign'
 import { readPhotoAnalysis, readR2Photos, readR2Displays, mergeR2Photos } from '@/core/modules/upload/photoSession'
 import { useUpload } from '@/core/modules/upload/useUpload'
 import { useSession } from '@/core/modules/session/useSession'
@@ -175,19 +176,9 @@ export default function ResultPage() {
           date: state.cover?.date,
           coverPhotoId,
           // Diseño elegido en el paso 3 (plantilla con foto o gráfica, etc.).
-          coverDesign: state.cover?.templateId ? {
-            templateId: state.cover.templateId,
-            textPosition: state.cover.textPosition,
-            textAlign: state.cover.textAlign,
-            textColor: state.cover.textColor,
-            kind: state.cover.kind,
-            fontId: state.cover.fontId,
-            fg: state.cover.fg,
-            bg: state.cover.bg,
-            accent: state.cover.accent,
-            artId: state.cover.artId,
-            titleScale: state.cover.titleScale,
-          } : undefined,
+          coverDesign: state.cover?.templateId
+            ? Object.fromEntries(DESIGN_KEYS.map(k => [k, state.cover?.[k]]).filter(([, v]) => v !== undefined))
+            : undefined,
         })
 
         setPhase('guardando')

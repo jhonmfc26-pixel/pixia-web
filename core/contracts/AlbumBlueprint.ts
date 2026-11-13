@@ -105,6 +105,15 @@ export interface CoverConfig {
   artId?: string
   /** Tamaño del título relativo a la plantilla (0.82 / 1 / 1.18). */
   titleScale?: number
+  // ── Catálogo de portadas (diseños subidos desde el admin, 2026-11-12) ──
+  /** Id del diseño en cover_designs (solo informativo: todo lo necesario para dibujarla va acá). */
+  designId?: string
+  /** Arte del diseño (PNG/JPG en R2). Reemplaza a la ilustración de artId. */
+  artUrl?: string
+  /** Proporción ancho/alto del arte, para recortarlo sin medir. */
+  artAspect?: number
+  /** Composición: la de la plantilla si no viene. 'full' = el arte cubre toda la tapa. */
+  layout?: 'poster' | 'centered' | 'framed' | 'full'
 }
 
 export interface AlbumBlueprint {
