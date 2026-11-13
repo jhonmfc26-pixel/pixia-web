@@ -19,6 +19,31 @@ export interface UploadProgress {
 }
 
 
+/** Esperas antes de cada reintento de una foto que no subió (red inestable, servidor ocupado). */
+const RETRY_DELAYS_MS = [700, 2000]
+
+/**
+ * Sube una foto. Reintenta si el fallo es pasajero (sin red, 429, 5xx); un
+ * rechazo definitivo (archivo inválido o muy grande) no se reintenta.
+ * Reintentar es seguro: el servidor no vuelve a escribir una foto ya subida.
+ */
+async function postWithRetry(formData: FormData): Promise<{ key: string; url: string; displayUrl?: string }> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[attempt - 1]))
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (res.ok) return await res.json()
+      const errText = await res.text().catch(() => 'unknown')
+      lastError = new Error(`HTTP ${res.status}: ${errText}`)
+      if (res.status !== 429 && res.status < 500) break
+    } catch (err) {
+      lastError = err // sin red o conexión cortada
+    }
+  }
+  throw lastError
+}
+
 export function useUpload(sessionId: string) {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
     total: 0, completed: 0, isUploading: false, failed: [],
@@ -112,15 +137,7 @@ export function useUpload(sessionId: string) {
           formData.append('sessionId', sessionId)
           formData.append('photoId', photoId)
           if (displayBody) formData.append('display', displayBody, 'display.jpg')
-          const res = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          })
-          if (!res.ok) {
-            const errText = await res.text().catch(() => 'unknown')
-            throw new Error(`HTTP ${res.status}: ${errText}`)
-          }
-          const data = await res.json()
+          const data = await postWithRetry(formData)
           return {
             photoId,
             r2Key: data.key,

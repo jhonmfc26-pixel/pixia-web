@@ -48,6 +48,11 @@ export async function signedR2Put(
   contentType: string,
   accessKeyId: string,
   secretAccessKey: string,
+  /**
+   * onlyIfNew: la subida solo se acepta si la clave todavía no existe
+   * (If-None-Match: *). Si ya existe, R2 responde 412 y no cambia nada.
+   */
+  opts: { onlyIfNew?: boolean } = {},
 ): Promise<Response> {
   const now = new Date()
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '').slice(0, 15) + 'Z'
@@ -101,6 +106,8 @@ export async function signedR2Put(
       'x-amz-content-sha256': payloadHash,
       'x-amz-date': amzDate,
       'Authorization': authHeader,
+      // No va firmado (SigV4 solo exige host y x-amz-*): R2 lo evalúa igual.
+      ...(opts.onlyIfNew ? { 'If-None-Match': '*' } : {}),
     },
     body,
   })
