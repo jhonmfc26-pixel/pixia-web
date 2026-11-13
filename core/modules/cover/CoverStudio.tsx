@@ -443,7 +443,7 @@ function ColorPanel({ config, set }: { config: CoverConfig; set: (p: Partial<Cov
         <div className="mt-2"><ColorInput label="Otro color" value={r.fg} onChange={v => set({ fg: v })} /></div>
       </div>
       <div>
-        <Label>Color de la tapa <span className="text-white/30">· lomo y contraportada</span></Label>
+        <Label>Color del lomo</Label>
         <div className="grid grid-cols-4 gap-2">
           {[{ id: 'negro', name: 'Negro', bg: '#111111' }, ...COVER_PALETTES].map(p => (
             <button key={p.id} onClick={() => set({ bg: p.bg })} aria-label={p.name} title={p.name}

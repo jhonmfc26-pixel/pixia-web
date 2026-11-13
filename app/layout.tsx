@@ -1,6 +1,7 @@
 import "./globals.css";
+// Fuentes de portadas y títulos servidas desde el propio sitio (ver el archivo).
+import "./cover-fonts.css";
 import type { Metadata, Viewport } from "next";
-import { GOOGLE_FONTS_URL } from "@/core/modules/cover/fonts";
 
 const SITE_URL = "https://pixiaa.com";
 const DESCRIPTION =
@@ -52,12 +53,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es-CO">
-      <head>
-        {/* Fuentes de portadas y títulos (ver core/modules/cover/fonts.ts). */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
-      </head>
       <body className="bg-gradient-to-br from-black via-zinc-900 to-black text-white min-h-screen" suppressHydrationWarning>
         {children}
       </body>

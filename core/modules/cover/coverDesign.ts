@@ -1,7 +1,7 @@
 /**
  * Estudio de portada (decisión de Jhon, 2026-11-12): dos tipos de tapa —
  * con foto a sangre y gráfica sin foto (color + ilustración + título
- * grande) — con tipografías, colores y lomo/contraportada que siguen el
+ * grande) — con tipografías, colores y un lomo que sigue el
  * diseño. Este archivo es la fuente única de las opciones (fuentes, paletas)
  * y de `resolveCover`, que combina lo que eligió el cliente con los valores
  * de la plantilla. Lo usan el visor, el editor, el paso 3 y el PDF, así que
@@ -69,7 +69,7 @@ function fontOfTemplate(t: CoverTemplate): CoverFont {
 export interface CoverPalette {
   id: string
   name: string
-  /** Fondo de la tapa gráfica, y color del lomo y la contraportada. */
+  /** Fondo de la tapa gráfica y color del lomo (la contraportada es siempre la oscura de Pixia). */
   bg: string
   /** Título y textos. */
   fg: string
@@ -95,7 +95,7 @@ export const COVER_PALETTES: CoverPalette[] = [
 const PALETTE_BY_ID = new Map(COVER_PALETTES.map(p => [p.id, p]))
 export const getPalette = (id: string | undefined) => (id ? PALETTE_BY_ID.get(id) : undefined)
 
-/** Color de la tapa (lomo + contraportada) de los álbumes de antes. */
+/** Color del lomo de los álbumes de antes (y de la contraportada, siempre). */
 export const LEGACY_CASE_COLOR = '#111111'
 
 const HEX = /^#[0-9a-fA-F]{6}$/
@@ -135,7 +135,7 @@ export interface ResolvedCover {
   titleSize: number
   subtitleSize: number
   fg: string
-  /** Fondo de la tapa gráfica / color del lomo y la contraportada. */
+  /** Fondo de la tapa gráfica / color del lomo. */
   bg: string
   accent: string
   artId?: string
@@ -258,13 +258,13 @@ function freeText(config: CoverConfig, kind: 'photo' | 'graphic'): boolean {
   return inRange(config.textX) && inRange(config.textY) && (kind === 'photo' || config.layout === 'full')
 }
 
-// ── Lomo y contraportada ────────────────────────────────────────────────
+// ── Lomo ────────────────────────────────────────────────
 
 /** Color del logo de Pixia (coral). */
 const LOGO_COLOR = '#E0405A'
 
 /**
- * Colores de la tapa fuera de la portada: lomo y contraportada siguen el
+ * Colores del lomo: sigue el
  * fondo elegido. El logo de Pixia NUNCA cambia de color (Jhon, 2026-11-12):
  * si se pierde sobre el fondo (tapa coral o rosada), va sobre una placa
  * redonda clara que lo deja ver con sus colores de siempre.
