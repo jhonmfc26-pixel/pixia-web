@@ -32,6 +32,12 @@ export default function DesignForm({ minPx }: { minPx: number }) {
     layout: f.layout as CoverConfig['layout'], bg: f.bg, fg: f.fg, accent: f.accent, fontId: f.font_id,
   }
   const small = dims && Math.max(dims.w, dims.h) < minPx
+  // Calidad de impresión del arte de tapa completa: en 30×30 se recorta un
+  // cuadrado del lado menor; en 21×28 (vertical) cubre 21 cm de ancho.
+  const dpi = dims && f.layout === 'full'
+    ? Math.round(Math.min(Math.min(dims.w, dims.h) / (30 / 2.54), dims.w / (21 / 2.54), dims.h / (28 / 2.54)))
+    : null
+  const lowDpi = dpi !== null && dpi < 250
   const input = 'w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-[var(--brand-coral)]/60'
 
   return (
@@ -44,9 +50,14 @@ export default function DesignForm({ minPx }: { minPx: number }) {
             onChange={e => {
               const fl = e.target.files?.[0] ?? null
               setFile(fl); setDims(null)
+              // Un JPG no tiene transparencia: casi siempre es arte de tapa completa.
+              if (fl && fl.type === 'image/jpeg') setF(p => ({ ...p, layout: 'full' }))
               if (fl) { const im = new Image(); const u = URL.createObjectURL(fl); im.onload = () => { setDims({ w: im.naturalWidth, h: im.naturalHeight }); URL.revokeObjectURL(u) }; im.src = u }
             }} />
-          {dims && <span className={`mt-1 block text-xs ${small ? 'text-red-300' : 'text-[var(--text-tertiary)]'}`}>{dims.w}×{dims.h} px{small ? ' — muy pequeña para imprimir' : ''}</span>}
+          {dims && <span className={`mt-1 block text-xs ${small ? 'text-red-300' : lowDpi ? 'text-amber-300' : 'text-[var(--text-tertiary)]'}`}>
+            {dims.w}×{dims.h} px{small ? ' — muy pequeña para imprimir' : ''}
+            {!small && dpi !== null && ` · se imprime a unos ${dpi} dpi${lowDpi ? ' en 30×30: se verá algo suave. Lo ideal es 3.600×4.800 px.' : ''}`}
+          </span>}
         </label>
         <label className="block text-sm"><span className="mb-1 block text-[var(--text-secondary)]">Nombre</span>
           <input name="name" required value={f.name} onChange={set('name')} placeholder="Perú — llama" className={input} /></label>
@@ -56,7 +67,7 @@ export default function DesignForm({ minPx }: { minPx: number }) {
           </select></label>
         <label className="block text-sm"><span className="mb-1 block text-[var(--text-secondary)]">País (solo viajes · vacío = cualquier destino)</span>
           <input name="country" value={f.country} onChange={set('country')} placeholder="Perú" className={input} /></label>
-        <label className="block text-sm"><span className="mb-1 block text-[var(--text-secondary)]">Composición</span>
+        <label className="block text-sm"><span className="mb-1 block text-[var(--text-secondary)]">Composición <span className="text-[var(--text-tertiary)]">· si la imagen ya trae el espacio para el título, «tapa completa»</span></span>
           <select name="layout" value={f.layout} onChange={set('layout')} className={input}>
             {DESIGN_LAYOUTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select></label>

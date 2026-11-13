@@ -72,3 +72,11 @@ body {
   background: rgba(232, 85, 58, 0.25);
   color: var(--text-primary);
 }
+
+/* Listas desplegables: el sitio es oscuro, pero las opciones del <select>
+   las dibuja el sistema con fondo blanco y heredaban el texto blanco: no se
+   veían (admin de portadas, 2026-11-12). */
+@layer base {
+  select { color-scheme: dark; }
+  select option { background-color: #1a1a1a; color: #f5f0eb; }
+}
