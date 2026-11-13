@@ -18,7 +18,7 @@
  * Si falta CF_ACCESS_TEAM_DOMAIN o ADMIN_EMAILS → nadie entra (en producción).
  *
  * En `next dev` (NODE_ENV !== 'production') se deja pasar sin Access, para
- * poder trabajar local — mismo criterio que la ruta /api/dev/generate-pdf.
+ * poder trabajar local.
  *
  * Sin dependencias: Web Crypto (disponible en el runtime edge de Cloudflare).
  */

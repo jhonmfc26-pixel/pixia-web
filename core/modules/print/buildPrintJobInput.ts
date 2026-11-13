@@ -8,11 +8,10 @@ import type { CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
  * Todo lo que el motor de PDF necesita para generar interior + cubierta de
  * un álbum, armado desde la fila cruda de `blueprints` en Supabase.
  *
- * ÚNICA fuente de verdad de este armado: la usan la ruta dev
- * (app/api/dev/generate-pdf) y el procesador de la cola de producción
- * (services/pdf-render-container, POST /process-pending). Si dev y prod
- * armaran el payload por separado, un álbum podría verse bien en la prueba
- * manual y salir distinto en una orden pagada — rompe WYSIWYG.
+ * ÚNICA fuente de verdad de este armado: la usan el procesador de la cola de
+ * producción (services/pdf-render-container, POST /process-pending) y la
+ * creación de órdenes (lib/orderAlbum.ts), para que las páginas que se
+ * cobran sean exactamente las que tiene el PDF.
  */
 export interface PrintJobInput {
   structure: AlbumStructure
