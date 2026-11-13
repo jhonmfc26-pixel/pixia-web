@@ -1,5 +1,6 @@
 import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { AlbumStructure, Face } from '@/core/modules/foldModel/types'
+import { photoSrc, type PhotoQuality } from './PhotoQualityContext'
 
 /**
  * Un "pliego" (spread) tal como lo ve el viewer: portada, contraportada,
@@ -35,23 +36,25 @@ export function getSpreadUrls(
   s: ViewerSpread,
   photosById: Map<string, PhotoAsset>,
   coverPhoto: PhotoAsset | undefined,
+  /** El visor precarga la versión liviana (ver PhotoQualityContext). */
+  quality: PhotoQuality = 'print',
 ): string[] {
   const urls: string[] = []
   const addFace = (face: Face) => {
     if (face.kind === 'dedication') {
       const p = face.dedication?.photoId ? photosById.get(face.dedication.photoId) : undefined
-      const url = p?.url || p?.thumbnailUrl
+      const url = photoSrc(p, quality)
       if (url) urls.push(url)
       return
     }
     for (const id of face.photoIds) {
       const p = photosById.get(id)
-      const url = p?.url || p?.thumbnailUrl
+      const url = photoSrc(p, quality)
       if (url) urls.push(url)
     }
   }
   if (s.kind === 'cover') {
-    const u = coverPhoto?.url || coverPhoto?.thumbnailUrl
+    const u = photoSrc(coverPhoto, quality)
     if (u) urls.push(u)
   } else if (s.kind === 'paired') {
     addFace(s.left); addFace(s.right)

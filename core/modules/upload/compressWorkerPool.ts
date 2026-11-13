@@ -1,10 +1,13 @@
 import { compressForUpload } from './compressForUpload'
 
 const POOL_SIZE = 2
-const TIMEOUT_MS = 15_000
+// Dos versiones por foto (imprenta + visor): con fotos grandes tarda más.
+const TIMEOUT_MS = 30_000
 
 interface WorkerResult {
   blob: Blob
+  /** Versión liviana para el visor (ver compressWorker.ts). */
+  displayBlob?: Blob
   sizeBefore: number
   sizeAfter: number
   savedRatio: number
@@ -30,7 +33,7 @@ function supportsWorkerCompression(): boolean {
 }
 
 function handleWorkerMessage(e: MessageEvent) {
-  const { id, blob, sizeBefore, sizeAfter, savedRatio, error } = e.data
+  const { id, blob, displayBlob, sizeBefore, sizeAfter, savedRatio, error } = e.data
   const job = pendingJobs.get(id)
   if (!job) return
   pendingJobs.delete(id)
@@ -39,7 +42,7 @@ function handleWorkerMessage(e: MessageEvent) {
   if (error) {
     job.reject(new Error(error))
   } else {
-    job.resolve({ blob, sizeBefore, sizeAfter, savedRatio })
+    job.resolve({ blob, displayBlob, sizeBefore, sizeAfter, savedRatio })
   }
 }
 
@@ -91,7 +94,7 @@ export async function compressInWorker(file: File): Promise<WorkerResult> {
     const timeoutId = setTimeout(() => {
       if (pendingJobs.has(id)) {
         pendingJobs.delete(id)
-        reject(new Error(`Worker timeout (15s): ${file.name}`))
+        reject(new Error(`Worker timeout (30s): ${file.name}`))
       }
     }, TIMEOUT_MS)
 

@@ -67,8 +67,11 @@ export interface CleanupPlan {
   counts: { draftsActive: number; draftsExpired: number; ordersActive: number; ordersExpired: number }
 }
 
-/** Claves `users/<sesión>/original/<foto>` dentro de cualquier JSON (URLs o claves sueltas). */
-const KEY_RE = /users\/[0-9a-fA-F-]{36}\/original\/[^"'\s?#\\)]+/g
+/**
+ * Claves `users/<sesión>/original/<foto>` y `users/<sesión>/display/<foto>`
+ * (versión liviana del visor, desde 2026-11-12) dentro de cualquier JSON.
+ */
+const KEY_RE = /users\/[0-9a-fA-F-]{36}\/(?:original|display)\/[^"'\s?#\\)]+/g
 
 export function extractPhotoKeys(value: unknown): string[] {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? '')

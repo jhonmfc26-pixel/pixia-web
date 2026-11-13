@@ -136,7 +136,7 @@ function SpineTitle({ title, spineWidthMm, spineHeightMm, fontFamily, uppercase,
   spineHeightMm: number
   fontFamily: string
   uppercase?: boolean
-  colors: { bg: string; fg: string; logoFilter?: string }
+  colors: { bg: string; fg: string; logoPlate?: string }
 }) {
   if (spineWidthMm < SPINE_MIN_WIDTH_FOR_LOGO_MM) return null
 
@@ -184,7 +184,8 @@ function SpineTitle({ title, spineWidthMm, spineHeightMm, fontFamily, uppercase,
           width: `${Math.min(spineWidthMm * 0.5, 6)}mm`,
           height: 'auto',
           opacity: 0.55,
-          filter: colors.logoFilter,
+          // Logo siempre con sus colores; placa clara si el fondo no contrasta.
+          ...(colors.logoPlate ? { background: colors.logoPlate, borderRadius: '50%', padding: '0.4mm' } : {}),
           flexShrink: 0,
         }}
       />

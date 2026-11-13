@@ -229,16 +229,15 @@ const LOGO_COLOR = '#E0405A'
 
 /**
  * Colores de la tapa fuera de la portada: lomo y contraportada siguen el
- * fondo elegido. El logo es coral; si se pierde sobre el fondo (tapa coral o
- * rosada) se pinta del color del texto.
+ * fondo elegido. El logo de Pixia NUNCA cambia de color (Jhon, 2026-11-12):
+ * si se pierde sobre el fondo (tapa coral o rosada), va sobre una placa
+ * redonda clara que lo deja ver con sus colores de siempre.
  */
-export function caseColors(cover: CoverConfig | undefined): { bg: string; fg: string; logoFilter?: string } {
+export function caseColors(cover: CoverConfig | undefined): { bg: string; fg: string; logoPlate?: string } {
   if (!cover) return { bg: LEGACY_CASE_COLOR, fg: '#FFFFFF' }
   const r = resolveCover(cover)
   const bg = r.bg
   const fg = r.kind === 'graphic' ? r.fg : readableOn(bg)
-  const logoFilter = contrastRatio(bg, LOGO_COLOR) < 1.8
-    ? (luminance(fg) > 0.5 ? 'brightness(0) invert(1)' : 'brightness(0)')
-    : undefined
-  return { bg, fg, logoFilter }
+  const logoPlate = contrastRatio(bg, LOGO_COLOR) < 1.8 ? '#FFF7EF' : undefined
+  return { bg, fg, logoPlate }
 }

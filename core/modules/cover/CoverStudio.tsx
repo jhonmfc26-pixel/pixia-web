@@ -286,15 +286,53 @@ function Swatch({ bg, fg, on, label, onClick }: { bg: string; fg: string; on: bo
   )
 }
 
+/** Gama para «a tu gusto»: tonos de tapa que imprimen bien, de claros a oscuros. */
+const COLOR_GRID = [
+  '#FFFFFF', '#F7F1E8', '#EFE4D2', '#E4D3B8', '#D9C2A0', '#C9A86A', '#A4673F', '#6E4A33',
+  '#F6D9D3', '#EBC9C3', '#E79A8B', '#E8553A', '#C8473A', '#B95F3C', '#8E3B2E', '#5B2F33',
+  '#FBE7B5', '#F2C78B', '#DFA33A', '#B9822C', '#DDE5C8', '#B9C4A7', '#7E9470', '#2F4A3A',
+  '#D6E6EE', '#9CC3D5', '#4F8AA8', '#24546F', '#CBBCDD', '#8E7BB0', '#35284A', '#16223D',
+  '#E6E6E3', '#B8B6B1', '#7D7A75', '#4A4845', '#2E2C2A', '#1B1A19', '#111111', '#000000',
+]
+
+/**
+ * Selector de color dentro del panel (no el del navegador: su ventana se
+ * abría pegada al borde derecho y se veía cortada).
+ */
 function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const commit = (v: string) => {
+    const hex = v.startsWith('#') ? v : `#${v}`
+    if (/^#[0-9a-fA-F]{6}$/.test(hex)) onChange(hex.toUpperCase())
+  }
   return (
-    <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2">
-      <span className="text-[13px] text-white/70">{label}</span>
-      <span className="flex items-center gap-2">
-        <span className="font-mono text-[11px] uppercase text-white/40">{value}</span>
-        <input type="color" value={value} onChange={e => onChange(e.target.value)} className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent p-0" />
-      </span>
-    </label>
+    <div className="rounded-xl border border-white/10">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left">
+        <span className="text-[13px] text-white/70">{label}</span>
+        <span className="flex items-center gap-2">
+          <span className="font-mono text-[11px] uppercase text-white/40">{value}</span>
+          <span className="h-7 w-9 rounded-md ring-1 ring-white/20" style={{ background: value }} />
+          <span className={`text-[10px] text-white/40 transition ${open ? 'rotate-180' : ''}`}>▾</span>
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-white/10 p-3">
+          <div className="grid grid-cols-8 gap-1.5">
+            {COLOR_GRID.map(c => (
+              <button key={c} type="button" onClick={() => onChange(c)} aria-label={c} title={c}
+                className={`aspect-square rounded-md ring-1 transition ${value.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-[var(--brand-coral)]' : 'ring-white/15 hover:ring-white/40'}`}
+                style={{ background: c }} />
+            ))}
+          </div>
+          <label className="mt-3 flex items-center gap-2">
+            <span className="text-[12px] text-white/50">Código</span>
+            <input key={value} defaultValue={value} onChange={e => commit(e.target.value)} maxLength={7} spellCheck={false}
+              className="w-28 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 font-mono text-[13px] uppercase text-white outline-none focus:border-[var(--brand-coral)]/60" />
+          </label>
+        </div>
+      )}
+    </div>
   )
 }
 

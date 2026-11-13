@@ -128,6 +128,8 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
   // ENCIMA de la hoja que gira (se veía una raya en el medio de la página que
   // pasa). Solo se dibuja con el libro quieto (estado 'read' de pageflip).
   const [turning, setTurning] = useState(false)
+  // Qué pliego se ve (para la sombra: en portada/contraportada hay una sola página).
+  const [shownKind, setShownKind] = useState(spreads[initialSpreadIdx]?.kind)
 
   useImperativeHandle(ref, () => ({
     goTo: (spreadIdx: number) => {
@@ -206,13 +208,20 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
   }, [flipbookKey])
 
   return (
-    <div style={{
-      position: 'relative',
-      // Sombra gris cálida y difusa — sobre fondo claro, una sombra negra
-      // dura se ve "recortada"; esta se difumina como si el libro
-      // descansara sobre una superficie real.
-      filter: 'drop-shadow(0 26px 48px rgba(80,68,52,0.22)) drop-shadow(0 8px 20px rgba(80,68,52,0.16))',
-    }}>
+    <div style={{ position: 'relative' }}>
+      {/* Sombra gris cálida bajo el libro. Antes era un filter: drop-shadow
+          sobre TODO el libro: el navegador lo recalculaba en cada cuadro de
+          la animación de pasar página (lento, sobre todo en celular). Ahora
+          es una caja quieta detrás de las páginas que se ven: en la portada
+          solo la derecha, en la contraportada solo la izquierda. */}
+      <div aria-hidden style={{
+        position: 'absolute', top: 0, bottom: 0,
+        left: twoPages && shownKind === 'cover' ? '50%' : 0,
+        right: twoPages && shownKind === 'back' ? '50%' : 0,
+        boxShadow: '0 26px 48px rgba(80,68,52,0.22), 0 8px 20px rgba(80,68,52,0.16)',
+        pointerEvents: 'none',
+        transition: 'left 0.35s ease, right 0.35s ease',
+      }} />
       <style>{PAGE_CSS}</style>
       <HTMLFlipBook
         key={flipbookKey}
@@ -230,6 +239,7 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
         onFlip={(e: { data: number }) => {
           const idx = pageIndexToSpreadIdx(e.data, spreads.length)
           currentSpreadIdxRef.current = idx
+          setShownKind(spreads[idx]?.kind)
           onFlip(idx)
         }}
         onInit={(e: { object: PageFlipInstance }) => setTwoPages(e.object.getOrientation() !== 'portrait')}

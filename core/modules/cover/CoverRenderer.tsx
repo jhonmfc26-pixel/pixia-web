@@ -8,6 +8,8 @@ import { manualCoverStyle, aspectOf } from '@/core/modules/viewer/manualCover'
 interface CoverRendererProps {
   config: CoverConfig
   photoUrl?: string
+  /** Si photoUrl (versión liviana del visor) no carga, se usa esta (la original). */
+  photoFallbackUrl?: string
   /**
    * Dimensiones reales de la foto — opcionales, solo para calcular el
    * recorte manual (ver manualCover.ts) y evitar el bloat de Chromium al
@@ -33,7 +35,7 @@ interface CoverRendererProps {
  *  - foto a sangre con el título encima (todas las de antes);
  *  - gráfica: fondo de color, ilustración propia y título grande, sin foto.
  */
-export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeight, format = '30x30', panelAspect }: CoverRendererProps) {
+export default function CoverRenderer({ config, photoUrl, photoFallbackUrl, photoWidth, photoHeight, format = '30x30', panelAspect }: CoverRendererProps) {
   const containerAspect = panelAspect ?? (format === 'a4' ? 3 / 4 : 1)
   const r = resolveCover(config)
 
@@ -57,7 +59,11 @@ export default function CoverRenderer({ config, photoUrl, photoWidth, photoHeigh
     <div style={root}>
       {photoUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt="" style={manualCoverStyle(aspectOf(photoWidth, photoHeight), containerAspect, 'center center')} />
+        <img src={photoUrl} alt="" style={manualCoverStyle(aspectOf(photoWidth, photoHeight), containerAspect, 'center center')}
+          onError={photoFallbackUrl && photoFallbackUrl !== photoUrl ? (e) => {
+            const img = e.currentTarget
+            if (img.src !== photoFallbackUrl) img.src = photoFallbackUrl
+          } : undefined} />
       )}
       {overlay !== 'none' && <div style={{ position: 'absolute', inset: 0, background: overlay }} />}
       <div style={{
