@@ -10,8 +10,8 @@ import { supabaseAdmin } from '@/lib/supabase'
  *   el definitivo, así que se reemplaza cualquier job previo (p.ej. uno de
  *   una prueba manual con la ruta dev) y se arranca de cero.
  * - overwrite=false → reintento del webhook sobre una orden ya aprobada: solo
- *   encola si todavía no hay un job de ESTA orden. Nunca pisa un job que ya
- *   está generándose o listo.
+ *   encola si el álbum todavía no tiene job de una orden. Nunca pisa un job
+ *   que ya está generándose o listo, ni el de otra orden del mismo álbum.
  */
 export async function enqueuePdfJob(params: {
   blueprintId: string
@@ -27,7 +27,9 @@ export async function enqueuePdfJob(params: {
       .eq('blueprint_id', blueprintId)
       .maybeSingle()
     if (readError) return { ok: false, error: readError.message }
-    if (existing?.order_reference === orderReference) return { ok: true, enqueued: false }
+    // Ya hay job de esta orden, o de OTRA orden pagada del mismo álbum (pago
+    // doble): no se pisa. Solo se reemplaza un job sin orden (prueba manual).
+    if (existing?.order_reference) return { ok: true, enqueued: false }
   }
 
   const { error } = await supabaseAdmin.from('pdf_generation_jobs').upsert(

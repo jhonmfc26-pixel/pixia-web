@@ -39,7 +39,7 @@ function fakeEngine(opts: { failInterior?: string } = {}): RenderEngine & { uplo
 
 /** Cola en memoria: claimNext entrega los jobs de `queue` en orden. */
 function fakeJobs(queue: QueueJob[], extra: { failures?: QueueJob[]; reconcileThrows?: boolean } = {}) {
-  const calls = { interiorReady: [] as string[], coverReady: [] as string[], failures: [] as { id: string; msg: string; final: boolean }[], alerted: [] as string[] }
+  const calls = { loaded: [] as { id: string; order: string | null }[], interiorReady: [] as string[], coverReady: [] as string[], failures: [] as { id: string; msg: string; final: boolean }[], alerted: [] as string[] }
   const failed: QueueJob[] = [...(extra.failures ?? [])]
   return {
     calls,
@@ -47,7 +47,7 @@ function fakeJobs(queue: QueueJob[], extra: { failures?: QueueJob[]; reconcileTh
       reconcileApprovedOrders: async () => { if (extra.reconcileThrows) throw new Error('db caída'); return [] },
       expireExhausted: async () => [],
       claimNext: async () => queue.shift() ?? null,
-      loadBlueprint: async () => ({}),
+      loadPrintSource: async (id: string, order: string | null) => { calls.loaded.push({ id, order }); return {} },
       markInteriorReady: async (id: string) => { calls.interiorReady.push(id) },
       markCoverReady: async (id: string) => { calls.coverReady.push(id) },
       markQueueFailure: async (id: string, msg: string, final: boolean) => {
@@ -70,6 +70,8 @@ test('job sano: genera interior + cubierta, sube a R2 y no alerta', async () => 
   assert.deepEqual(calls.interiorReady, ['album-1'])
   assert.deepEqual(calls.coverReady, ['album-1'])
   assert.equal(alerts.length, 0)
+  // El álbum se pide con su orden: se imprime la copia que se cobró.
+  assert.deepEqual(calls.loaded, [{ id: 'album-1', order: 'ORD-1' }])
 })
 
 test('falla en un intento intermedio: queda para reintento, sin alerta', async () => {
@@ -139,4 +141,12 @@ test('reconcile: encola órdenes sin job o con job de prueba dev; no pisa jobs d
   ]
   const jobsByBook = new Map<string, string | null>([['b2', 'B'], ['b3', null], ['b4', 'Z']])
   assert.deepEqual(findOrdersMissingJob(orders, jobsByBook).map((o) => o.reference), ['A', 'C'])
+})
+
+test('reconcile: un álbum con dos pagos y sin job encola solo el primero', () => {
+  const orders = [
+    { reference: 'PRIMERO', book_id: 'b1' },
+    { reference: 'SEGUNDO', book_id: 'b1' },
+  ]
+  assert.deepEqual(findOrdersMissingJob(orders, new Map()).map((o) => o.reference), ['PRIMERO'])
 })
