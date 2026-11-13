@@ -26,40 +26,6 @@ import { useSession } from '@/core/modules/session/useSession'
 /** Las fotos marcadas con ⭐ suben a este score: abren capítulos y ganan páginas a sangre. */
 const STARRED_SCORE = 100
 
-async function fileToCompressedBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image()
-    const url = URL.createObjectURL(file)
-
-    img.onload = () => {
-      const MAX = 800
-      let { width, height } = img
-
-      if (width > height && width > MAX) {
-        height = Math.round((height * MAX) / width)
-        width = MAX
-      } else if (height > MAX) {
-        width = Math.round((width * MAX) / height)
-        height = MAX
-      }
-
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, width, height)
-      URL.revokeObjectURL(url)
-
-      resolve(canvas.toDataURL('image/jpeg', 0.70))
-    }
-
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Error cargando imagen: ${file.name}`)) }
-
-    img.src = url
-  })
-}
-
 type Phase = 'subiendo' | 'fotos' | 'diseno' | 'guardando' | 'listo'
 
 const PHASE_COPY: Record<Phase, { title: string; sub: string }> = {
@@ -78,6 +44,10 @@ export default function ResultPage() {
   const [done, setDone] = useState(0)
   const [total, setTotal] = useState(0)
   const [attempt, setAttempt] = useState(0)
+  /** Fotos que no se pudieron subir después de reintentar: el cliente decide qué hacer. */
+  const [uploadIssue, setUploadIssue] = useState<{ missing: number; total: number } | null>(null)
+  /** El cliente eligió armar el álbum sin las fotos que no subieron. */
+  const skipMissing = useRef(false)
   const running = useRef(false)
   const { sessionId, isReady: sessionReady } = useSession()
   const { uploadProgress, uploadPhotos } = useUpload(sessionId || '')
@@ -88,6 +58,7 @@ export default function ResultPage() {
     if (state.photos.length === 0) return
     running.current = true
     setError(null)
+    setUploadIssue(null)
     setPhase('fotos')
     setDone(0)
 
@@ -104,18 +75,17 @@ export default function ResultPage() {
           const t = analysis.get(id)?.takenAt
           return t ? new Date(t).getTime() : Infinity
         }
-        const filesToProcess = state.photos
+        const chosen = state.photos
           .slice(0, MAX_PHOTOS)
           .map((p, i) => ({ p, i }))
           .sort((a, b) => (time(a.p.id) - time(b.p.id)) || (a.i - b.i))
           .map(({ p }) => p)
-        setTotal(filesToProcess.length)
+        setTotal(chosen.length)
 
         // Fotos que no alcanzaron a subirse en el paso 2 (se pasó rápido, falló
-        // la red...): se suben ahora. Sin esto quedaban en base64 dentro del
-        // libro — pesado, llenaba el almacenamiento del celular y no sirve para imprimir.
-        const missing = filesToProcess.filter(p => !r2Map.has(p.id))
-        if (missing.length > 0 && sessionId) {
+        // la red...): se suben ahora.
+        const missing = chosen.filter(p => !r2Map.has(p.id))
+        if (missing.length > 0 && sessionId && !skipMissing.current) {
           setPhase('subiendo')
           const uploaded = await uploadPhotos(missing.map(p => ({ file: p.file, photoId: p.id })))
           for (const u of uploaded) r2Map.set(u.photoId, u.url)
@@ -124,12 +94,26 @@ export default function ResultPage() {
           setPhase('fotos')
         }
 
+        // Al álbum solo entran fotos subidas en alta calidad: es lo que se
+        // imprime. (Antes una foto que no subía entraba como copia comprimida
+        // y salía pixelada o en blanco en el PDF, sin que nadie se enterara.)
+        // Si falta alguna se le dice al cliente, que decide: reintentar o
+        // seguir sin esas.
+        const filesToProcess = chosen.filter(p => r2Map.has(p.id))
+        const notUploaded = chosen.length - filesToProcess.length
+        if (notUploaded > 0 && !skipMissing.current) {
+          setUploadIssue({ missing: notUploaded, total: chosen.length })
+          running.current = false
+          return
+        }
+        setTotal(filesToProcess.length)
+
         let processed = 0
         const results = await Promise.allSettled(
           filesToProcess.map(async (p, index) => {
             const meta = analysis.get(p.id)
-            const r2Url = r2Map.get(p.id)
-            const src = r2Url ?? await fileToCompressedBase64(p.file)
+            const r2Url = r2Map.get(p.id)!
+            const src = r2Url
             setDone(++processed)
             const baseScore = meta?.score || null
             const score = p.priority
@@ -141,7 +125,7 @@ export default function ResultPage() {
               url: src,
               // Versión liviana para el visor (users/<sesión>/display/); si no
               // hay, la misma URL. Nunca el base64 de análisis: el visor la usaría.
-              thumbnailUrl: (r2Url && r2Displays.get(p.id)) || r2Url || (meta?.thumbnail || ''),
+              thumbnailUrl: r2Displays.get(p.id) || r2Url,
               r2Key: '',
               width: meta?.width ?? 0,
               height: meta?.height ?? 0,
@@ -160,7 +144,7 @@ export default function ResultPage() {
 
         if (photos.length < MIN_PHOTOS) {
           throw new Error(
-            `Solo pudimos leer ${photos.length} de ${filesToProcess.length} fotos y necesitamos al menos ${MIN_PHOTOS}. ` +
+            `Solo pudimos leer ${photos.length} de ${chosen.length} fotos y necesitamos al menos ${MIN_PHOTOS}. ` +
             'Vuelve, agrega algunas más e inténtalo de nuevo.',
           )
         }
@@ -213,6 +197,35 @@ export default function ResultPage() {
         <p className="mt-3 text-white/60">Se reinició la sesión y ya no tenemos tus fotos en esta pestaña.</p>
         <button onClick={() => router.push('/create')} className="mt-8 rounded-lg bg-[var(--brand-coral)] px-6 py-3 font-medium text-white hover:brightness-110">
           Crear mi álbum
+        </button>
+      </Centered>
+    )
+  }
+
+  if (uploadIssue) {
+    const { missing, total: chosenTotal } = uploadIssue
+    const uploaded = chosenTotal - missing
+    const one = missing === 1
+    return (
+      <Centered>
+        <h1 className="font-[family-name:var(--font-display)] text-3xl text-white">
+          {one ? 'Una foto no terminó de subir' : `${missing} fotos no terminaron de subir`}
+        </h1>
+        <p className="mt-3 text-white/60">
+          Subimos {uploaded} de tus {chosenTotal} fotos. Revisa tu conexión a internet y vuelve a intentarlo: tus fotos siguen aquí.
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <button onClick={() => { skipMissing.current = false; setAttempt(a => a + 1) }} className="rounded-lg bg-[var(--brand-coral)] px-6 py-3 font-medium text-white hover:brightness-110">
+            Reintentar la subida
+          </button>
+          {uploaded >= MIN_PHOTOS && (
+            <button onClick={() => { skipMissing.current = true; setAttempt(a => a + 1) }} className="rounded-lg border border-white/15 px-6 py-3 font-medium text-white hover:bg-white/5">
+              {one ? 'Seguir sin esa foto' : `Seguir sin esas ${missing} fotos`}
+            </button>
+          )}
+        </div>
+        <button onClick={backToPhotos} className="mt-5 text-sm text-white/45 underline-offset-4 hover:text-white/70 hover:underline">
+          Volver a mis fotos
         </button>
       </Centered>
     )
