@@ -43,6 +43,9 @@ export type CoverDraft = {
   artUrl?: string;
   artAspect?: number;
   layout?: CoverConfig["layout"];
+  textX?: number;
+  textY?: number;
+  titleInArt?: boolean;
 };
 
 /** Pasos del asistente. La barra de progreso y el reducer salen de acá. */

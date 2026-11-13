@@ -28,6 +28,9 @@ export interface PixiaBook {
     artUrl?: string
     artAspect?: number
     layout?: 'poster' | 'centered' | 'framed' | 'full'
+    textX?: number
+    textY?: number
+    titleInArt?: boolean
   }
   editorial: {
     intent: string; tone: NarrativeTone; summary: string

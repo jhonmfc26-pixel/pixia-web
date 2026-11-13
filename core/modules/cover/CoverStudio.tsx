@@ -14,8 +14,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AlbumFormat, CoverConfig, OccasionType, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import CoverRenderer from './CoverRenderer'
+import DraggableCoverText from './DraggableCoverText'
 import { galleryTemplates } from './coverTemplates'
-import { COVER_FONTS, COVER_PALETTES, TITLE_SCALES, applyTemplate, resolveCover, isHex } from './coverDesign'
+import { COVER_FONTS, COVER_PALETTES, TITLE_SCALES, applyTemplate, resolveCover, isHex, canDragText, contrastRatio } from './coverDesign'
 import { CoverArtSvg, artForOccasion } from './coverArt'
 import { useCoverDesigns } from './useCoverDesigns'
 import { countryInTitle, designToCover, normalizeCountry, sortDesigns, type CoverDesign } from '@/lib/coverDesigns'
@@ -85,14 +86,18 @@ export default function CoverStudio({ config, onChange, onClose, occasion, forma
           {view === 'portada' ? (
             <div className="w-[min(100%,calc(34svh*var(--ar)))] md:w-[min(100%,560px,calc(72svh*var(--ar)))]" style={{ ['--ar' as string]: aspectOf(format) }}>
               <div className="overflow-hidden rounded-[4px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.06)]">
-                <CoverRenderer config={config} photoUrl={photo?.url} photoWidth={photo?.width} photoHeight={photo?.height} format={format} />
+                <DraggableCoverText enabled={canDragText(config)} onMove={(x, y) => set({ textX: x, textY: y })}>
+                  <CoverRenderer config={config} photoUrl={photo?.url} photoWidth={photo?.width} photoHeight={photo?.height} format={format} />
+                </DraggableCoverText>
               </div>
             </div>
           ) : (
             <FullWrap config={config} photo={photo} format={format} pageCount={pageCount} />
           )}
           <p className="text-center text-[11px] text-white/35">
-            {view === 'portada' ? 'Lo que ves es lo que se imprime.' : 'Contraportada · lomo · portada, como sale de la imprenta.'}
+            {view === 'portada'
+              ? (canDragText(config) ? 'Arrastra el texto para ponerlo donde quieras. Lo que ves es lo que se imprime.' : 'Lo que ves es lo que se imprime.')
+              : 'Contraportada · lomo · portada, como sale de la imprenta.'}
           </p>
         </section>
 
@@ -255,8 +260,13 @@ function TextPanel({ config, set }: { config: CoverConfig; set: (p: Partial<Cove
   return (
     <div className="space-y-5">
       <label className="block">
-        <Label>Título</Label>
+        <Label>{config.titleInArt ? 'Nombre del álbum' : 'Título'}</Label>
         <input className={input} value={config.title} maxLength={40} onChange={e => set({ title: e.target.value })} />
+        {config.titleInArt && (
+          <span className="mt-1.5 block text-[11px] leading-relaxed text-white/45">
+            Este diseño ya trae el título dibujado: este nombre va en el lomo. Abajo puedes agregar el año o la fecha.
+          </span>
+        )}
       </label>
       <label className="block">
         <Label>Nombres <span className="text-white/30">· opcional</span></Label>
@@ -285,10 +295,10 @@ function TextPanel({ config, set }: { config: CoverConfig; set: (p: Partial<Cove
           <Label>Dónde va el texto</Label>
           <div role="radiogroup" aria-label="Dónde va el texto" className="grid w-[96px] grid-cols-3 grid-rows-3 gap-1 rounded-md border border-white/15 bg-white/[0.04] p-1.5" style={{ aspectRatio: '1' }}>
             {POSITIONS.flatMap(pos => ALIGNS.map(al => {
-              const on = r.position === pos && r.align === al
+              const on = r.textX === undefined && r.position === pos && r.align === al
               return (
                 <button key={`${pos}-${al}`} role="radio" aria-checked={on} aria-label={`${POS_LABEL[pos]} ${ALIGN_LABEL[al]}`}
-                  onClick={() => set({ textPosition: pos, textAlign: al })}
+                  onClick={() => set({ textPosition: pos, textAlign: al, textX: undefined, textY: undefined })}
                   className={`flex items-center rounded-[3px] transition ${al === 'left' ? 'justify-start' : al === 'right' ? 'justify-end' : 'justify-center'} ${on ? 'bg-[var(--brand-coral)]/25' : 'hover:bg-white/10'}`}>
                   <span className={`block h-[3px] rounded-full ${on ? 'w-4 bg-[var(--brand-coral)]' : 'w-2 bg-white/30'}`} />
                 </button>
@@ -408,6 +418,11 @@ function ColorPanel({ config, set }: { config: CoverConfig; set: (p: Partial<Cov
         </div>
         <div className="space-y-2">
           <Label>A tu gusto</Label>
+          {r.layout !== 'full' && contrastRatio(r.bg, r.fg) < 3 && (
+            <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-100">
+              Este color de título se lee poco sobre el fondo. Se imprime tal cual: prueba uno más claro u oscuro.
+            </p>
+          )}
           <ColorInput label="Fondo de la tapa" value={r.bg} onChange={v => set({ bg: v })} />
           <ColorInput label="Título y textos" value={r.fg} onChange={v => set({ fg: v })} />
           <ColorInput label="Detalles del dibujo" value={r.accent} onChange={v => set({ accent: v })} />

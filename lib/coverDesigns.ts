@@ -27,6 +27,11 @@ export interface CoverDesign {
   text_align: 'left' | 'center' | 'right'
   active: boolean
   sort: number
+  /** El arte trae el título dibujado (ej. «PERÚ»): Pixia no escribe el título encima. */
+  title_in_art?: boolean | null
+  /** Posición del texto arrastrada en el admin (centro, % de la portada). Solo «tapa completa». */
+  text_x?: number | null
+  text_y?: number | null
 }
 
 export const DESIGN_OCCASIONS: { id: string; label: string }[] = [
@@ -60,6 +65,9 @@ export function designToCover(d: CoverDesign): Partial<CoverConfig> {
     fontId: d.font_id,
     textPosition: d.text_position,
     textAlign: d.text_align,
+    textX: d.text_x ?? undefined,
+    textY: d.text_y ?? undefined,
+    titleInArt: !!d.title_in_art,
     artId: undefined,
     titleScale: undefined,
     textColor: 'auto',

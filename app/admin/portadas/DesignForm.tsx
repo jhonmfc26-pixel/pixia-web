@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CoverConfig } from '@/core/contracts/AlbumBlueprint'
 import CoverRenderer from '@/core/modules/cover/CoverRenderer'
+import DraggableCoverText from '@/core/modules/cover/DraggableCoverText'
 import { COVER_FONTS } from '@/core/modules/cover/coverDesign'
 import { DESIGN_LAYOUTS, DESIGN_OCCASIONS } from '@/lib/coverDesigns'
 
@@ -20,13 +21,19 @@ export default function DesignForm({ minPx }: { minPx: number }) {
     name: '', occasion: 'viaje', country: '', layout: 'poster', bg: '#F06292', fg: '#FFFFFF', accent: '#FFE0B2',
     font_id: 'bebas', text_position: 'top', text_align: 'left', sort: '0', format: '30x30',
   })
+  const [titleInArt, setTitleInArt] = useState(false)
+  const [sampleLines, setSampleLines] = useState(false)
+  // Posición arrastrada en la vista previa (solo tapa completa).
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(p => ({ ...p, [k]: e.target.value }))
   const url = useMemo(() => (file ? URL.createObjectURL(file) : ''), [file])
   useEffect(() => () => { if (url) URL.revokeObjectURL(url) }, [url])
 
   const cover: CoverConfig = {
     photoId: '', templateId: 'catalog', kind: 'graphic',
-    title: SAMPLE_TITLE[f.occasion] ?? 'Título', subtitle: 'Ana & Luis', date: 'Julio 2026',
+    // Nombres y fecha son opcionales para el cliente: la vista previa los muestra solo si se pide.
+    title: SAMPLE_TITLE[f.occasion] ?? 'Título', subtitle: sampleLines ? 'Ana & Luis' : '', date: sampleLines ? 'Julio 2026' : '',
+    titleInArt, ...(pos && f.layout === 'full' ? { textX: pos.x, textY: pos.y } : {}),
     textPosition: f.text_position as CoverConfig['textPosition'], textAlign: f.text_align as CoverConfig['textAlign'], textColor: 'auto',
     artUrl: url || undefined, artAspect: dims ? dims.w / dims.h : undefined,
     layout: f.layout as CoverConfig['layout'], bg: f.bg, fg: f.fg, accent: f.accent, fontId: f.font_id,
@@ -94,6 +101,13 @@ export default function DesignForm({ minPx }: { minPx: number }) {
               </span></label>
           ))}
         </div>
+        <label className="sm:col-span-2 flex items-start gap-2.5 rounded-lg border border-white/10 px-3 py-2.5 text-sm">
+          <input type="checkbox" name="title_in_art" value="1" checked={titleInArt} onChange={e => setTitleInArt(e.target.checked)} className="mt-0.5" />
+          <span>
+            <span className="block">El arte ya trae el título dibujado <span className="text-[var(--text-tertiary)]">(ej. la palabra «PERÚ» animada)</span></span>
+            <span className="block text-xs text-[var(--text-tertiary)]">Pixia no escribe el título encima; el cliente solo puede agregar el año o la fecha, y su título va en el lomo.</span>
+          </span>
+        </label>
         <label className="block text-sm"><span className="mb-1 block text-[var(--text-secondary)]">Orden (menor sale primero)</span>
           <input name="sort" type="number" value={f.sort} onChange={set('sort')} className={input} /></label>
         <div className="flex items-end sm:col-span-2">
@@ -113,9 +127,20 @@ export default function DesignForm({ minPx }: { minPx: number }) {
           ))}
         </div>
         <div className="overflow-hidden rounded shadow-lg">
-          <CoverRenderer config={cover} format={f.format as '30x30' | 'a4'} />
+          <DraggableCoverText enabled={f.layout === 'full'} onMove={(x, y) => setPos({ x, y })}>
+            <CoverRenderer config={cover} format={f.format as '30x30' | 'a4'} />
+          </DraggableCoverText>
         </div>
-        <p className="mt-2 text-xs text-[var(--text-tertiary)]">Vista previa con un título de ejemplo. El cliente cambia título, colores y letra.</p>
+        <input type="hidden" name="text_x" value={pos && f.layout === 'full' ? pos.x : ''} />
+        <input type="hidden" name="text_y" value={pos && f.layout === 'full' ? pos.y : ''} />
+        <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <input type="checkbox" checked={sampleLines} onChange={e => setSampleLines(e.target.checked)} /> Ver con nombres y fecha de ejemplo
+        </label>
+        <p className="mt-2 text-xs leading-relaxed text-[var(--text-tertiary)]">
+          {f.layout === 'full' ? 'Arrastra el texto a donde va en tu diseño. ' : ''}
+          El cliente escribe su título; los nombres y la fecha solo salen si los llena. También puede cambiar colores y letra.
+          {pos && f.layout === 'full' && <button type="button" onClick={() => setPos(null)} className="ml-1 underline">Volver a la posición fija</button>}
+        </p>
       </div>
     </form>
   )
