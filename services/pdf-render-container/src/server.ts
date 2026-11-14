@@ -4,6 +4,7 @@ import { createR2Client, signDownloadUrl, verifyDownloadToken } from './r2'
 import { runStorageCleanup, type CleanupMode } from './storage'
 import { createJobsClient } from './jobs'
 import { runSweep } from './queue'
+import { checkPendingPayments } from './payments'
 import type { AlbumStructure } from '@/core/modules/foldModel/types'
 import type { CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 
@@ -141,6 +142,9 @@ app.post('/render-cover', async (req, res) => {
 // Fonts); el <base href> solo cubre rutas relativas residuales. No puede ser
 // pixiaa.com: está detrás de Cloudflare Access y Cloud Run no pasa.
 const PRINT_BASE_URL = process.env.PRINT_BASE_URL || 'https://assets.pixiaa.com/'
+// La web, para revisar pagos pendientes (payments.ts). Solo necesita que
+// /api/orders no esté detrás de Cloudflare Access (desde el lanzamiento).
+const PIXIA_SITE_URL = process.env.PIXIA_SITE_URL || 'https://pixiaa.com'
 let sweepRunning = false
 
 app.post('/process-pending', async (req, res) => {
@@ -152,6 +156,10 @@ app.post('/process-pending', async (req, res) => {
       jobs,
       engine: { renderInterior: renderInteriorPdf, renderCover: renderCoverPdf, upload: (k, b, t) => r2.upload(k, b, t) },
       baseUrl: PRINT_BASE_URL,
+      checkPayments: () => checkPendingPayments({
+        listPending: (min, max, limit) => jobs.listStalePendingOrders(min, max, limit),
+        siteUrl: PIXIA_SITE_URL,
+      }),
     })
     console.log('[pdf-render-container] barrido:', JSON.stringify(result))
     res.status(200).json(result)

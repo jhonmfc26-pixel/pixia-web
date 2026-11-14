@@ -24,6 +24,8 @@ const RULES: Record<string, Rule> = {
   // personas comparten IP: el tope solo frena abuso automatizado.
   '/api/upload': { perMinute: 600, sample: 10 },
   '/api/orders': { perMinute: 10, sample: 1 },
+  // La página de confirmación pregunta por el pago mientras espera (unas 20 veces en 3 minutos).
+  '/api/orders/verify': { perMinute: 30, sample: 1 },
   '/api/editorial': { perMinute: 5, sample: 1 },
   '/api/pqr': { perMinute: 5, sample: 1 },
 }
