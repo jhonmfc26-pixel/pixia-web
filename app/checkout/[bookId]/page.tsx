@@ -393,7 +393,7 @@ export default function CheckoutPage() {
         if (result?.transaction) {
           // La referencia ya tiene una transacción: no se puede reutilizar.
           pendingOrder.current = null
-          router.push(`/checkout/success?ref=${data.reference}`)
+          router.push(`/checkout/success?ref=${data.reference}&id=${encodeURIComponent(result.transaction.id ?? '')}`)
         } else {
           console.log('[checkout] Widget cerrado sin transacción')
           setSubmitting(false)

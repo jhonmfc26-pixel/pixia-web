@@ -24,6 +24,8 @@ process.env.ALERT_EMAIL = 'equipo@pixiaa.com'
 type Row = Record<string, unknown>
 const db: Record<string, Row[]> = {}
 const wompi = new Map<string, Row>()
+let wompiCalls = 0
+let wompiDown = false
 const emails: { to: string[]; subject: string }[] = []
 const tokens: Record<string, string> = { 'token-ana': 'user-ana', 'token-beto': 'user-beto' }
 /** Fallas inyectadas: `${METHOD} ${tabla}` → cuántas veces falla. */
@@ -66,6 +68,11 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
   const url = new URL(req.url)
 
   if (url.host === 'wompi.test') {
+    wompiCalls++
+    if (wompiDown) return json({ error: 'service unavailable' }, 503)
+    // Búsqueda por referencia: el doble devuelve TODAS las transacciones, para
+    // comprobar que el código filtra por referencia y no se queda con otra.
+    if (url.pathname.endsWith('/transactions')) return json({ data: [...wompi.values()] })
     const tx = wompi.get(url.pathname.split('/').pop()!)
     return tx ? json({ data: tx }) : json({ error: 'not found' }, 404)
   }
@@ -141,6 +148,7 @@ globalThis.fetch = fakeFetch as typeof fetch
 // Las rutas leen las variables de entorno al cargarse: se importan después de fijarlas.
 type Handler = (req: NextRequest) => Promise<Response>
 let createOrder: Handler, wompiWebhook: Handler, persist: Handler
+let verifyOrder: (req: NextRequest, ctx: { params: Promise<{ reference: string }> }) => Promise<Response>
 let TERMS_VERSION: string
 let pagesOf: (book: unknown) => number
 let countRealPages: typeof import('@/core/modules/foldModel/validate').countRealPages
@@ -149,6 +157,7 @@ before(async () => {
   createOrder = (await import('@/app/api/orders/create/route')).POST
   wompiWebhook = (await import('@/app/api/orders/webhook/route')).POST
   persist = (await import('@/app/api/blueprints/persist/route')).POST
+  verifyOrder = (await import('@/app/api/orders/[reference]/route')).POST
   TERMS_VERSION = (await import('@/lib/legal')).TERMS_VERSION
   const { foldsFromBlueprint } = await import('@/core/modules/foldModel/fromBlueprint')
   const { normalizeBook } = await import('@/core/modules/album/normalizeBook')
@@ -221,6 +230,8 @@ beforeEach(() => {
   for (const t of ['blueprints', 'orders', 'pdf_generation_jobs']) db[t] = []
   emails.length = 0
   wompi.clear()
+  wompiCalls = 0
+  wompiDown = false
   failures.clear()
 })
 
@@ -434,4 +445,117 @@ test('firma inválida o monto distinto: el pago no se aprueba', async () => {
   assert.equal(res.status, 400)
   assert.equal(db.orders[0].payment_status, 'pending')
   assert.equal(blueprint().status, 'draft')
+})
+
+// ── A1: el pago no depende solo del aviso de Wompi ──────────────────────────
+
+/** Una transacción que existe en Wompi, sin que llegue ningún aviso. */
+function wompiTx(reference: string, status: string, id = `tx-${++txCount}`) {
+  const order = db.orders.find(o => o.reference === reference)
+  const tx = { id, reference, status, amount_in_cents: order ? Number(order.total_cop) * 100 : 100, payment_method_type: 'PSE' }
+  wompi.set(id, tx)
+  return tx
+}
+/** Lo que hace la página de confirmación (con el ?id= de Wompi) o el barrido (sin id). */
+async function verify(reference: string, transactionId?: string) {
+  const res = await verifyOrder(post(`/api/orders/${reference}`, transactionId ? { transactionId } : {}), { params: Promise.resolve({ reference }) })
+  return { status: res.status, body: await res.json() as { order?: Row; error?: string }, sync: res.headers.get('X-Pixia-Sync') }
+}
+
+test('A1 · el aviso de Wompi no llega: al volver de pagar se confirma igual (álbum congelado, PDF y un correo)', async () => {
+  const { body } = await create(album(30))
+  const ref = String(body.reference)
+  const tx = wompiTx(ref, 'APPROVED')
+  const r = await verify(ref, tx.id)
+  assert.equal(r.status, 200)
+  assert.equal(r.body.order?.payment_status, 'approved')
+  assert.equal(r.sync, 'actualizado')
+  assert.equal(db.orders[0].wompi_transaction_id, tx.id)
+  assert.equal(blueprint().status, 'ordered')
+  assert.equal(db.pdf_generation_jobs.length, 1)
+  assert.equal(mailsTo('ana@test.co').length, 1)
+
+  // La página sigue preguntando y después llega el aviso de Wompi: nada se repite.
+  await verify(ref, tx.id)
+  const late = await webhook(ref, 'APPROVED', tx.id)
+  assert.equal(late.status, 200)
+  assert.equal(db.pdf_generation_jobs.length, 1)
+  assert.equal(mailsTo('ana@test.co').length, 1)
+})
+
+test('A1 · el cliente cerró el navegador: el barrido encuentra el pago por la referencia', async () => {
+  const a = await create(album(30))
+  const refA = String(a.body.reference)
+  // Otra transacción aprobada de OTRA referencia, que Wompi también devuelve.
+  wompiTx('PIXIA-OTRO0000-1700000000000', 'APPROVED')
+  wompiTx(refA, 'APPROVED')
+  const r = await verify(refA)
+  assert.equal(r.body.order?.payment_status, 'approved')
+  assert.equal(db.pdf_generation_jobs.length, 1)
+})
+
+test('A1 · Wompi todavía no tiene transacción para el pedido: sigue pendiente, sin errores', async () => {
+  const { body } = await create(album(30))
+  const r = await verify(String(body.reference))
+  assert.equal(r.status, 200)
+  assert.equal(r.sync, 'sin-transaccion')
+  assert.equal(r.body.order?.payment_status, 'pending')
+})
+
+test('A1 · un id de transacción de otro pedido no cambia nada', async () => {
+  const { body } = await create(album(30))
+  const ajena = wompiTx('PIXIA-OTRO0000-1700000000000', 'APPROVED')
+  const r = await verify(String(body.reference), ajena.id)
+  assert.equal(r.status, 200)
+  assert.equal(r.sync, 'no-se-pudo-consultar')
+  assert.equal(db.orders[0].payment_status, 'pending')
+  assert.equal(db.pdf_generation_jobs.length, 0)
+})
+
+test('A1 · PSE en proceso: sigue pendiente, se guarda el id y la siguiente consulta lo aprueba', async () => {
+  const { body } = await create(album(30))
+  const ref = String(body.reference)
+  const tx = wompiTx(ref, 'PENDING')
+  const first = await verify(ref, tx.id)
+  assert.equal(first.body.order?.payment_status, 'pending')
+  assert.equal(db.orders[0].wompi_transaction_id, tx.id)
+
+  tx.status = 'APPROVED' // el banco confirmó
+  const later = await verify(ref) // el barrido no conoce el id: usa el guardado
+  assert.equal(later.body.order?.payment_status, 'approved')
+  assert.equal(mailsTo('ana@test.co').length, 1)
+})
+
+test('A1 · pedido ya resuelto: no se le vuelve a preguntar a Wompi', async () => {
+  const { body } = await create(album(30))
+  const ref = String(body.reference)
+  await webhook(ref, 'APPROVED')
+  wompiCalls = 0
+  const r = await verify(ref)
+  assert.equal(r.sync, 'ya-resuelto')
+  assert.equal(wompiCalls, 0)
+})
+
+test('A1 · si Wompi no responde, el pedido no cambia y la página no se rompe', async () => {
+  const { body } = await create(album(30))
+  wompiDown = true
+  const r = await verify(String(body.reference))
+  assert.equal(r.status, 200)
+  assert.equal(r.sync, 'no-se-pudo-consultar')
+  assert.equal(r.body.order?.payment_status, 'pending')
+})
+
+test('A1 · monto distinto en Wompi: no se aprueba', async () => {
+  const { body } = await create(album(30))
+  const ref = String(body.reference)
+  const tx = wompiTx(ref, 'APPROVED')
+  tx.amount_in_cents = 100_00
+  const r = await verify(ref, tx.id)
+  assert.equal(r.body.order?.payment_status, 'pending')
+  assert.equal(db.pdf_generation_jobs.length, 0)
+})
+
+test('A1 · referencia mal formada o inexistente', async () => {
+  assert.equal((await verify('nada')).status, 400)
+  assert.equal((await verify('PIXIA-ABCD1234-1700000000000')).status, 404)
 })
