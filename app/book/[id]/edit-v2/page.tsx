@@ -2,6 +2,8 @@
 
 export const runtime = 'edge'
 
+import { EmailCodeForm } from '@/components/auth/EmailCodeForm'
+import { authErrorMessage } from '@/lib/authMessages'
 import { PhotoQualityContext } from '@/core/modules/viewer/PhotoQualityContext'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
@@ -558,7 +560,7 @@ function LoginRequiredScreen({ bookId }: { bookId: string }) {
     })
     setSending(false)
     if (otpError) {
-      setError(otpError.message)
+      setError(authErrorMessage(otpError.message))
       return
     }
     setSent(true)
@@ -617,16 +619,23 @@ function LoginRequiredScreen({ bookId }: { bookId: string }) {
                 cursor: sending || !email.trim() ? 'default' : 'pointer',
               }}
             >
-              {sending ? 'Enviando...' : 'Enviar enlace de acceso'}
+              {sending ? 'Enviando...' : 'Enviarme el código de acceso'}
             </button>
           </>
         ) : (
           <div>
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>📬</div>
             <p style={{ fontSize: '14px', color: '#fff', marginBottom: '8px', fontWeight: 500 }}>Revisa tu correo</p>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
-              Te enviamos un enlace a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>{email}</strong>. Ábrelo para volver directo a tu edición.
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, marginBottom: '20px' }}>
+              Te enviamos un correo a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>{email}</strong>. Escribe aquí el código que viene en el correo, o abre el enlace en este mismo dispositivo.
             </p>
+            <EmailCodeForm email={email} />
+            <button
+              onClick={() => { setSent(false); setError(null) }}
+              style={{ marginTop: '14px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              ¿No llegó? Enviar otro correo
+            </button>
           </div>
         )}
       </div>

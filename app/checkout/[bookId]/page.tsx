@@ -2,6 +2,8 @@
 
 export const runtime = 'edge'
 
+import { EmailCodeForm } from '@/components/auth/EmailCodeForm'
+import { authErrorMessage } from '@/lib/authMessages'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Script from 'next/script'
@@ -267,14 +269,13 @@ export default function CheckoutPage() {
     const { error } = await supabaseBrowser.auth.signInWithOtp({
       email: form.email,
       options: {
-        // TODO: integrar Resend como SMTP custom de Supabase para emails de marca
         emailRedirectTo: `${window.location.origin}/auth/callback`,
         shouldCreateUser: true,
       },
     })
     setOtpSending(false)
     if (error) {
-      setOtpError(error.message)
+      setOtpError(authErrorMessage(error.message))
     } else {
       setOtpSent(true)
       localStorage.setItem('pixia_pending_checkout', JSON.stringify({
@@ -498,8 +499,8 @@ export default function CheckoutPage() {
               {!otpSent ? (
                 <>
                   <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
-                    Te enviamos un enlace de acceso a <strong style={{ color: '#fff' }}>{form.email}</strong>.
-                    Haz clic en él para confirmar y continuar con tu pedido.
+                    Para guardar tu álbum en tu cuenta te enviaremos un correo a <strong style={{ color: '#fff' }}>{form.email}</strong>
+                    con un código de acceso.
                   </p>
 
                   {otpError && (
@@ -520,7 +521,7 @@ export default function CheckoutPage() {
                       cursor: otpSending ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {otpSending ? 'Enviando...' : 'Enviar enlace'}
+                    {otpSending ? 'Enviando...' : 'Enviarme el código'}
                   </button>
                   <p style={{ marginTop: 12, fontSize: 11, lineHeight: 1.5, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
                     Usamos tu correo para tu cuenta y tu pedido, según nuestra{' '}
@@ -535,9 +536,13 @@ export default function CheckoutPage() {
                       Revisa tu correo
                     </p>
                     <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', lineHeight: 1.6 }}>
-                      Te enviamos el enlace a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>{form.email}</strong>.
-                      Haz clic en él para continuar con tu pedido.
+                      Te enviamos un correo a <strong style={{ color: 'rgba(255,255,255,0.85)' }}>{form.email}</strong>.
+                      Escribe aquí el código que viene en el correo, o abre el enlace en este mismo dispositivo.
                     </p>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <EmailCodeForm email={form.email} />
                   </div>
 
                   <button
@@ -551,7 +556,7 @@ export default function CheckoutPage() {
                       cursor: 'pointer',
                     }}
                   >
-                    ¿No llegó? Reenviar enlace
+                    ¿No llegó? Enviar otro correo
                   </button>
                   <p style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '10px' }}>
                     Revisa también la carpeta de spam
