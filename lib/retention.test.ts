@@ -116,3 +116,22 @@ test('contador del borrador', () => {
   assert.equal(draftDaysLeft(ago(18.2), NOW, 30), 12)
   assert.ok(draftDaysLeft(ago(31), NOW, 30) <= 0)
 })
+
+test('M6 · un borrador vencido con un pago en curso no se borra', () => {
+  const run = (o: Partial<OrderInfo>) => planCleanup({
+    blueprints: [bp('b', 31, [key(S1, 'a')])],
+    orders: [order('o', 'b', { paymentStatus: 'pending', photoKeys: [key(S1, 'a')], ...o })],
+    photos: [obj(key(S1, 'a'), 31)], pdfs: [],
+  }, NOW, CFG)
+  // Pedido de hace 1 día sin pagar (PSE en curso): el álbum y sus fotos quedan.
+  const paying = run({ createdAt: ago(1) })
+  assert.deepEqual(paying.deleteBlueprintIds, [])
+  assert.equal(paying.deletePhotos.length, 0)
+  assert.equal(paying.counts.draftsActive, 1)
+  // Rechazado ayer: el cliente puede reintentar, también queda.
+  assert.deepEqual(run({ paymentStatus: 'declined', createdAt: ago(1) }).deleteBlueprintIds, [])
+  // Pedido sin pagar de hace 5 días: ya no protege.
+  const stale = run({ createdAt: ago(5) })
+  assert.deepEqual(stale.deleteBlueprintIds, ['b'])
+  assert.equal(stale.deletePhotos.length, 1)
+})
