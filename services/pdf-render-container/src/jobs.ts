@@ -172,6 +172,24 @@ export class JobsClient {
   }
 
   /**
+   * Pedidos que siguen con el pago «pendiente» entre `minMinutes` y `maxHours`
+   * después de creados: candidatos a preguntarle a Wompi (ver payments.ts).
+   */
+  async listStalePendingOrders(minMinutes: number, maxHours: number, limit: number): Promise<string[]> {
+    const now = Date.now()
+    const { data, error } = await this.supabase
+      .from('orders')
+      .select('reference')
+      .eq('payment_status', 'pending')
+      .lte('created_at', new Date(now - minMinutes * 60_000).toISOString())
+      .gte('created_at', new Date(now - maxHours * 3_600_000).toISOString())
+      .order('created_at', { ascending: true })
+      .limit(limit)
+    if (error) throw new Error(`pagos pendientes falló: ${error.message}`)
+    return (data ?? []).map((o) => o.reference as string)
+  }
+
+  /**
    * Segunda red de seguridad: órdenes aprobadas en los últimos `days` días
    * cuyo álbum no tiene job de esa orden (el webhook no pudo encolar y Wompi
    * tampoco reintentó). Las encola en 'pendiente'. Devuelve las referencias.

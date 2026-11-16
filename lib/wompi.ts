@@ -112,6 +112,40 @@ export async function fetchTransactionStatus(
   }
 }
 
+/** Orden de preferencia cuando una referencia tiene varias transacciones. */
+const STATUS_RANK: Record<string, number> = { APPROVED: 0, PENDING: 1, VOIDED: 2, DECLINED: 3, ERROR: 4 }
+
+/**
+ * Busca en Wompi la transacción de una referencia (cuando no se conoce su id:
+ * el cliente cerró el navegador antes de volver de pagar y el aviso de Wompi
+ * no llegó). Requiere la llave privada.
+ *
+ * Devuelve `undefined` si Wompi no tiene ninguna transacción con esa
+ * referencia y `null` si no se pudo consultar. Solo se aceptan transacciones
+ * cuya referencia coincide exactamente, aunque Wompi devolviera otras.
+ */
+export async function findTransactionByReference(
+  reference: string,
+): Promise<WompiTransactionStatus | null | undefined> {
+  try {
+    const response = await fetch(`${wompiApiUrl()}/transactions?reference=${encodeURIComponent(reference)}`, {
+      headers: { Authorization: `Bearer ${process.env.WOMPI_PRIVATE_KEY}` },
+    })
+    if (!response.ok) {
+      console.error('[Wompi] findTransactionByReference error:', response.status)
+      return null
+    }
+    const json = await response.json() as { data?: unknown }
+    const list = (Array.isArray(json.data) ? json.data : []) as WompiTransactionStatus[]
+    const mine = list.filter(t => t && t.reference === reference && typeof t.id === 'string')
+    if (mine.length === 0) return undefined
+    return mine.sort((a, b) => (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9))[0]
+  } catch (err) {
+    console.error('[Wompi] findTransactionByReference exception:', err)
+    return null
+  }
+}
+
 /**
  * Modelo de precio oficial — fijo, no configurable por variable de entorno.
  * (Antes leía de NEXT_PUBLIC_BASE_PRICE_COP/NEXT_PUBLIC_SHIPPING_COP con

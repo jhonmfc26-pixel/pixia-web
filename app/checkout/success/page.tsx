@@ -39,6 +39,9 @@ function CheckoutSuccessContent() {
     localStorage.removeItem('pixia_pending_checkout')
   }, [])
 
+  // Wompi agrega ?id=<transacción> al volver de pagar.
+  const transactionId = searchParams.get('id')
+
   useEffect(() => {
     if (!reference) {
       setError('Referencia de orden no encontrada')
@@ -46,34 +49,48 @@ function CheckoutSuccessContent() {
       return
     }
 
-    let attempts = 0
     let cancelled = false
 
+    // Cada consulta le pregunta a Wompi por el pago (POST): así el pedido se
+    // confirma aunque el aviso de Wompi tarde o no llegue. Rápido al principio,
+    // más espaciado después: un pago por PSE puede tardar unos minutos.
+    const waits = [0, 2000, 2000, 3000, 3000, 5000, 5000, 5000, 10000, 10000, 15000, 15000, 15000, 15000, 15000, 15000, 15000, 15000]
     const poll = async () => {
-      while (attempts < 10 && !cancelled) {
+      for (let i = 0; i < waits.length && !cancelled; i++) {
+        await new Promise(r => setTimeout(r, waits[i]))
+        if (cancelled) return
         try {
-          const res = await fetch(`/api/orders/${reference}`)
+          const res = await fetch(`/api/orders/${encodeURIComponent(reference)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactionId }),
+          })
           if (res.ok) {
             const data = await res.json()
             if (cancelled) return
             setOrder(data.order)
-            if (data.order.payment_status === 'approved') {
+            // Ya hay respuesta definitiva: se deja de preguntar.
+            if (data.order.payment_status !== 'pending') {
               setLoading(false)
               return
             }
+            // Pendiente: se muestra «Pago en proceso» y se sigue preguntando.
+            setLoading(false)
+          } else if (res.status === 404) {
+            setError('No pudimos encontrar tu orden')
+            setLoading(false)
+            return
           }
         } catch (err) {
           console.error('[success] poll error:', err)
         }
-        attempts++
-        await new Promise(r => setTimeout(r, 2000))
       }
       if (!cancelled) setLoading(false)
     }
 
     poll()
     return () => { cancelled = true }
-  }, [reference])
+  }, [reference, transactionId])
 
   if (loading) {
     return (
@@ -112,7 +129,7 @@ function CheckoutSuccessContent() {
 
       <p className="mx-auto mt-4 max-w-md text-base leading-relaxed text-white/65">
         {isPaid && 'Recibimos tu pago. Tu álbum entra a producción en las próximas 24 horas y te avisamos por correo cuando salga hacia tu casa.'}
-        {isPending && 'Tu pago se está procesando. Te escribimos por correo apenas se confirme.'}
+        {isPending && 'Tu pago se está procesando. Esta página se actualiza sola, y te escribimos por correo apenas se confirme.'}
         {!isPaid && !isPending && 'El pago no se completó. Si crees que es un error, escríbenos.'}
       </p>
 

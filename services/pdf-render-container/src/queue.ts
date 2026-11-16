@@ -3,12 +3,15 @@ import { findUnprintablePhotos, describeUnprintable } from '@/core/modules/print
 import { renderInteriorPdf, renderCoverPdf } from './renderAlbum'
 import { sendPdfFailureAlert } from './alert'
 import type { JobsClient, QueueJob } from './jobs'
+import type { PaymentCheck } from './payments'
 
 /**
  * Barrido de la cola pagado → PDF. Lo llama Cloud Scheduler cada 5 min vía
  * POST /process-pending (ver server.ts y supabase/pdf_jobs_trigger.sql).
  *
  * Orden de cada barrido:
+ *   0. Pagos pendientes: a los pedidos que siguen «pendientes» (el aviso de
+ *      Wompi no llegó) se les pregunta a Wompi a través de la web.
  *   1. Reconciliar: órdenes aprobadas sin job → se encolan (red de seguridad
  *      por si el webhook no pudo encolar).
  *   2. Expirar: jobs que agotaron intentos → 'fallo'.
@@ -32,6 +35,7 @@ export interface RenderEngine {
 }
 
 export interface SweepResult {
+  payments: PaymentCheck[]
   reconciled: string[]
   expired: string[]
   processed: { order: string | null; albumId: string; ok: boolean; error?: string }[]
@@ -51,12 +55,28 @@ export async function runSweep(deps: {
   now?: () => number
   /** Inyectable para tests; en producción siempre buildPrintJobInput. */
   build?: typeof buildPrintJobInput
+  /** Revisar pagos pendientes (ver payments.ts). Sin esto, el paso 0 no corre. */
+  checkPayments?: () => Promise<PaymentCheck[]>
 }): Promise<SweepResult> {
   const { jobs, engine, baseUrl } = deps
   const alert = deps.alert ?? sendPdfFailureAlert
   const now = deps.now ?? Date.now
   const started = now()
-  const result: SweepResult = { reconciled: [], expired: [], processed: [], alertsSent: 0, alertsFailed: 0 }
+  const result: SweepResult = { payments: [], reconciled: [], expired: [], processed: [], alertsSent: 0, alertsFailed: 0 }
+
+  // 0. Pagos pendientes. Va primero: un pago que se confirma acá queda
+  // encolado en este mismo barrido. Un fallo acá no frena el resto.
+  if (deps.checkPayments) {
+    try {
+      result.payments = await deps.checkPayments()
+      const confirmed = result.payments.filter((p) => p.result === 'approved').map((p) => p.reference)
+      if (confirmed.length) console.warn(`[queue] Pagos confirmados sin aviso de Wompi: ${confirmed.join(', ')}`)
+      const failed = result.payments.filter((p) => !['approved', 'pending', 'declined', 'voided', 'error'].includes(p.result))
+      if (failed.length) console.error('[queue] No se pudo revisar el pago de:', JSON.stringify(failed))
+    } catch (err) {
+      console.error('[queue] revisar pagos pendientes falló:', err)
+    }
+  }
 
   // 1. Reconciliar. Un fallo acá no frena el resto del barrido.
   try {
