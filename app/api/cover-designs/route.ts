@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /** Catálogo público de portadas (solo las visibles). Lo piden el paso 3 y el estudio. */

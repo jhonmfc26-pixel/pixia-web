@@ -3,7 +3,6 @@ import { isAdminRequest } from '@/lib/admin/auth'
 import { requeuePdf } from '@/lib/admin/data'
 import { kickPdfSweep } from '@/lib/admin/sweep'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /** POST desde el botón "Reintentar / Regenerar PDF" del detalle del pedido. */

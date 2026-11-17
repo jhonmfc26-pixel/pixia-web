@@ -7,10 +7,10 @@
  *   2. Acá se VERIFICA ese JWT (firma RS256 contra las llaves públicas del
  *      equipo de Access, audiencia, emisor, vencimiento) y que el email esté
  *      en ADMIN_EMAILS. No basta con que el header exista: el dominio
- *      *.pages.dev del proyecto NO pasa por Access, y sin esta verificación
+ *      *.workers.dev (o el *.pages.dev de antes) NO pasa por Access, y sin esta verificación
  *      el portal quedaría abierto por esa puerta.
  *
- * Variables (Cloudflare Pages → Settings → Variables):
+ * Variables (Cloudflare → Workers → pixia-web → Settings → Variables and secrets):
  *   CF_ACCESS_TEAM_DOMAIN  p.ej. "miequipo.cloudflareaccess.com"
  *   CF_ACCESS_AUD          (opcional) "Application Audience (AUD) Tag" de la
  *                          app de Access; varias separadas por coma
@@ -80,7 +80,7 @@ function csv(v: string | undefined): string[] {
 }
 
 /**
- * Rechazo con motivo en los logs (Cloudflare Pages → Functions → logs en
+ * Rechazo con motivo en los logs (Cloudflare → Workers → pixia-web → Logs, en
  * tiempo real). Nunca se loguea el token; el AUD y el email del token no son
  * secretos y son justo lo que hace falta para corregir la configuración.
  */
@@ -113,10 +113,10 @@ export async function evaluateAdmin(
   const token = headers.get(JWT_HEADER)
 
   if (!token) {
-    return config.allowDevBypass ? { admin: { email: 'dev@localhost' } } : fail('la request no trae el header de Cloudflare Access — ¿la ruta está cubierta por la app "Pixia Admin" o se entró por *.pages.dev?')
+    return config.allowDevBypass ? { admin: { email: 'dev@localhost' } } : fail('la request no trae el header de Cloudflare Access — ¿la ruta está cubierta por la app "Pixia Admin" o se entró por *.workers.dev?')
   }
   if (!config.teamDomain || config.emails.length === 0) {
-    return fail('falta CF_ACCESS_TEAM_DOMAIN o ADMIN_EMAILS en las variables de Cloudflare Pages (o no se redesplegó después de crearlas)')
+    return fail('falta CF_ACCESS_TEAM_DOMAIN o ADMIN_EMAILS en las variables del Worker (o no se redesplegó después de crearlas)')
   }
 
   try {

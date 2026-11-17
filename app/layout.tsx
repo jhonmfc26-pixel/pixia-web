@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   applicationName: "Pixia",
   keywords: ["álbum de fotos", "fotolibro", "álbum de fotos impreso", "libro de fotos", "álbum de boda", "álbum de viaje", "Colombia"],
   alternates: { canonical: "/" },
-  // En public/ y no como app/icon.png: next-on-pages trata los íconos de app/
+  // En public/ y no como app/icon.png: next-on-pages (el empaquetador anterior) trataba los íconos de app/
   // como rutas del servidor y la build de Cloudflare falla.
   icons: { icon: "/icon.png", apple: "/apple-icon.png" },
   openGraph: {

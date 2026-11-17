@@ -1,3 +1,5 @@
+import { getCloudflareContext } from '@opennextjs/cloudflare'
+
 interface KVNamespace {
   get(key: string): Promise<string | null>
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>
@@ -31,12 +33,12 @@ const RULES: Record<string, Rule> = {
 }
 const DEFAULT_RULE: Rule = { perMinute: 100, sample: 1 }
 
-// En dev/build no hay contexto Cloudflare; getRequestContext() throws → null → sin rate limiting
+// Fuera del Worker (pruebas, build) no hay contexto de Cloudflare:
+// getCloudflareContext() lanza → null → sin rate limiting.
 async function getKV(): Promise<KVNamespace | null> {
   try {
-    const { getRequestContext } = await import('@cloudflare/next-on-pages')
-    const { env } = getRequestContext()
-    return ((env as Record<string, unknown>).RATE_LIMIT_KV as KVNamespace) ?? null
+    const { env } = getCloudflareContext()
+    return ((env as unknown as Record<string, unknown>).RATE_LIMIT_KV as KVNamespace) ?? null
   } catch {
     return null
   }

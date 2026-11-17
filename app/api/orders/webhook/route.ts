@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateWebhookSignature, fetchTransactionStatus } from '@/lib/wompi'
 import { applyVerifiedTransaction } from '@/lib/paymentSync'
 
-export const runtime = 'edge'
 
 export async function POST(req: NextRequest) {
   let payload: {

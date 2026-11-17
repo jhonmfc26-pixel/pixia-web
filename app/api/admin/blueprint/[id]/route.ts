@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isAdminRequest } from '@/lib/admin/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /**

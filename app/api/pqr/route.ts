@@ -4,7 +4,6 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { parsePqrInput } from '@/lib/pqr'
 import { createPqr } from '@/lib/pqrData'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /** Radicar una petición, queja o reclamo desde /soporte. */

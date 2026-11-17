@@ -8,7 +8,6 @@ import type { CoverConfig } from '@/core/contracts/AlbumBlueprint'
 import { Badge, Card } from '../_components'
 import DesignForm from './DesignForm'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /**
