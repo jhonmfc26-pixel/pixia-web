@@ -1,6 +1,6 @@
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { planCleanup, extractPhotoKeys, r2MonthlyCostUsd, GB, type StoredObject, type BlueprintInfo, type OrderInfo } from '@/lib/retention'
+import { planCleanup, extractPhotoKeys, r2MonthlyCostUsd, GB, PAYMENT_GRACE_DAYS, DAY_MS, type StoredObject, type BlueprintInfo, type OrderInfo } from '@/lib/retention'
 import { COMMERCIAL } from '@/lib/legal'
 import { sendAlert } from './alert'
 
@@ -112,13 +112,16 @@ export async function runStorageCleanup(mode: CleanupMode) {
       assets.list('users/'),
       pdfs.list(),
       selectAll<{ id: string; created_at: string; cover: unknown; spreads: unknown; structure: unknown }>(sb, 'blueprints', 'id, created_at, cover, spreads, structure'),
-      selectAll<{ id: string; book_id: string | null; payment_status: string | null; delivered_at: string | null; assets_purged_at: string | null; book_snapshot: unknown }>(
-        sb, 'orders', 'id, book_id, payment_status, delivered_at, assets_purged_at, book_snapshot', q => q.eq('payment_status', 'approved')),
+      // Pagados (protegen hasta la garantía) y los recientes sin pagar (pago en curso).
+      selectAll<{ id: string; book_id: string | null; payment_status: string | null; created_at: string | null; delivered_at: string | null; assets_purged_at: string | null; book_snapshot: unknown }>(
+        sb, 'orders', 'id, book_id, payment_status, created_at, delivered_at, assets_purged_at, book_snapshot',
+        q => q.or(`payment_status.eq.approved,created_at.gte."${new Date(now.getTime() - PAYMENT_GRACE_DAYS * DAY_MS).toISOString()}"`)),
     ])
 
     const blueprints: BlueprintInfo[] = bpRows.map(r => ({ id: r.id, createdAt: new Date(r.created_at), photoKeys: extractPhotoKeys([r.cover, r.spreads, r.structure]) }))
     const orders: OrderInfo[] = orderRows.map(r => ({
       id: r.id, bookId: r.book_id, paymentStatus: r.payment_status,
+      createdAt: r.created_at ? new Date(r.created_at) : null,
       deliveredAt: r.delivered_at ? new Date(r.delivered_at) : null,
       assetsPurgedAt: r.assets_purged_at ? new Date(r.assets_purged_at) : null,
       photoKeys: extractPhotoKeys(r.book_snapshot),

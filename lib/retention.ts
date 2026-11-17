@@ -6,6 +6,10 @@
  *
  *  - Álbum SIN pedido pagado: se guarda (y se puede editar) 30 días desde que
  *    se creó. Después se borran sus fotos y su fila.
+ *  - Álbum con un pago EN CURSO (pedido sin pagar creado hace menos de
+ *    PAYMENT_GRACE_DAYS): se guarda aunque el borrador ya tenga 30 días. Un
+ *    pago por PSE puede tardar, y borrar el álbum en medio dejaría un pedido
+ *    pagado sin nada que imprimir.
  *  - Álbum CON pedido pagado: se guarda mientras el pedido está en curso y
  *    hasta 30 días después de la entrega (garantía). Después se borran sus
  *    fotos y su PDF; la fila del pedido se conserva (normas contables).
@@ -48,6 +52,8 @@ export interface OrderInfo {
   id: string
   bookId: string | null
   paymentStatus: string | null
+  /** Cuándo se creó el pedido. Sin esto, un pedido sin pagar no protege su álbum. */
+  createdAt?: Date | null
   deliveredAt: Date | null
   assetsPurgedAt: Date | null
   /** Claves de fotos del snapshot que se cobró. */
@@ -78,6 +84,9 @@ export function extractPhotoKeys(value: unknown): string[] {
   return [...new Set(text.match(KEY_RE) ?? [])]
 }
 
+/** Un pedido sin pagar protege su álbum este tiempo (el barrido de pagos revisa hasta 3 días). */
+export const PAYMENT_GRACE_DAYS = 3
+
 export const sessionOf = (key: string) => key.split('/').slice(0, 2).join('/') // "users/<sesión>"
 const isPaid = (o: OrderInfo) => o.paymentStatus === 'approved'
 
@@ -95,6 +104,12 @@ export function planCleanup(
     paidByBook.set(o.bookId, [...(paidByBook.get(o.bookId) ?? []), o])
   }
   const orderActive = (o: OrderInfo) => !o.deliveredAt || ageDays(o.deliveredAt) < config.warrantyDays
+
+  // Álbumes con un pago en curso: no se tocan aunque el borrador esté vencido.
+  const payingBooks = new Set<string>()
+  for (const o of input.orders) {
+    if (!isPaid(o) && o.bookId && o.createdAt && ageDays(o.createdAt) < PAYMENT_GRACE_DAYS) payingBooks.add(o.bookId)
+  }
 
   const protectedKeys = new Set<string>()
   const protectedBooks = new Set<string>() // álbumes cuyos PDFs se guardan
@@ -121,7 +136,7 @@ export function planCleanup(
       if (orders.some(orderActive)) b.photoKeys.forEach(k => protectedKeys.add(k))
       continue // la fila de un álbum comprado nunca se borra (el admin la usa)
     }
-    if (ageDays(b.createdAt) < config.draftDays) {
+    if (ageDays(b.createdAt) < config.draftDays || payingBooks.has(b.id)) {
       counts.draftsActive++
       b.photoKeys.forEach(k => protectedKeys.add(k))
     } else {
