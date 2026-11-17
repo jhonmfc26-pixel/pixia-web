@@ -46,7 +46,7 @@ interface UploadControllerProps {
  * que es lo único que de verdad excluye su grafo de imports del bundle del
  * edge function (edit-v2 es runtime='edge'). Un import() suelto dentro de
  * una función NO alcanza acá: Cloudflare Workers no soporta cargar chunks
- * aparte en runtime, así que next-on-pages horneja cualquier módulo
+ * aparte en runtime, así que el empaquetador horneaba cualquier módulo
  * alcanzable — estática o dinámicamente — dentro del mismo .func.js. Solo el
  * límite ssr:false de Next (que directamente omite el componente del render
  * de servidor) logra que heic2any/exifr no lleguen ni sean necesarios ahí.

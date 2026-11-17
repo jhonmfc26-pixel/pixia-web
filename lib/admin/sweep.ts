@@ -1,4 +1,4 @@
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 /**
  * Pide al contenedor que procese la cola YA (POST /process-pending), en vez
@@ -20,7 +20,7 @@ export function kickPdfSweep(): boolean {
     .catch(err => console.error('[admin] no se pudo llamar a /process-pending:', err))
 
   try {
-    getRequestContext().ctx.waitUntil(run)
+    getCloudflareContext().ctx.waitUntil(run)
   } catch {
     // `next dev` local: no hay contexto de Cloudflare; la promesa corre igual.
   }

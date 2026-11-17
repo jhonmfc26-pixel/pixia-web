@@ -10,7 +10,7 @@
 ## Stack
 
 - Next.js 16.1.4 + TypeScript (strict), Turbopack en dev
-- Cloudflare Pages — deploy automático desde GitHub, **runtime edge obligatorio en todas las rutas API**
+- Cloudflare Workers con OpenNext (`@opennextjs/cloudflare`) — deploy automático desde GitHub (Workers Builds). Desde 2026-11 reemplaza a Pages + next-on-pages; las rutas ya NO llevan `runtime = 'edge'` (OpenNext no lo admite)
 - Cloudflare R2: bucket `pixia-assets`, acceso por AWS Sig V4 manual (no SDK, incompatible con edge)
 - Claude API (Haiku): solo post-pago
 - Wompi: pagos Colombia (pendiente integración)

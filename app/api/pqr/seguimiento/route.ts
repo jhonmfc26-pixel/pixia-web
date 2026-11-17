@@ -3,7 +3,6 @@ import { rateLimit } from '@/core/middleware/rateLimiter'
 import { normalizeRadicado } from '@/lib/pqr'
 import { findPqrForCustomer } from '@/lib/pqrData'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /** Seguimiento de un radicado: pide radicado + correo (los dos deben coincidir). */

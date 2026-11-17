@@ -1,6 +1,5 @@
 'use client'
 
-export const runtime = 'edge'
 
 import { EmailCodeForm } from '@/components/auth/EmailCodeForm'
 import { authErrorMessage } from '@/lib/authMessages'

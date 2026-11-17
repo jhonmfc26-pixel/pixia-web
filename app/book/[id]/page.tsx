@@ -1,6 +1,5 @@
 'use client'
 
-export const runtime = 'edge'
 
 import { PhotoQualityContext } from '@/core/modules/viewer/PhotoQualityContext'
 import { useEffect, useMemo, useRef, useState } from 'react'

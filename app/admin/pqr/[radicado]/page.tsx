@@ -7,7 +7,6 @@ import { PQR_STATUS_LABEL, PQR_TYPES, formatBogotaDateTime } from '@/lib/pqr'
 import { formatDateEs } from '@/lib/businessDays'
 import { Badge, Card, DueBadge, Field } from '../../_components'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 const FLASH: Record<string, string> = {

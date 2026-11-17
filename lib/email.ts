@@ -23,7 +23,7 @@ interface OrderConfirmationData {
  */
 export function explainEmailError(msg: string): string {
   if (/verify a domain|testing emails|own email address/i.test(msg)) {
-    return 'Resend está en modo de prueba y solo envía a tu propio correo. Hay que verificar el dominio pixiaa.com en Resend y poner EMAIL_FROM (por ejemplo "Pixia <hola@pixiaa.com>") en las variables de Cloudflare Pages.'
+    return 'Resend está en modo de prueba y solo envía a tu propio correo. Hay que verificar el dominio pixiaa.com en Resend y poner EMAIL_FROM (por ejemplo "Pixia <hola@pixiaa.com>") en las variables del Worker de Cloudflare.'
   }
   return msg
 }

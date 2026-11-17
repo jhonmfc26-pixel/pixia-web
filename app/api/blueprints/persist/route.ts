@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
 
-export const runtime = 'edge'
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024
 

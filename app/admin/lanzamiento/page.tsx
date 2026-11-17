@@ -4,7 +4,6 @@ import { isAdminRequest } from '@/lib/admin/auth'
 import { launchChecks, MANUAL_STEPS, type CheckStatus, type LaunchCheck } from '@/lib/launchChecks'
 import { Badge, Card } from '../_components'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 const TONE: Record<CheckStatus, 'ok' | 'warn' | 'bad'> = { ok: 'ok', aviso: 'warn', falta: 'bad' }
