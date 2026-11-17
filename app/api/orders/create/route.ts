@@ -6,7 +6,6 @@ import { PAGES_INCLUDED } from '@/lib/formats'
 import { rateLimit } from '@/core/middleware/rateLimiter'
 import { blueprintInsertColumns, matchesWhatClientSaw, resolveOrderAlbum, type StoredBlueprint } from '@/lib/orderAlbum'
 
-export const runtime = 'edge'
 
 interface CreateOrderRequest {
   bookId: string

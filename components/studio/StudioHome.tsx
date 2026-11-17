@@ -1,5 +1,5 @@
 'use client'
-/* eslint-disable @next/next/no-img-element -- fotos estáticas en /public, sin optimizador en Cloudflare Pages */
+/* eslint-disable @next/next/no-img-element -- fotos estáticas en /public, sin optimizador de imágenes en Cloudflare */
 
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'

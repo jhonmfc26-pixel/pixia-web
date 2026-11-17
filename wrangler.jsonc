@@ -1,0 +1,29 @@
+// Configuración del Worker de Pixia (OpenNext sobre Cloudflare Workers).
+// Reemplaza al proyecto de Cloudflare Pages + next-on-pages (2026-11).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pixia",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // Sin direcciones públicas *.workers.dev ni de vista previa: el sitio solo
+  // se sirve por sus dominios (pixiaa.com, nuevo.pixiaa.com), que es donde
+  // aplica Cloudflare Access. Una dirección *.workers.dev lo saltaría.
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    // Debe coincidir con "name".
+    { "binding": "WORKER_SELF_REFERENCE", "service": "pixia" }
+  ],
+  // Limitador de peticiones (core/middleware/rateLimiter.ts). Mismo espacio
+  // de KV que usaba el proyecto de Pages.
+  "kv_namespaces": [
+    { "binding": "RATE_LIMIT_KV", "id": "8196b73f4749453cb5e6188fd80b1097" }
+  ],
+  // Registros del Worker en el panel de Cloudflare (Workers → pixia-web → Logs).
+  "observability": { "enabled": true }
+}

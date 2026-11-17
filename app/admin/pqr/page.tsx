@@ -6,7 +6,6 @@ import { listPqr } from '@/lib/pqrData'
 import { PQR_STATUS_LABEL, PQR_TYPES, formatBogotaDateTime } from '@/lib/pqr'
 import { Badge, Card, DueBadge } from '../_components'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPqrPage() {

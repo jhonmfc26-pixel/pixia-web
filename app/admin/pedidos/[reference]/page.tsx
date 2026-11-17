@@ -7,7 +7,6 @@ import { formatCop, formatDateTime, formatDuration, needsAttention, PDF_STATE_LA
 import { Badge, ButtonLink, Card, Field, PaymentBadge, PdfBadge } from '../../_components'
 import { CARRIERS, isPrintStatus, statusIndex } from '@/lib/orderStatus'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 const FLASH: Record<string, { tone: 'ok' | 'bad'; text: string }> = {

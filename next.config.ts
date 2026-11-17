@@ -31,3 +31,7 @@ const nextConfig: NextConfig = {
 }
 
 export default nextConfig
+
+// Bindings de Cloudflare (KV, etc.) también en `next dev`.
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
+initOpenNextCloudflareForDev()

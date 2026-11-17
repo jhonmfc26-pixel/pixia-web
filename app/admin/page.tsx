@@ -9,7 +9,6 @@ import {
 } from '@/lib/admin/model'
 import { PaymentBadge, PdfBadge, ShipBadge } from './_components'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 const RANGES: [Filters['range'], string][] = [['hoy', 'Hoy'], ['7d', 'Últimos 7 días'], ['30d', 'Últimos 30 días'], ['todo', 'Todo']]

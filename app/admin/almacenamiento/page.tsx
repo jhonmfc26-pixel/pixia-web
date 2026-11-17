@@ -7,7 +7,6 @@ import { COMMERCIAL } from '@/lib/legal'
 import { GB, r2MonthlyCostUsd } from '@/lib/retention'
 import { Badge, Card, Field } from '../_components'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 const gb = (b: number | null | undefined) => `${((b ?? 0) / GB).toFixed(2)} GB`
