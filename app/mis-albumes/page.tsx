@@ -1,5 +1,6 @@
 'use client'
 
+import { EmailCodeForm } from '@/components/auth/EmailCodeForm'
 import { formatOfBook, shortSize } from '@/lib/formats'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -431,12 +432,18 @@ function LoginPrompt({ onCreate }: { onCreate: () => void }) {
         <Link href="/" className="font-[family-name:var(--font-display)] text-xl text-white/80">Pixia</Link>
         <h1 className="mt-8 font-[family-name:var(--font-display)] text-3xl font-normal">Tus álbumes</h1>
         {state === 'sent' ? (
-          <p className="mt-4 leading-relaxed text-white/65">
-            Te enviamos un enlace a <span className="text-white">{email.trim()}</span>. Ábrelo en este mismo dispositivo para entrar.
-          </p>
+          <div className="mt-4">
+            <p className="leading-relaxed text-white/65">
+              Te enviamos un correo a <span className="text-white">{email.trim()}</span>. Escribe aquí el código que viene en el correo, o abre el enlace en este mismo dispositivo.
+            </p>
+            <div className="mt-6"><EmailCodeForm email={email} /></div>
+            <button type="button" onClick={() => setState('idle')} className="mt-4 text-sm text-white/45 underline underline-offset-4 hover:text-white/70">
+              ¿No llegó? Enviar otro correo
+            </button>
+          </div>
         ) : (
           <>
-            <p className="mt-3 text-white/60">Escribe el correo con el que hiciste tu pedido y te enviamos un enlace para entrar.</p>
+            <p className="mt-3 text-white/60">Escribe el correo con el que hiciste tu pedido y te enviamos un código para entrar.</p>
             <form onSubmit={send} className="mt-8 space-y-3">
               <input type="email" inputMode="email" autoComplete="email" required value={email}
                 onChange={e => { setEmail(e.target.value); if (state === 'error' || state === 'unknown') setState('idle') }}
@@ -444,13 +451,13 @@ function LoginPrompt({ onCreate }: { onCreate: () => void }) {
                 className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-[var(--brand-coral)]" />
               <button type="submit" disabled={state === 'sending'}
                 className="w-full rounded-xl bg-[var(--brand-coral)] px-6 py-3.5 font-medium text-white transition hover:brightness-110 disabled:opacity-60">
-                {state === 'sending' ? 'Enviando…' : 'Enviarme el enlace'}
+                {state === 'sending' ? 'Enviando…' : 'Enviarme el código'}
               </button>
               <p className="text-xs leading-relaxed text-white/40">
                 Usamos tu correo solo para tu cuenta y tus pedidos, según nuestra <Link href="/privacidad" className="underline">Política de datos personales</Link>.
               </p>
               {state === 'error' && (
-                <p className="text-sm text-[#F08A72]">No pudimos enviar el enlace. Revisa el correo (debe ser el de tu pedido) e inténtalo de nuevo.</p>
+                <p className="text-sm text-[#F08A72]">No pudimos enviar el correo. Revisa la dirección (debe ser la de tu pedido) e inténtalo de nuevo en un momento.</p>
               )}
               {state === 'unknown' && (
                 <p className="text-sm text-[#F08A72]">No encontramos pedidos con ese correo. Revisa que sea el mismo con el que compraste.</p>
