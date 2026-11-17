@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import express from 'express'
 import { renderInteriorPdf, renderCoverPdf } from './renderAlbum'
 import { createR2Client, signDownloadUrl, verifyDownloadToken } from './r2'
@@ -33,7 +34,11 @@ app.use(express.json({ limit: '50mb' })) // el body trae fotos+structure del ál
 function checkAuth(req: express.Request): boolean {
   const auth = req.header('authorization')
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
-  return token === CONTAINER_SECRET
+  if (!token) return false
+  // Tiempo constante: === delataría, midiendo tiempos, cuántos caracteres coinciden.
+  const a = Buffer.from(token)
+  const b = Buffer.from(CONTAINER_SECRET)
+  return a.length === b.length && timingSafeEqual(a, b)
 }
 
 app.get('/health', (_req, res) => res.status(200).send('ok'))

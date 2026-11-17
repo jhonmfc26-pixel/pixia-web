@@ -3,6 +3,7 @@
  * Documentación: https://docs.wompi.co
  */
 
+import { safeEqual } from '@/lib/safeEqual'
 import { DEFAULT_FORMAT_ID, PAGES_INCLUDED, getFormat, type AlbumFormatId } from '@/lib/formats'
 import { wompiApiUrl } from '@/lib/wompiConfig'
 
@@ -84,7 +85,7 @@ export async function validateWebhookSignature(
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   const expectedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 
-  return expectedHash === checksum
+  return safeEqual(expectedHash, checksum)
 }
 
 /**
