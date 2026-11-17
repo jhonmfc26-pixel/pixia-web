@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AlbumStyle, AlbumFormat, CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import { FacePageView, HeroSpreadPageView } from './SpreadFaces'
 import CoverPage from './pages/CoverPage'
@@ -96,6 +96,9 @@ interface PixiaFlipBookProps {
 // de clase sobrevive a esa reescritura porque vive fuera del atributo style.
 const PAPER_BG = '#F9F6F1'
 const PAGE_CLASS = 'pixia-flip-page'
+/** Duración de pasar una hoja; el desplazamiento del libro y la sombra usan la misma. */
+const FLIP_MS = 700
+
 const PAGE_CSS = `.${PAGE_CLASS} { background: ${PAPER_BG}; overflow: hidden; border-radius: ${PAGE_RADIUS}px; }`
 
 function wrapPage(content: ReactNode, key: string) {
@@ -131,11 +134,18 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
   // Qué pliego se ve (para la sombra: en portada/contraportada hay una sola página).
   const [shownKind, setShownKind] = useState(spreads[initialSpreadIdx]?.kind)
 
+  // Hacia dónde va el libro: se fija apenas se pide pasar de página (botones,
+  // teclado, miniaturas) para que el desplazamiento y la sombra acompañen la
+  // animación. Si la hoja se arrastra con el dedo, se fija al terminar (onFlip).
+  const announce = useCallback((spreadIdx: number) => setShownKind(spreads[spreadIdx]?.kind), [spreads])
+
   useImperativeHandle(ref, () => ({
     goTo: (spreadIdx: number) => {
       const pf = bookRef.current?.pageFlip()
       if (!pf) return
       const targetPage = spreadIdxToPageIndex(spreadIdx, spreads.length)
+      // El libro se centra (o se abre) a la vez que pasa la hoja, no después.
+      announce(spreadIdx)
 
       if (pf.getOrientation() === 'portrait') {
         // En vertical se ve una página a la vez: se navega por páginas reales.
@@ -159,9 +169,19 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
       else if (delta === -1) pf.flipPrev()
       else pf.flip(targetPage)
     },
-    flipNext: () => bookRef.current?.pageFlip()?.flipNext(),
-    flipPrev: () => { const pf = bookRef.current?.pageFlip(); if (pf) flipPrevSafe(pf) },
-  }), [spreads.length, onFlip])
+    flipNext: () => {
+      const pf = bookRef.current?.pageFlip()
+      if (!pf) return
+      announce(Math.min(currentSpreadIdxRef.current + 1, spreads.length - 1))
+      pf.flipNext()
+    },
+    flipPrev: () => {
+      const pf = bookRef.current?.pageFlip()
+      if (!pf) return
+      announce(Math.max(currentSpreadIdxRef.current - 1, 0))
+      flipPrevSafe(pf)
+    },
+  }), [spreads.length, onFlip, announce])
 
   const flipChildren = useMemo(() => {
     const items: ReactNode[] = []
@@ -207,8 +227,17 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
     return () => clearTimeout(timer)
   }, [flipbookKey])
 
+  // Libro cerrado = una sola tapa. pageflip la dibuja en una mitad del pliego
+  // (portada a la derecha, contraportada a la izquierda) y la otra mitad
+  // queda vacía: el libro se corre medio ancho de página para que la tapa
+  // quede centrada y sola, como el álbum impreso cerrado (Jhon, 2026-11-16:
+  // «se ve una hoja blanca al inicio y otra al final»).
+  const closed = twoPages ? (shownKind === 'cover' ? 'front' : shownKind === 'back' ? 'back' : null) : null
+  const shift = closed === 'front' ? -width / 2 : closed === 'back' ? width / 2 : 0
+  const EASE = `${FLIP_MS}ms cubic-bezier(.4,0,.2,1)`
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', transform: `translateX(${shift}px)`, transition: `transform ${EASE}` }}>
       {/* Sombra gris cálida bajo el libro. Antes era un filter: drop-shadow
           sobre TODO el libro: el navegador lo recalculaba en cada cuadro de
           la animación de pasar página (lento, sobre todo en celular). Ahora
@@ -216,11 +245,11 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
           solo la derecha, en la contraportada solo la izquierda. */}
       <div aria-hidden style={{
         position: 'absolute', top: 0, bottom: 0,
-        left: twoPages && shownKind === 'cover' ? '50%' : 0,
-        right: twoPages && shownKind === 'back' ? '50%' : 0,
+        left: closed === 'front' ? '50%' : 0,
+        right: closed === 'back' ? '50%' : 0,
         boxShadow: '0 26px 48px rgba(80,68,52,0.22), 0 8px 20px rgba(80,68,52,0.16)',
         pointerEvents: 'none',
-        transition: 'left 0.35s ease, right 0.35s ease',
+        transition: `left ${EASE}, right ${EASE}`,
       }} />
       <style>{PAGE_CSS}</style>
       <HTMLFlipBook
@@ -233,7 +262,7 @@ const PixiaFlipBook = forwardRef<PixiaFlipBookHandle, PixiaFlipBookProps>(functi
         showCover={true}
         usePortrait={isMobile}
         drawShadow={true}
-        flippingTime={700}
+        flippingTime={FLIP_MS}
         useMouseEvents={true}
         ref={bookRef}
         onFlip={(e: { data: number }) => {
