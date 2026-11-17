@@ -816,6 +816,31 @@ function EditV2PageInner() {
     })
   }
   const [coverEditorOpen, setCoverEditorOpen] = useState(false)
+  // ── Cambios sin guardar ────────────────────────────────────────────────────
+  // Lo que se guardaría al tocar «Listo» (mismos refs que handleDone). Se
+  // compara con lo último guardado (o lo cargado) para avisar antes de salir.
+  const editorSnapshot = () => JSON.stringify({
+    structure: structureRef.current,
+    cover: coverRef.current ?? bookRef.current?.cover ?? null,
+    spreads: bookRef.current?.spreads ?? null,
+  })
+  const savedSnapshotRef = useRef<string | null>(null)
+  const hasUnsavedChanges = () => savedSnapshotRef.current !== null && editorSnapshot() !== savedSnapshotRef.current
+  const [confirmLeave, setConfirmLeave] = useState(false)
+
+  useEffect(() => {
+    // Cerrar la pestaña, recargar o salir con cambios sin guardar: el
+    // navegador pregunta antes (el texto lo pone el navegador).
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges()) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // /book/<id>/edit-v2?portada=1 abre directo el estudio de portada (desde el
   // visor o al terminar de crear): al pulsar «Listo» ahí se guarda y se vuelve
   // al álbum, sin pasar por el editor de páginas.
@@ -831,6 +856,11 @@ function EditV2PageInner() {
       setCoverEditorOpen(true)
     }
   }, [book, studioDeepLink])
+
+  // Punto de partida de «cambios sin guardar»: el álbum tal como se cargó.
+  useEffect(() => {
+    if (savedSnapshotRef.current === null && book && structure) savedSnapshotRef.current = editorSnapshot()
+  }, [book, structure])
 
   // ── Mapa de fotos ───────────────────────────────────────────────────────────
   const photosById = useMemo(() => {
@@ -1059,17 +1089,14 @@ function EditV2PageInner() {
         return
       }
 
-      let savedOk = false
-
-      // Intentar guardar en Supabase vía API (service_role) — el cliente del
-      // navegador NO tiene política UPDATE sobre `blueprints` (RLS solo permite
-      // SELECT a authenticated; ver supabase/policies.sql), así que un
-      // `supabaseBrowser.update()` directo es un no-op silencioso: no falla,
-      // pero tampoco escribe nada. /api/blueprints/persist usa supabaseAdmin
-      // (bypassa RLS) y persiste structure + spreads (fotos nuevas incluidas)
+      // Guardar en la cuenta vía API (service_role) — el cliente del navegador
+      // NO tiene política UPDATE sobre `blueprints` (RLS solo permite SELECT a
+      // authenticated; ver supabase/policies.sql). /api/blueprints/persist usa
+      // supabaseAdmin y persiste structure + spreads (fotos nuevas incluidas)
       // en un solo upsert — mismo mecanismo que auth/callback.
+      let res: Response | null = null
       try {
-        const res = await fetch('/api/blueprints/persist', {
+        res = await fetch('/api/blueprints/persist', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1077,38 +1104,55 @@ function EditV2PageInner() {
           },
           body: JSON.stringify({ blueprint: { ...currentBook, structure: currentStructure, cover: currentCover }, sessionId: sessionId ?? '' }),
         })
-        if (res.ok) {
-          savedOk = true
-          console.log('[EditV2] Blueprint guardado en Supabase (structure + spreads)')
-        } else {
-          const errText = await res.text().catch(() => 'unknown')
-          console.warn('[EditV2] /api/blueprints/persist:', res.status, errText)
-        }
       } catch (e) {
-        console.warn('[EditV2] No se pudo guardar en Supabase:', e)
+        console.warn('[EditV2] No se pudo guardar en Supabase (red):', e)
       }
 
-      // Red de EMERGENCIA: solo llega acá con sesión válida confirmada arriba
-      // (Supabase caído, red, etc.) — nunca como sustituto de sesión ausente.
-      if (!savedOk) {
-        try {
-          await updateLocalBook(id, { structure: currentStructure, spreads: currentBook.spreads, cover: currentCover })
-          savedOk = true
-          console.log('[EditV2] Estructura guardada en localStorage (fallback de emergencia — Supabase falló con sesión válida)')
-        } catch (e) {
-          console.error('[EditV2] Error guardando en localStorage:', e)
-        }
-      }
-
-      if (savedOk) {
+      if (res?.ok) {
+        console.log('[EditV2] Blueprint guardado en Supabase (structure + spreads)')
+        savedSnapshotRef.current = editorSnapshot()
         showToast('Guardado', false, 1200)
         // De vuelta a la numeración compartida con el viewer (portada = 0).
         // Desde «Personalizar portada» se vuelve a la portada.
         const spread = studioDeepLink ? 0 : currentFold + 1
         setTimeout(() => { window.location.href = `/book/${id}?spread=${spread}` }, 1000)
-      } else {
-        showToast('No se pudo guardar, reintenta', true, 4000)
+        return
       }
+
+      const status = res?.status ?? 0
+      const serverMsg = res ? ((await res.json().catch(() => null)) as { error?: string } | null)?.error : undefined
+      console.warn('[EditV2] /api/blueprints/persist:', status, serverMsg)
+
+      // Rechazos definitivos: reintentar no sirve y guardar una copia en este
+      // navegador solo haría creer que quedó guardado (antes decía «Guardado» y
+      // el visor mostraba la versión vieja de la cuenta).
+      if (status === 409) {
+        // El álbum ya se pagó: queda congelado. Se vuelve al visor.
+        savedSnapshotRef.current = editorSnapshot()
+        showToast(serverMsg || 'Este álbum ya fue pedido y no se puede modificar', true, 3500)
+        setTimeout(() => { window.location.href = `/book/${id}` }, 3000)
+        return
+      }
+      if (status === 401) {
+        setHasSession(false)
+        showToast('Tu sesión expiró — inicia sesión de nuevo para guardar tus cambios', true, 5000)
+        return
+      }
+      if (status === 403 || status === 413 || status === 400) {
+        showToast(serverMsg || 'No se pudo guardar este álbum', true, 6000)
+        return
+      }
+
+      // Falla pasajera (sin internet, servidor caído): se guarda una copia de
+      // respaldo en este dispositivo, pero se dice la verdad — NO quedó en la
+      // cuenta — y el editor sigue abierto para reintentar.
+      try {
+        await updateLocalBook(id, { structure: currentStructure, spreads: currentBook.spreads, cover: currentCover })
+        console.log('[EditV2] Copia de respaldo guardada en este dispositivo (la cuenta no respondió)')
+      } catch (e) {
+        console.error('[EditV2] Error guardando la copia de respaldo:', e)
+      }
+      showToast('No pudimos guardar en tu cuenta. Revisa tu conexión y toca «Listo» otra vez.', true, 6000)
     } finally {
       setIsSaving(false)
     }
@@ -1561,7 +1605,10 @@ function EditV2PageInner() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <button
-          onClick={() => { window.location.href = `/book/${id}?spread=${currentFold + 1}` }}
+          onClick={() => {
+            if (hasUnsavedChanges()) { setConfirmLeave(true); return }
+            window.location.href = `/book/${id}?spread=${currentFold + 1}`
+          }}
           style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px', padding: '6px 0', flexShrink: 0, whiteSpace: 'nowrap' }}
         >
           ← Volver
@@ -1694,6 +1741,23 @@ function EditV2PageInner() {
           onClose={() => { setDedicationEditorFaceId(null); setUploadIntent(null) }}
         />
       )}
+
+      {/* Salir con cambios sin guardar. Escape o tocar fuera = seguir editando
+          (ConfirmDialog trata eso como «cancelar»), nunca descartar. */}
+      <ConfirmDialog
+        open={confirmLeave}
+        title="Tienes cambios sin guardar"
+        message="Si sales ahora se pierden. Para guardarlos, toca «Listo»."
+        confirmLabel="Salir sin guardar"
+        cancelLabel="Seguir editando"
+        variant="danger"
+        onCancel={() => setConfirmLeave(false)}
+        onConfirm={() => {
+          setConfirmLeave(false)
+          savedSnapshotRef.current = editorSnapshot()
+          window.location.href = `/book/${id}?spread=${currentFold + 1}`
+        }}
+      />
 
       {/* Confirmación de "Eliminar pliego" — reemplaza window.confirm nativo */}
       <ConfirmDialog
