@@ -274,7 +274,7 @@ Antes de entregar un PDF se comprueba que se puede imprimir tal cual:
   dice cuál fue; la cola reintenta (suele ser algo pasajero de red) y, si
   sigue fallando, alerta.
 - **Dominios permitidos** (`src/printHosts.ts`): Chromium solo descarga de
-  `assets.pixiaa.com`, del dominio de `PRINT_BASE_URL` y de Google Fonts. Si el
+  el bucket público de fotos (`pub-aa3db0435cb645cfbb71c0b49a045b28.r2.dev`) o `assets.pixiaa.com`, del dominio de `PRINT_BASE_URL` y de Google Fonts. Si el
   almacenamiento cambia de dirección, se agrega sin tocar código:
 
   ```bash

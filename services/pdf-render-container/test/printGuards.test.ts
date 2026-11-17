@@ -16,6 +16,9 @@ import type { buildPrintJobInput } from '@/core/modules/print/buildPrintJobInput
 test('solo se descarga del almacenamiento de Pixia y de Google Fonts', () => {
   const hosts = allowedPrintHosts('https://assets.pixiaa.com/', '')
   for (const ok of [
+    // Una foto real de producción (dirección pública del bucket de R2).
+    'https://pub-aa3db0435cb645cfbb71c0b49a045b28.r2.dev/users/20151055-65d7-4590-9d6a-d20adb0643f6/original/20a1fc53-0cba-4c2e-9d1e-1a2b3c4d5e6f.jpg',
+    'https://pub-aa3db0435cb645cfbb71c0b49a045b28.r2.dev/covers/0f2e1d3c-4b5a-6978-8a9b-0c1d2e3f4a5b.png',
     'https://assets.pixiaa.com/users/s/original/p.jpg',
     'https://assets.pixiaa.com/logo-pixia.png',
     'https://fonts.googleapis.com/css2?family=Inter',
@@ -27,6 +30,7 @@ test('solo se descarga del almacenamiento de Pixia y de Google Fonts', () => {
     'https://servidor-ajeno.example/x.jpg',
     'http://assets.pixiaa.com/x.jpg',               // sin https
     'https://assets.pixiaa.com.evil.example/x.jpg', // parece, pero no es
+    'https://pub-otrobucketajeno0000000000000000000.r2.dev/x.jpg', // otro bucket de R2, de otra cuenta
     'http://169.254.169.254/computeMetadata/v1/',   // metadatos de la nube
     'http://localhost:8080/',
     'file:///etc/passwd',
