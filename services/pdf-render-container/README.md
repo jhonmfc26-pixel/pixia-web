@@ -8,9 +8,10 @@ Acá hay RAM real (2GB+), así que el álbum completo se arma como UN documento
 HTML (todas las páginas con salto de página CSS) y Chromium lo pagina de un
 tirón — sin merge, sin OOM.
 
-**El Worker CF sigue activo y funcionando** — este contenedor es una
-migración que se valida en paralelo (ver `?engine=worker|container` en
-`app/api/dev/generate-pdf/route.ts`), no un reemplazo inmediato.
+Este contenedor es el motor de producción: genera los PDF de los pedidos
+pagados desde la cola (ver «Cola de producción» más abajo). La ruta de prueba
+`app/api/dev/generate-pdf` se borró el 2026-11-13 (en producción nunca
+respondía y ocupaba espacio en el paquete de Cloudflare).
 
 ## Cómo se comparte el código con la app (WYSIWYG)
 
