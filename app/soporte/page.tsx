@@ -13,7 +13,9 @@ import { field, label, primary } from './ui'
  * Admite ?tipo=garantia&orden=PIXIA-... para llegar con el formulario listo.
  */
 export default function SoportePage() {
-  return <Suspense fallback={null}><SoporteForm /></Suspense>
+  // La reserva ocupa la pantalla mientras llega el formulario: con `null` el
+  // pie de página aparecía arriba y saltaba hacia abajo (CLS 0,3 en celular).
+  return <Suspense fallback={<div style={{ minHeight: '100vh' }} />}><SoporteForm /></Suspense>
 }
 
 interface Done { radicado: string; createdAtLabel: string; dueDateLabel: string; email: string }

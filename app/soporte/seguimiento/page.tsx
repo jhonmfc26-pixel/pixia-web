@@ -17,7 +17,9 @@ interface Found {
 }
 
 export default function SeguimientoPage() {
-  return <Suspense fallback={null}><Seguimiento /></Suspense>
+  // La reserva ocupa la pantalla mientras llega el formulario: con `null` el
+  // pie de página aparecía arriba y saltaba hacia abajo (CLS 0,3 en celular).
+  return <Suspense fallback={<div style={{ minHeight: '100vh' }} />}><Seguimiento /></Suspense>
 }
 
 function Seguimiento() {

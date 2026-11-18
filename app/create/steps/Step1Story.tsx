@@ -8,12 +8,12 @@ import { FORMATS, formatCop, idealFormat, type AlbumFormat } from "@/lib/formats
 import { PRICING } from "@/lib/wompi";
 
 const stories = [
-  { id: "wedding", title: "Boda", image: "/story/wedding.jpg" },
-  { id: "honeymoon", title: "Luna de miel", image: "/story/honeymoon.jpg" },
-  { id: "trip", title: "Viaje", image: "/story/trip.jpg" },
-  { id: "anniversary", title: "Aniversario", image: "/story/anniversary.jpg" },
+  { id: "wedding", title: "Boda", image: "/story/wedding.webp" },
+  { id: "honeymoon", title: "Luna de miel", image: "/story/honeymoon.webp" },
+  { id: "trip", title: "Viaje", image: "/story/trip.webp" },
+  { id: "anniversary", title: "Aniversario", image: "/story/anniversary.webp" },
   { id: "kids", title: "Niños y bebés", image: null },
-  { id: "other", title: "Otra historia", image: "/story/other.jpg" },
+  { id: "other", title: "Otra historia", image: "/story/other.webp" },
 ];
 
 /** Cómo se nombra el momento en la frase "ideal para …". */

@@ -1,3 +1,8 @@
+/**
+ * Puntaje de una foto a partir de sus píxeles. Funciones puras, sin DOM: las
+ * usa el worker de análisis (quickAnalysisWorker.ts) y el respaldo en el hilo
+ * principal (quickAnalysis.ts), así los dos dan el mismo resultado.
+ */
 export interface PhotoScore {
   sharpness: number
   exposure: number
@@ -8,44 +13,33 @@ export interface PhotoScore {
   recommendation: 'hero' | 'supporting' | 'discard'
 }
 
-export async function scorePhoto(src: string): Promise<PhotoScore> {
-  if (typeof window === 'undefined') return defaultScore()
-  return new Promise((resolve) => {
-    const img = new window.Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const MAX = 200
-      const scale = Math.min(MAX / img.width, MAX / img.height)
-      canvas.width = Math.floor(img.width * scale)
-      canvas.height = Math.floor(img.height * scale)
+/** Lado mayor de la muestra que se mide (la foto se reduce a esto antes de medir). */
+export const SCORE_SAMPLE = 200
 
-      const ctx = canvas.getContext('2d')
-      if (!ctx) { resolve(defaultScore()); return }
-
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const pixels = imageData.data
-
-      const sharpness = measureSharpness(pixels, canvas.width, canvas.height)
-      const exposure = measureExposure(pixels)
-      const composition = measureComposition(pixels, canvas.width, canvas.height)
-      const resolution = measureResolution(img.width, img.height)
-      const faces = 0
-
-      const finalScore = Math.round(sharpness + exposure + composition + faces + resolution)
-
-      const recommendation: 'hero' | 'supporting' | 'discard' =
-        finalScore >= 70 ? 'hero' :
-        finalScore >= 45 ? 'supporting' : 'discard'
-
-      resolve({ sharpness, exposure, composition, faces, resolution, finalScore, recommendation })
-    }
-    img.onerror = () => resolve(defaultScore())
-    img.src = src
-  })
+/** Tamaño de la muestra para una foto de `w`×`h`. */
+export function sampleSize(w: number, h: number): { w: number; h: number } {
+  const scale = Math.min(SCORE_SAMPLE / w, SCORE_SAMPLE / h)
+  return { w: Math.max(1, Math.floor(w * scale)), h: Math.max(1, Math.floor(h * scale)) }
 }
 
-function defaultScore(): PhotoScore {
+/**
+ * `pixels` es la muestra RGBA (ver sampleSize); `srcW`×`srcH`, el tamaño de
+ * la foto que se puntúa (de él sale la nota de resolución).
+ */
+export function scoreFromPixels(pixels: Uint8ClampedArray, w: number, h: number, srcW: number, srcH: number): PhotoScore {
+  const sharpness = measureSharpness(pixels, w, h)
+  const exposure = measureExposure(pixels)
+  const composition = measureComposition(pixels, w, h)
+  const resolution = measureResolution(srcW, srcH)
+  const faces = 0
+  const finalScore = Math.round(sharpness + exposure + composition + faces + resolution)
+  const recommendation: PhotoScore['recommendation'] =
+    finalScore >= 70 ? 'hero' :
+    finalScore >= 45 ? 'supporting' : 'discard'
+  return { sharpness, exposure, composition, faces, resolution, finalScore, recommendation }
+}
+
+export function defaultScore(): PhotoScore {
   return {
     sharpness: 12, exposure: 10, composition: 10,
     faces: 0, resolution: 10, finalScore: 42,
@@ -67,6 +61,7 @@ function measureSharpness(pixels: Uint8ClampedArray, w: number, h: number): numb
       count++
     }
   }
+  if (count === 0) return 0
   return Math.min(25, Math.round((sum / count / 20) * 25))
 }
 
@@ -99,7 +94,7 @@ function measureComposition(pixels: Uint8ClampedArray, w: number, h: number): nu
       }
     }
   }
-
+  if (cCount === 0 || bCount === 0) return 0
   const contrast = Math.abs(cBright / cCount - bBright / bCount)
   return Math.min(20, Math.round((contrast / 50) * 20))
 }

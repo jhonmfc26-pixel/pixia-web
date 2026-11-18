@@ -17,7 +17,9 @@ import './studio.css'
  * dentro de cada sección (secciones altas con un escenario "sticky").
  */
 
-const IMG = (name: string) => `/showcase/${name}.jpg`
+// WebP de 1024 px (~65 % menos que los JPG originales): en pantalla ninguna
+// pasa de ~430 px de ancho.
+const IMG = (name: string) => `/showcase/${name}.webp`
 
 export default function StudioHome() {
   const root = useRef<HTMLDivElement>(null)
@@ -83,7 +85,7 @@ export default function StudioHome() {
             <div className="st-cover" data-ref="heroCover">
               <div className="st-face st-cover-front">
                 <span className="st-grain" />
-                <img src={IMG('playa')} alt="Álbum Pixia de boda, tapa dura con foto" style={{ objectPosition: '62% 50%' }} />
+                <img src={IMG('playa')} alt="Álbum Pixia de boda, tapa dura con foto" fetchPriority="high" style={{ objectPosition: '62% 50%' }} />
                 <div className="st-title-on-cover"><b>Nuestra boda</b><span>Laura &amp; Andrés · 2026</span></div>
               </div>
               <div className="st-face st-cover-inside st-cloth">
@@ -125,7 +127,7 @@ export default function StudioHome() {
           <div className="st-spread" data-ref="spread" />
           {PROCESS_PHOTOS.map((n, i) => (
             <div key={i} className="st-print" data-print={i}>
-              <img src={IMG(n)} alt="" />
+              <img loading="lazy" decoding="async" src={IMG(n)} alt="" />
               {i === 0 && <span className="st-star" data-ref="star" aria-hidden>★</span>}
             </div>
           ))}
@@ -147,7 +149,7 @@ export default function StudioHome() {
             <div className="st-cover">
               <div className="st-face st-cover-front">
                 <span className="st-grain" />
-                <img src={IMG('boda-beso')} alt="" style={{ objectPosition: '50% 35%' }} />
+                <img loading="lazy" decoding="async" src={IMG('boda-beso')} alt="" style={{ objectPosition: '50% 35%' }} />
                 <div className="st-title-on-cover"><b>Nuestra boda</b></div>
               </div>
             </div>
@@ -191,7 +193,7 @@ function FormatSlot({ format: f }: { format: AlbumFormat }) {
             <div className="st-face st-cover-front">
               <span className="st-grain" />
               {f.id === '30x30' && <>
-                <img src={IMG('boda-paseo')} alt="Álbum grande 30 × 30 de boda" style={{ objectPosition: '50% 40%' }} />
+                <img loading="lazy" decoding="async" src={IMG('boda-paseo')} alt="Álbum grande 30 × 30 de boda" style={{ objectPosition: '50% 40%' }} />
                 <div className="st-title-on-cover"><b>Laura &amp; Andrés</b></div>
               </>}
               {f.id === '20x20' && (
@@ -206,7 +208,7 @@ function FormatSlot({ format: f }: { format: AlbumFormat }) {
                 </div>
               )}
               {f.id === '21x28' && <>
-                <img src={IMG('viaje-carretera')} alt="Álbum vertical 21 × 28 de viaje" style={{ objectPosition: '70% 50%' }} />
+                <img loading="lazy" decoding="async" src={IMG('viaje-carretera')} alt="Álbum vertical 21 × 28 de viaje" style={{ objectPosition: '70% 50%' }} />
                 <div className="st-title-on-cover"><b>Ruta al desierto</b><span>Agosto 2026</span></div>
               </>}
             </div>
