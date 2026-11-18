@@ -1,7 +1,8 @@
 'use client'
 import { useState, useCallback } from 'react'
 import { readExif, type ExifData } from './exifReader'
-import { scorePhoto, type PhotoScore } from './photoScorer'
+import type { PhotoScore } from './photoScorer'
+import { quickAnalysis } from './quickAnalysis'
 import { MAX_PHOTOS } from '@/core/modules/upload/limits'
 import { classifyOrientation } from '@/core/modules/album/photoGeometry'
 import type { MeaningRegion } from '@/core/contracts/AlbumBlueprint'
@@ -62,13 +63,16 @@ export function usePhotoAnalysis() {
           const globalIdx = i + batchIdx
 
           const exif = await readExif(file)
-          const src = await compressFile(file, 800, 0.75)
-          const dims = await getImageDimensions(src)
+          // Una sola decodificación por foto y fuera del hilo principal; la
+          // grilla ya la pidió para su miniatura y se reusa (quickAnalysis.ts).
+          const quick = await quickAnalysis(file)
+          const src = quick.thumbnail ?? ''
+          const dims = { width: quick.width, height: quick.height }
 
           const ratio = dims.width / dims.height
           const orientation = classifyOrientation(ratio)
 
-          const score = await scorePhoto(src)
+          const score = quick.score
           // TODO: reemplazar por face-api.js/MediaPipe cuando esté integrado.
           // FaceDetector (Shape Detection API) no está disponible en la mayoría de
           // navegadores sin flags experimentales — omitir la llamada evita el fallback
@@ -176,66 +180,4 @@ async function detectFaces(src: string, imgW: number, imgH: number): Promise<Mea
   } catch {
     return []
   }
-}
-
-async function compressFile(file: File, maxSize: number, quality: number): Promise<string> {
-  if (typeof window === 'undefined') return ''
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const img = new window.Image()
-    let settled = false
-
-    const cleanup = () => {
-      if (settled) return
-      settled = true
-      clearTimeout(timeoutId)
-      URL.revokeObjectURL(url)
-    }
-
-    const timeoutId = setTimeout(() => {
-      if (settled) return
-      cleanup()
-      reject(new Error(`compress timeout: ${file.name}`))
-    }, 10000)
-
-    img.onload = () => {
-      try {
-        let { width, height } = img
-        if (width > height && width > maxSize) {
-          height = Math.round(height * maxSize / width)
-          width = maxSize
-        } else if (height > maxSize) {
-          width = Math.round(width * maxSize / height)
-          height = maxSize
-        }
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')!
-        ctx.drawImage(img, 0, 0, width, height)
-        const dataUrl = canvas.toDataURL('image/jpeg', quality)
-        cleanup()
-        resolve(dataUrl)
-      } catch {
-        cleanup()
-        reject(new Error(`compress canvas failed: ${file.name}`))
-      }
-    }
-
-    img.onerror = () => {
-      cleanup()
-      reject(new Error(`compress failed: ${file.name}`))
-    }
-
-    img.src = url
-  })
-}
-
-async function getImageDimensions(src: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    const img = new window.Image()
-    img.onload = () => resolve({ width: img.width, height: img.height })
-    img.onerror = () => resolve({ width: 0, height: 0 })
-    img.src = src
-  })
 }

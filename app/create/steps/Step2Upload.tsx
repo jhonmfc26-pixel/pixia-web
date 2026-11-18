@@ -20,6 +20,7 @@ import { useSession } from "@/core/modules/session/useSession";
 import { MIN_PHOTOS, MAX_PHOTOS } from "@/core/modules/upload/limits";
 import { normalizeFiles, isHeicFile } from "@/core/modules/upload/normalizeFiles";
 import { hashFileContent } from "@/core/modules/upload/contentHash";
+import { quickAnalysis } from "@/core/modules/scoring/quickAnalysis";
 import { mergePhotoAnalysis, mergeR2Photos, readPhotoAnalysis, type PhotoAnalysisEntry } from "@/core/modules/upload/photoSession";
 import { estimateAlbumPages } from "@/core/modules/album/estimatePages";
 import { PAGES_INCLUDED, formatCop, getFormat } from "@/lib/formats";
@@ -28,34 +29,20 @@ import { PRICING } from "@/lib/wompi";
 /** Fotos que se pueden marcar como favoritas (van más grandes en el álbum). */
 const MAX_FAVORITES = 5;
 
-// Genera thumbnail 150x150 base64 (~8-12KB por foto) para grids rápidos
-async function generateThumbnail(file: File, maxSize = 150): Promise<string | null> {
-  try {
-    return await new Promise((resolve, reject) => {
-      const img = new window.Image()
-      const url = URL.createObjectURL(file)
-      img.onload = () => {
-        const ratio = img.width / img.height
-        let w = maxSize, h = maxSize
-        if (ratio > 1) h = Math.round(maxSize / ratio)
-        else w = Math.round(maxSize * ratio)
-        const canvas = document.createElement('canvas')
-        canvas.width = w
-        canvas.height = h
-        const ctx = canvas.getContext('2d')!
-        ctx.drawImage(img, 0, 0, w, h)
-        URL.revokeObjectURL(url)
-        resolve(canvas.toDataURL('image/jpeg', 0.6))
-      }
-      img.onerror = () => {
-        URL.revokeObjectURL(url)
-        reject(new Error('thumbnail gen failed'))
-      }
-      img.src = url
-    })
-  } catch {
-    return null
-  }
+// Miniatura de 150 px para la grilla. Sale del mismo análisis que el
+// puntaje (una sola decodificación por foto, fuera del hilo principal).
+function generateThumbnail(file: File): Promise<string | null> {
+  return quickAnalysis(file).then(a => a.thumbnail, () => null)
+}
+
+/** Como Promise.all(items.map(fn)), pero con a lo sumo `limit` en curso. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i]) }
+  }))
+  return out
 }
 
 type ImageFormat = 'jpeg' | 'png' | 'webp' | 'heic' | 'unknown'
@@ -235,7 +222,8 @@ export default function Step2Upload() {
         // Deduplicar por contenido (SHA-256): mismo archivo elegido 2 veces en
         // este lote, o una foto que ya está en el álbum de esta sesión — no se
         // sube de nuevo. Regla: cero fotos repetidas.
-        const validHashes = await Promise.all(validFiles.map(hashFileContent))
+        // De a pocas: leer 100 fotos de 4 MB a la vez son 400 MB en memoria.
+        const validHashes = await mapLimit(validFiles, 3, hashFileContent)
         const existingHashes = new Set(
           photos.map(p => p.contentHash).filter((h): h is string => !!h)
         )

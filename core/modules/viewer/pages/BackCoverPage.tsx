@@ -1,4 +1,6 @@
+'use client'
 import type { CoverConfig } from '@/core/contracts/AlbumBlueprint'
+import { usePhotoQuality } from '@/core/modules/viewer/PhotoQualityContext'
 
 interface BackCoverPageProps {
   style?: string
@@ -12,8 +14,18 @@ interface BackCoverPageProps {
 
 const BACK = '#111111'
 
+/**
+ * Logo de imprenta (1024 px, 1,3 MB) y su copia para pantalla (512 px, 28 KB):
+ * el mismo dibujo, solo que la de pantalla no se descarga entera en el
+ * celular cada vez que se abre un álbum. Va con la versión que pida la página,
+ * igual que las fotos (PhotoQualityContext): el PDF siempre usa la grande.
+ */
+const LOGO_PRINT = 'https://assets.pixiaa.com/logo-pixia.png'
+const LOGO_SCREEN = '/logo-pixia-pantalla.webp'
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function BackCoverPage(_props: BackCoverPageProps) {
+  const quality = usePhotoQuality()
   return (
     <div style={{
       width: '100%', height: '100%', position: 'relative', background: BACK,
@@ -35,7 +47,7 @@ export default function BackCoverPage(_props: BackCoverPageProps) {
           de opacidad, una "P" de ~14 mm casi invisible (Jhon, 2026-11-09). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://assets.pixiaa.com/logo-pixia.png"
+        src={quality === 'display' ? LOGO_SCREEN : LOGO_PRINT}
         alt="Pixia"
         style={{ width: '26cqw', height: 'auto', opacity: 0.92 }}
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}

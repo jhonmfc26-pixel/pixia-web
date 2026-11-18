@@ -10,29 +10,48 @@ export interface ExifData {
 // Contador a nivel de módulo — loguea solo las primeras 3 fotos por sesión de análisis
 let _exifLogCount = 0
 
-export async function readExif(file: File): Promise<ExifData> {
-  const empty: ExifData = { takenAt: null }
-  const logThis = ++_exifLogCount <= 3
+/** Los datos EXIF van al principio del archivo: casi siempre basta con leer esto. */
+const HEAD_BYTES = 512 * 1024
+/** El trozo leído no alcanzó: hay que leer el archivo entero. */
+const INCOMPLETE = Symbol('incompleto')
 
+export async function readExif(file: File): Promise<ExifData> {
+  const logThis = ++_exifLogCount <= 3
+  // Primero solo el principio (una foto de celular pesa 3–5 MB y se leen
+  // decenas seguidas); si no alcanza, el archivo entero, como antes.
+  if (file.size > HEAD_BYTES) {
+    const head = await readExifFrom(await file.slice(0, HEAD_BYTES).arrayBuffer().catch(() => null), file.name, logThis, true)
+    if (head !== INCOMPLETE) return head
+  }
+  const full = await readExifFrom(await file.arrayBuffer().catch(() => null), file.name, logThis, false)
+  return full === INCOMPLETE ? { takenAt: null } : full
+}
+
+async function readExifFrom(
+  buffer: ArrayBuffer | null, name: string, logThis: boolean, partial: boolean,
+): Promise<ExifData | typeof INCOMPLETE> {
+  const empty: ExifData = { takenAt: null }
+  if (!buffer) return partial ? INCOMPLETE : empty
   try {
-    const buffer = await file.arrayBuffer()
     const view = new DataView(buffer)
 
     if (view.getUint16(0) !== 0xFFD8) {
-      if (logThis) console.log('[EXIF] sin segmento JPEG (no 0xFFD8):', file.name)
+      if (logThis) console.log('[EXIF] sin segmento JPEG (no 0xFFD8):', name)
       return empty
     }
 
     let offset = 2
     while (offset < view.byteLength - 2) {
+      if (partial && offset + 4 > view.byteLength) return INCOMPLETE
       const marker = view.getUint16(offset)
       const length = view.getUint16(offset + 2)
 
       if (marker === 0xFFE1) {
+        if (partial && offset + 2 + length > view.byteLength) return INCOMPLETE
         const exifHeader = view.getUint32(offset + 4)
         if (exifHeader === 0x45786966) {
           const result = parseExifIFD(view, offset + 10)
-          if (logThis) console.log('[EXIF]', file.name, {
+          if (logThis) console.log('[EXIF]', name, {
             foundAPP1: true,
             takenAt: result.takenAt ?? null,
             gps: result.lat != null ? { lat: result.lat, lng: result.lng } : null,
@@ -44,11 +63,12 @@ export async function readExif(file: File): Promise<ExifData> {
       if (marker === 0xFFDA) break
       offset += 2 + length
     }
+    if (partial && offset >= view.byteLength - 2) return INCOMPLETE
 
-    if (logThis) console.log('[EXIF] sin segmento Exif (APP1 no encontrado):', file.name)
+    if (logThis) console.log('[EXIF] sin segmento Exif (APP1 no encontrado):', name)
     return empty
   } catch {
-    return empty
+    return partial ? INCOMPLETE : empty
   }
 }
 
