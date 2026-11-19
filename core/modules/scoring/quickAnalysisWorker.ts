@@ -5,6 +5,8 @@
 // principal (miniatura temprana, copia de 800 px para medir, miniatura otra
 // vez): con 40 fotos la pantalla quedaba congelada casi un minuto en un
 // celular medio.
+// La página manda de a una foto por worker y espera la respuesta: nunca hay
+// más de una foto entera en memoria por worker.
 import {
   THUMB_QUALITY, ANALYSIS_QUALITY, thumbSize, analysisSize,
 } from './quickAnalysisShared'
@@ -12,9 +14,6 @@ import {
 interface Job {
   id: string
   file: File
-  /** Dimensiones de la foto ya orientada (según la vio una <img> en la página). */
-  width: number
-  height: number
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,16 +58,19 @@ function canvas2d(w: number, h: number, willReadFrequently = false) {
 }
 
 ctx.onmessage = async (e: MessageEvent<Job>) => {
-  const { id, file, width, height } = e.data
+  const { id, file } = e.data
   const opened: ImageBitmap[] = []
   try {
     if (!(await appliesOrientation())) {
       ctx.postMessage({ id, mismatch: true })
       return
     }
-    const a = analysisSize(width, height)
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
     opened.push(bitmap)
+    // Ya orientada (lo confirmó la prueba de arriba): las mismas medidas que
+    // vería una <img> en la página. La página no carga la foto para nada.
+    const width = bitmap.width, height = bitmap.height
+    const a = analysisSize(width, height)
 
     // Copia de análisis de 800 px, como siempre. Se decodifica la foto entera
     // (no ya reducida): así la copia sale idéntica a la de antes y el puntaje
@@ -87,7 +89,10 @@ ctx.onmessage = async (e: MessageEvent<Job>) => {
     // puntaje sale idéntico; es poco trabajo.
     const analysisCopy = await mid.c.convertToBlob({ type: 'image/jpeg', quality: ANALYSIS_QUALITY })
 
-    ctx.postMessage({ id, thumbnail, analysisCopy })
+    // La foto entera se suelta antes de responder: en un iPhone la memoria
+    // es lo que cierra la pestaña.
+    opened.forEach(b => b.close()); opened.length = 0
+    ctx.postMessage({ id, width, height, thumbnail, analysisCopy })
   } catch (err) {
     ctx.postMessage({ id, error: err instanceof Error ? err.message : 'error en el worker' })
   } finally {
