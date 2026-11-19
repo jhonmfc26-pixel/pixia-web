@@ -5,10 +5,16 @@
  *
  * - Una sola pasada por foto: la grilla (miniatura temprana) y el análisis
  *   piden lo mismo y comparten el resultado.
- * - Dos workers y una cola: nunca se decodifican decenas de fotos de 12 MP a
- *   la vez (en un iPhone eso puede cerrar la pestaña por memoria).
- * - Sin workers (navegadores viejos), o si el worker ve la foto de lado, lo
- *   hace el hilo principal, de a una foto y con una sola decodificación.
+ * - MEMORIA: como mucho POOL_SIZE fotos en proceso a la vez, en todo el
+ *   módulo. La grilla pide las 100 miniaturas de golpe; si cada pedido
+ *   cargara su foto en una <img> mientras espera turno, un iPhone decodifica
+ *   decenas de fotos de 12 MP a la vez, se queda sin memoria y Safari
+ *   recarga la pestaña (el cliente vuelve al paso 1). Por eso las fotos
+ *   esperan en una cola SIN cargarse, y en el camino del worker la página no
+ *   las carga nunca: el worker mide la foto él mismo.
+ * - Sin workers (navegadores viejos), o si el navegador no aplica la
+ *   orientación EXIF dentro del worker, lo hace la página: de a una foto, y
+ *   la <img> se suelta apenas termina.
  */
 import { defaultScore } from './photoScorer'
 import {
@@ -17,7 +23,14 @@ import {
 
 export type { QuickAnalysis } from './quickAnalysisShared'
 
-const POOL_SIZE = 2
+/** iPhone y iPad (incluido el iPad que se presenta como Mac): menos memoria por pestaña. */
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+/** Fotos en proceso a la vez (cada una ocupa ~50 MB decodificada). */
+const POOL_SIZE = isIOS() ? 1 : 2
 const WORKER_TIMEOUT_MS = 30_000
 
 const memo = new WeakMap<File, Promise<QuickAnalysis>>()
@@ -26,7 +39,7 @@ const memo = new WeakMap<File, Promise<QuickAnalysis>>()
 export function quickAnalysis(file: File): Promise<QuickAnalysis> {
   let p = memo.get(file)
   if (!p) {
-    p = run(file)
+    p = limited(() => run(file))
     memo.set(file, p)
     // Si falla, que un próximo intento (otra tanda) pueda volver a probar.
     p.catch(() => memo.delete(file))
@@ -34,57 +47,46 @@ export function quickAnalysis(file: File): Promise<QuickAnalysis> {
   return p
 }
 
+// ── Cola: a lo sumo POOL_SIZE fotos en proceso ──────────────────────────────
+
+let active = 0
+const waiting: Array<() => void> = []
+
+async function limited<T>(job: () => Promise<T>): Promise<T> {
+  if (active >= POOL_SIZE) await new Promise<void>(resolve => waiting.push(resolve))
+  active++
+  try {
+    return await job()
+  } finally {
+    active--
+    waiting.shift()?.()
+  }
+}
+
 async function run(file: File): Promise<QuickAnalysis> {
-  const { width, height, img } = await loadImage(file)
-  const size = analysisSize(width, height)
   if (workersAvailable()) {
     try {
-      const r = await inWorker(file, width, height)
+      const r = await inWorker(file)
       if (r) {
-        releaseImage(img)
+        const size = analysisSize(r.width, r.height)
         const url = URL.createObjectURL(r.analysisCopy)
         try {
-          return { width: size.w, height: size.h, thumbnail: r.thumbnail, score: await scoreCopy(await loadSrc(url), width, height) }
+          return { width: size.w, height: size.h, thumbnail: r.thumbnail, score: await scoreCopy(await loadSrc(url), r.width, r.height) }
         } finally { URL.revokeObjectURL(url) }
       }
     } catch (err) {
       console.warn('[quickAnalysis] worker falló, sigue en la página:', file.name, err)
     }
   }
-  return onMainThread(img, width, height, size)
-}
-
-/**
- * Carga la foto en una <img> solo para leer sus dimensiones ya orientadas:
- * el navegador no la decodifica entera mientras no se dibuje.
- */
-function loadImage(file: File): Promise<{ width: number; height: number; img: HTMLImageElement }> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const img = new window.Image()
-    const timeout = setTimeout(() => { URL.revokeObjectURL(url); reject(new Error(`no cargó: ${file.name}`)) }, 15_000)
-    img.onload = () => {
-      clearTimeout(timeout)
-      const width = img.naturalWidth, height = img.naturalHeight
-      if (!width || !height) { URL.revokeObjectURL(url); reject(new Error(`sin dimensiones: ${file.name}`)); return }
-      // La URL sigue viva por si hace falta el respaldo; se libera al terminar.
-      img.dataset.blobUrl = url
-      resolve({ width, height, img })
-    }
-    img.onerror = () => { clearTimeout(timeout); URL.revokeObjectURL(url); reject(new Error(`no se pudo leer: ${file.name}`)) }
-    img.src = url
-  })
-}
-
-function releaseImage(img: HTMLImageElement) {
-  const url = img.dataset.blobUrl
-  if (url) { URL.revokeObjectURL(url); delete img.dataset.blobUrl }
-  img.removeAttribute('src')
+  return onMainThread(file)
 }
 
 // ── Workers ─────────────────────────────────────────────────────────────────
 
 interface WorkerResult {
+  /** Medidas de la foto ya orientada. */
+  width: number
+  height: number
   thumbnail: string | null
   /** Copia de análisis de 800 px en JPEG 0,75: de ella sale el puntaje. */
   analysisCopy: Blob
@@ -111,14 +113,15 @@ function getPool(): Worker[] {
     for (let i = 0; i < POOL_SIZE; i++) {
       const w = new Worker(new URL('./quickAnalysisWorker.ts', import.meta.url), { type: 'module' })
       w.onmessage = (e: MessageEvent) => {
-        const { id, thumbnail, analysisCopy, mismatch, error } = e.data || {}
+        const { id, width, height, thumbnail, analysisCopy, mismatch, error } = e.data || {}
         const job = pending.get(id)
         if (!job) return
         pending.delete(id)
         clearTimeout(job.timer)
         if (error) job.reject(new Error(error))
         else if (mismatch) job.resolve(null)
-        else job.resolve({ thumbnail: thumbnail ?? null, analysisCopy })
+        else if (!width || !height) job.reject(new Error('sin medidas'))
+        else job.resolve({ width, height, thumbnail: thumbnail ?? null, analysisCopy })
       }
       w.onerror = (e) => {
         // El worker no arrancó (o se cayó): todo pasa al respaldo.
@@ -132,7 +135,7 @@ function getPool(): Worker[] {
   return pool
 }
 
-function inWorker(file: File, width: number, height: number) {
+function inWorker(file: File) {
   const workers = getPool()
   const id = `qa-${counter++}`
   const worker = workers[counter % workers.length]
@@ -141,42 +144,52 @@ function inWorker(file: File, width: number, height: number) {
       if (pending.delete(id)) reject(new Error('tiempo agotado'))
     }, WORKER_TIMEOUT_MS)
     pending.set(id, { resolve, reject, timer })
-    worker.postMessage({ id, file, width, height })
+    worker.postMessage({ id, file })
   })
 }
 
-// ── Respaldo en el hilo principal: de a una foto ────────────────────────────
+// ── Respaldo en el hilo principal ───────────────────────────────────────────
 
-let mainQueue: Promise<unknown> = Promise.resolve()
+/** Una foto a la vez (la cola de arriba ya limita); la <img> se suelta al terminar. */
+async function onMainThread(file: File): Promise<QuickAnalysis> {
+  const url = URL.createObjectURL(file)
+  const img = new window.Image()
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(`no cargó: ${file.name}`)), 15_000)
+      img.onload = () => { clearTimeout(timeout); resolve() }
+      img.onerror = () => { clearTimeout(timeout); reject(new Error(`no se pudo leer: ${file.name}`)) }
+      img.src = url
+    })
+    const width = img.naturalWidth, height = img.naturalHeight
+    if (!width || !height) throw new Error(`sin dimensiones: ${file.name}`)
+    const size = analysisSize(width, height)
 
-function onMainThread(img: HTMLImageElement, width: number, height: number, size: { w: number; h: number }): Promise<QuickAnalysis> {
-  const job = mainQueue.then(async () => {
+    let thumbnail: string | null = null
     try {
-      let thumbnail: string | null = null
-      try {
-        const t = thumbSize(width, height)
-        const c = document.createElement('canvas')
-        c.width = t.w; c.height = t.h
-        c.getContext('2d')!.drawImage(img, 0, 0, t.w, t.h)
-        thumbnail = c.toDataURL('image/jpeg', THUMB_QUALITY)
-      } catch { /* sin miniatura: la grilla muestra el esqueleto */ }
+      const t = thumbSize(width, height)
+      const c = document.createElement('canvas')
+      c.width = t.w; c.height = t.h
+      c.getContext('2d')!.drawImage(img, 0, 0, t.w, t.h)
+      thumbnail = c.toDataURL('image/jpeg', THUMB_QUALITY)
+    } catch { /* sin miniatura: la grilla muestra el esqueleto */ }
 
-      let score = defaultScore()
-      try {
-        // Igual que siempre: copia JPEG de 800 px y de ahí la medición.
-        const midCanvas = document.createElement('canvas')
-        midCanvas.width = size.w; midCanvas.height = size.h
-        midCanvas.getContext('2d')!.drawImage(img, 0, 0, size.w, size.h)
-        score = await scoreCopy(await loadSrc(midCanvas.toDataURL('image/jpeg', ANALYSIS_QUALITY)), width, height)
-      } catch { /* puntaje neutro */ }
+    let score = defaultScore()
+    try {
+      // Igual que siempre: copia JPEG de 800 px y de ahí la medición.
+      const midCanvas = document.createElement('canvas')
+      midCanvas.width = size.w; midCanvas.height = size.h
+      midCanvas.getContext('2d')!.drawImage(img, 0, 0, size.w, size.h)
+      const copy = midCanvas.toDataURL('image/jpeg', ANALYSIS_QUALITY)
+      midCanvas.width = 0; midCanvas.height = 0
+      score = await scoreCopy(await loadSrc(copy), width, height)
+    } catch { /* puntaje neutro */ }
 
-      return { width: size.w, height: size.h, thumbnail, score }
-    } finally {
-      releaseImage(img)
-    }
-  })
-  mainQueue = job.catch(() => undefined)
-  return job
+    return { width: size.w, height: size.h, thumbnail, score }
+  } finally {
+    URL.revokeObjectURL(url)
+    img.removeAttribute('src')
+  }
 }
 
 function loadSrc(src: string): Promise<HTMLImageElement> {
@@ -203,5 +216,7 @@ async function scoreCopy(copy: HTMLImageElement, width: number, height: number) 
     return scoreSample(cx.getImageData(0, 0, s.w, s.h).data, s.w, s.h, width, height)
   } catch {
     return defaultScore()
+  } finally {
+    copy.removeAttribute('src')
   }
 }
