@@ -3,7 +3,6 @@ import { isAdminRequest } from '@/lib/admin/auth'
 import { isPqrStatus } from '@/lib/pqr'
 import { updatePqr } from '@/lib/pqrData'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /** POST del formulario de respuesta en /admin/pqr/<radicado>. */

@@ -41,7 +41,7 @@ export async function listStorageReports(limit = 30): Promise<StorageReport[]> {
 export async function requestStorageMeasure(): Promise<{ ok: true } | { ok: false; error: string }> {
   const base = process.env.PDF_CONTAINER_URL
   const secret = process.env.PDF_CONTAINER_SECRET
-  if (!base || !secret) return { ok: false, error: 'Faltan PDF_CONTAINER_URL y/o PDF_CONTAINER_SECRET en Cloudflare Pages.' }
+  if (!base || !secret) return { ok: false, error: 'Faltan PDF_CONTAINER_URL y/o PDF_CONTAINER_SECRET en las variables del Worker de Cloudflare.' }
   try {
     const res = await fetch(new URL('/storage-cleanup?mode=prueba', base), {
       method: 'POST',

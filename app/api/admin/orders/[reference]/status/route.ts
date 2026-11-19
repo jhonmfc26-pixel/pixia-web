@@ -3,7 +3,6 @@ import { isAdminRequest } from '@/lib/admin/auth'
 import { updatePrintStatus } from '@/lib/admin/data'
 import { isPrintStatus } from '@/lib/orderStatus'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /** POST desde el formulario "Estado del pedido" del detalle en el admin. */

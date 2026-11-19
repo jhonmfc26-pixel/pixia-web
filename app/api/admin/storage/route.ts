@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isAdminRequest } from '@/lib/admin/auth'
 import { requestStorageMeasure } from '@/lib/admin/storage'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /** POST del botón "Medir ahora" en /admin/almacenamiento (modo prueba: no borra nada). */

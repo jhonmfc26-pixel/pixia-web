@@ -32,7 +32,7 @@ export function launchChecks(env: Env = process.env, legal: Record<string, strin
   // ── Pagos
   const wompi = wompiSetup(env)
   if (wompi.mode === 'produccion') add('Pagos', 'Wompi en producción', 'ok', 'Las cuatro llaves son de producción: los pagos son reales.')
-  else if (wompi.mode === 'pruebas') add('Pagos', 'Wompi en modo de pruebas', 'aviso', 'Las llaves son de sandbox: no se cobra dinero real. Para vender, pon las cuatro llaves de producción en Cloudflare Pages (entorno Production) y vuelve a desplegar.')
+  else if (wompi.mode === 'pruebas') add('Pagos', 'Wompi en modo de pruebas', 'aviso', 'Las llaves son de sandbox: no se cobra dinero real. Para vender, pon las cuatro llaves de producción en las variables del Worker de Cloudflare y vuelve a desplegar (la pública, NEXT_PUBLIC_WOMPI_PUBLIC_KEY, también como variable de compilación).')
   else add('Pagos', 'Wompi mal configurado', 'falta', wompi.problems.join(' '))
 
   // ── Correos
