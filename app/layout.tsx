@@ -46,6 +46,39 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/**
+ * Página vieja después de un despliegue. Cloudflare solo sirve los archivos
+ * (estilos y JS, con nombre por versión) del despliegue actual. Una página
+ * abierta desde antes, o que el navegador restaura de su copia (Chrome en
+ * iPhone lo hace al reabrir una pestaña), pide archivos que ya no existen:
+ * queda sin estilos y sin responder. Si falla un archivo propio, se recarga
+ * la página una vez (como mucho una por minuto, para no entrar en bucle).
+ */
+const STALE_PAGE_GUARD = `(function(){
+  var KEY = 'pixia_recarga_despliegue';
+  function reloadOnce() {
+    try {
+      var last = +sessionStorage.getItem(KEY) || 0;
+      if (Date.now() - last < 60000) return;
+      sessionStorage.setItem(KEY, String(Date.now()));
+    } catch (e) { return; }
+    location.reload();
+  }
+  function ours(u) { return typeof u === 'string' && u.indexOf('/_next/static/') !== -1; }
+  addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t !== window && (t.tagName === 'LINK' || t.tagName === 'SCRIPT') && ours(t.href || t.src)) reloadOnce();
+  }, true);
+  addEventListener('unhandledrejection', function (e) {
+    var m = String((e.reason && (e.reason.message || e.reason.name)) || '');
+    if (/ChunkLoadError|Loading chunk|Failed to load chunk|dynamically imported module|Importing a module script failed/i.test(m)) reloadOnce();
+  });
+  addEventListener('load', function () {
+    var links = document.querySelectorAll('link[rel="stylesheet"]');
+    for (var i = 0; i < links.length; i++) if (ours(links[i].href) && !links[i].sheet) return reloadOnce();
+  });
+})();`;
+
 export default function RootLayout({
   children,
 }: {
@@ -53,6 +86,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es-CO">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: STALE_PAGE_GUARD }} />
+      </head>
       <body className="bg-gradient-to-br from-black via-zinc-900 to-black text-white min-h-screen" suppressHydrationWarning>
         {children}
       </body>
