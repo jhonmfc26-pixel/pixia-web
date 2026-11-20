@@ -8,7 +8,8 @@ import {
 } from '@dnd-kit/core'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
 import type { AlbumStructure, Face } from '../types'
-import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { AlbumStyle, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import { PageMargin, faceHasPageMargin } from '@/core/modules/viewer/SpreadFaces'
 import type { SelState } from './selectionTypes'
 import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
 import PixiaImage from '@/components/ui/PixiaImage'
@@ -303,11 +304,13 @@ interface FoldStructureViewerProps {
   onFoldChange: (idx: number) => void
   /** Reordena fotos DENTRO de una misma cara (drag) — no cambia el layout. */
   onReorder: (faceId: string, fromIndex: number, toIndex: number) => void
+  /** Márgenes de página del álbum: el editor muestra lo mismo que el visor y el PDF. */
+  pageStyle?: AlbumStyle
 }
 
 export default function FoldStructureViewer({
   structure, photosById, sel, onSel, showGutter = true,
-  currentFold, onFoldChange, onReorder,
+  currentFold, onFoldChange, onReorder, pageStyle = 'sin-margen',
 }: FoldStructureViewerProps) {
 
   // ── Fit-contain sizing ─────────────────────────────────────────────────────
@@ -381,7 +384,10 @@ export default function FoldStructureViewer({
           : PANEL_SHADOW,
       }}
     >
-      <FaceReadView face={face} photosById={photosById} sel={sel} onSel={onSel} onReorder={onReorder} />
+      {/* Mismo margen de página que el visor y el PDF (PageMargin). */}
+      <PageMargin show={faceHasPageMargin(face, pageStyle)}>
+        <FaceReadView face={face} photosById={photosById} sel={sel} onSel={onSel} onReorder={onReorder} />
+      </PageMargin>
     </div>
   )
 

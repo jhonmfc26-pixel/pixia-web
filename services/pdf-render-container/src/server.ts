@@ -69,6 +69,8 @@ interface RenderInteriorBody {
   photos: Record<string, PhotoAsset>
   format: string
   baseUrl: string
+  /** Márgenes de página; sin él, a sangre. */
+  style?: string
 }
 
 interface RenderCoverBody {
@@ -98,7 +100,7 @@ app.post('/render-interior', async (req, res) => {
   await jobs.startInteriorJob(albumId)
   try {
     const started = Date.now()
-    const result = await renderInteriorPdf(structure, photosById, format, baseUrl)
+    const result = await renderInteriorPdf(structure, photosById, format, baseUrl, body.style === 'con-margen' ? 'con-margen' : 'sin-margen')
     const elapsedMs = Date.now() - started
     for (const w of result.warnings) {
       console.warn(`[pdf-render-container] ${albumId} interior: foto ${w.photoId} a ${w.effectiveDpi} DPI (objetivo ${w.targetDpi})`)

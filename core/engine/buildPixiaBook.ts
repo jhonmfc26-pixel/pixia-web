@@ -299,6 +299,8 @@ export async function buildPixiaBookWithAI(draft: AlbumDraft): Promise<PixiaBook
     },
     occasion: occasionFromStory(draft.story),
     format: formatOfBook(draft.format).blueprintFormat,
+    // Álbum nuevo: fotos hasta el borde, salvo que el cliente pida margen.
+    style: draft.style === 'con-margen' ? 'con-margen' : 'sin-margen',
     cover: {
       title,
       subtitle: draft.subtitle?.trim() || undefined,

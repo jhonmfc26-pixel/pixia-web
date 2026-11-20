@@ -64,6 +64,8 @@ type WizardState = {
   formatChosen: boolean;
   photos: PhotoItem[];
   cover?: CoverDraft;
+  /** Páginas interiores: fotos hasta el borde (sin-margen) o con margen blanco. */
+  pageStyle: "sin-margen" | "con-margen";
 };
 
 type WizardAction =
@@ -72,7 +74,8 @@ type WizardAction =
   | { type: "SET_STORY_TYPE"; payload: string }
   | { type: "SET_FORMAT"; payload: AlbumFormatId; /** Solo pruebas internas: permite un formato que todavía no se vende (/create?formato=21x28&prueba=1). */ preview?: boolean }
   | { type: "SET_PHOTOS"; payload: PhotoItem[] }
-  | { type: "SET_COVER"; payload: CoverDraft };
+  | { type: "SET_COVER"; payload: CoverDraft }
+  | { type: "SET_PAGE_STYLE"; payload: "sin-margen" | "con-margen" };
 
 /* =======================
    INITIAL STATE
@@ -82,6 +85,7 @@ const initialState: WizardState = {
   step: 1,
   format: "30x30",
   formatChosen: false,
+  pageStyle: "sin-margen",
   photos: [],
 };
 
@@ -113,6 +117,8 @@ function wizardReducer(
       return { ...state, photos: action.payload };
     case "SET_COVER":
       return { ...state, cover: action.payload };
+    case "SET_PAGE_STYLE":
+      return { ...state, pageStyle: action.payload };
     default:
       return state;
   }

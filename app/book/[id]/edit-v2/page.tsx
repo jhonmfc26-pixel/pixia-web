@@ -27,7 +27,7 @@ import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructu
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { getLocalBook, updateLocalBook } from '@/core/engine/localBookStorage'
 import { isOrdered } from '@/core/modules/album/orderLock'
-import { LayoutGrid, PenLine, Plus, RefreshCw, Star, Trash2, Upload } from 'lucide-react'
+import { LayoutGrid, Maximize, PenLine, Plus, RefreshCw, Square, Star, Trash2, Upload } from 'lucide-react'
 import { LAYOUTS } from '@/core/modules/album/layouts/registry'
 import FoldStructureViewer from '@/core/modules/foldModel/render/FoldStructureViewer'
 import type { SelState } from '@/core/modules/foldModel/render/selectionTypes'
@@ -816,6 +816,13 @@ function EditV2PageInner() {
     })
   }
   const [coverEditorOpen, setCoverEditorOpen] = useState(false)
+  // Márgenes de página: el cliente elige. El editor, el visor y el PDF dibujan
+  // el mismo marco (PageMargin), así que lo que ve acá es lo que se imprime.
+  const togglePageStyle = () => {
+    const next = bookRef.current?.style === 'con-margen' ? 'sin-margen' : 'con-margen'
+    setBook(prev => prev ? { ...prev, style: next } : prev)
+    showToast(next === 'con-margen' ? 'Páginas con margen blanco' : 'Fotos hasta el borde de la página')
+  }
   // ── Cambios sin guardar ────────────────────────────────────────────────────
   // Lo que se guardaría al tocar «Listo» (mismos refs que handleDone). Se
   // compara con lo último guardado (o lo cargado) para avisar antes de salir.
@@ -823,6 +830,7 @@ function EditV2PageInner() {
     structure: structureRef.current,
     cover: coverRef.current ?? bookRef.current?.cover ?? null,
     spreads: bookRef.current?.spreads ?? null,
+    style: bookRef.current?.style ?? null,
   })
   const savedSnapshotRef = useRef<string | null>(null)
   const hasUnsavedChanges = () => savedSnapshotRef.current !== null && editorSnapshot() !== savedSnapshotRef.current
@@ -888,8 +896,8 @@ function EditV2PageInner() {
           key: fold.id, label: `${i + 1}`, aspectRatio: 2 * pageAspect,
           render: (
             <div style={{ display: 'flex', width: '100%', height: '100%', gap: '1px' }}>
-              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={fold.left} photosById={photosById} /></div>
-              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={fold.right} photosById={photosById} /></div>
+              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={fold.left} photosById={photosById} style={book?.style} /></div>
+              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={fold.right} photosById={photosById} style={book?.style} /></div>
             </div>
           ),
         }
@@ -897,7 +905,7 @@ function EditV2PageInner() {
       // composition (hero-spread)
       return { key: fold.id, label: `${i + 1}`, aspectRatio: 2 * pageAspect, render: <HeroSpreadThumbnail face={fold.face} photosById={photosById} /> }
     })
-  }, [structure, photosById, pageAspect])
+  }, [structure, photosById, pageAspect, book?.style])
 
   // Saltar a un pliego desde la tira — mismo reset de selección que usan
   // los botones ‹/› de FoldStructureViewer al navegar.
@@ -1667,6 +1675,32 @@ function EditV2PageInner() {
             </button>
           )}
 
+          {/* Márgenes de página: con margen blanco o fotos hasta el borde */}
+          <button
+            onClick={togglePageStyle}
+            disabled={!book}
+            aria-pressed={book?.style === 'con-margen'}
+            title={book?.style === 'con-margen' ? 'Cambiar a fotos hasta el borde' : 'Cambiar a páginas con margen blanco'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '7px 12px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: '8px',
+              color: 'rgba(255,255,255,0.75)',
+              fontSize: '13px', fontWeight: 500,
+              cursor: book ? 'pointer' : 'default',
+              transition: 'background 0.15s, color 0.15s',
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => { if (book) { e.currentTarget.style.background = 'rgba(232,85,58,0.15)'; e.currentTarget.style.color = '#E8553A' } }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
+          >
+            {book?.style === 'con-margen' ? <Square size={14} strokeWidth={1.5} /> : <Maximize size={14} strokeWidth={1.5} />}
+            <span className="pixia-ed-long">{book?.style === 'con-margen' ? 'Con margen' : 'Sin margen'}</span>
+            <span className="pixia-ed-short">{book?.style === 'con-margen' ? 'Margen' : 'Borde'}</span>
+          </button>
+
           {/* Botón "Editar portada" */}
           <button
             onClick={() => setCoverEditorOpen(true)}
@@ -1806,6 +1840,7 @@ function EditV2PageInner() {
         currentFold={currentFold}
         onFoldChange={setCurrentFold}
         onReorder={handleReorderWithinFace}
+        pageStyle={book?.style}
       />
 
       {/* Hint: visible cuando no hay selección activa */}

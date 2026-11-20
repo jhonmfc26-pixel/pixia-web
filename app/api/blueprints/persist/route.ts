@@ -76,7 +76,8 @@ export async function POST(req: NextRequest) {
     status: blueprint.status === 'preview' ? 'preview' : 'draft',
     occasion: blueprint.occasion,
     format: blueprint.format,
-    style: blueprint.style,
+    // Solo los dos estilos que existen (márgenes de página); sin valor, el de siempre.
+    style: blueprint.style === 'sin-margen' ? 'sin-margen' : 'con-margen',
     page_count: blueprint.pageCount,
     cover: blueprint.cover,
     spreads: blueprint.spreads,

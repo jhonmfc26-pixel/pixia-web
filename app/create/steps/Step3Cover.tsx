@@ -232,6 +232,34 @@ export default function Step3Cover() {
               placeholder={ph.date} onChange={(e) => update({ date: e.target.value })} />
           </label>
 
+          {/* Páginas interiores: fotos hasta el borde o con margen blanco.
+              Se puede cambiar después en el editor; el visor, el editor y el
+              PDF de imprenta muestran siempre lo mismo. */}
+          <div>
+            <span className="mb-2 block text-sm text-white/70">Páginas del álbum</span>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Páginas del álbum">
+              {([
+                { id: "sin-margen", name: "Fotos hasta el borde" },
+                { id: "con-margen", name: "Con margen blanco" },
+              ] as const).map((o) => {
+                const on = state.pageStyle === o.id;
+                return (
+                  <button key={o.id} type="button" role="radio" aria-checked={on}
+                    onClick={() => dispatch({ type: "SET_PAGE_STYLE", payload: o.id })}
+                    className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${on ? "border-[var(--brand-coral)] bg-[var(--brand-coral)]/[0.08]" : "border-white/10 hover:border-white/25"}`}>
+                    {/* Miniatura de una página abierta: dos fotos, con o sin margen */}
+                    <span aria-hidden className={`flex h-8 w-14 shrink-0 gap-px rounded-[3px] bg-[#F9F6F1] ${o.id === "con-margen" ? "p-[3px]" : ""}`}>
+                      <span className="flex-1 rounded-[1px] bg-[#9c8b74]" />
+                      <span className="flex-1 rounded-[1px] bg-[#c4a77d]" />
+                    </span>
+                    <span className={`text-[13px] leading-tight ${on ? "text-white" : "text-white/60"}`}>{o.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <span className="mt-1.5 block text-[12px] text-white/40">Lo puedes cambiar después en el editor.</span>
+          </div>
+
           {kind === "photo" && ordered.length > 1 && (
             <div>
               <span className="mb-2 flex items-baseline justify-between text-sm text-white/70">

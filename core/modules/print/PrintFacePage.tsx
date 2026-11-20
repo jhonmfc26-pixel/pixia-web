@@ -1,4 +1,4 @@
-import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { AlbumStyle, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { Face } from '@/core/modules/foldModel/types'
 import type { PrintProfile } from './printProfiles'
 import { FacePageView, HeroSpreadPageView } from '@/core/modules/viewer/SpreadFaces'
@@ -43,14 +43,21 @@ function PrintPageContainer({ profile, children }: { profile: PrintProfile; chil
  * — mismo componente que usa el viewer, sin el prop `side` (ese solo existe
  * para dibujar la sombra de lomo en pantalla, no aplica impreso).
  */
-export function PrintFace({ face, photosById, profile }: {
+export function PrintFace({ face, photosById, profile, style = 'sin-margen' }: {
   face: Face
   photosById: Map<string, PhotoAsset>
   profile: PrintProfile
+  /** Estilo del álbum: con-margen imprime el mismo marco que se ve en el visor y el editor. */
+  style?: AlbumStyle
 }) {
   return (
     <PrintPageContainer profile={profile}>
-      <FacePageView face={face} photosById={photosById} />
+      <FacePageView
+        face={face}
+        photosById={photosById}
+        style={style}
+        print={{ trimWidthMm: profile.widthMm, trimHeightMm: profile.heightMm, bleedMm: profile.bleedMm }}
+      />
     </PrintPageContainer>
   )
 }

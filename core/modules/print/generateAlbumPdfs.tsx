@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib'
 import type { ReactElement } from 'react'
 import type { AlbumStructure, Face } from '@/core/modules/foldModel/types'
-import type { CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { AlbumStyle, CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { PrintProfile } from './printProfiles'
 import { checkSlotDpi, type DpiWarning } from './dpiCheck'
 import { PrintFace, PrintHeroSpreadHalf } from './PrintFacePage'
@@ -20,6 +20,8 @@ interface GenerateContext {
   renderer: HtmlToPdfRenderer
   /** Origen real de la app — ver wrapPrintPageHtml. */
   baseUrl: string
+  /** Estilo del álbum (márgenes de página). */
+  style?: AlbumStyle
 }
 
 export interface PageDescriptor {
@@ -48,7 +50,7 @@ export interface PageElement {
 export function buildInteriorPages(
   structure: AlbumStructure,
   photosById: Map<string, PhotoAsset>,
-  ctx: { profile: PrintProfile; baseUrl: string },
+  ctx: { profile: PrintProfile; baseUrl: string; style?: AlbumStyle },
 ): PageDescriptor[] {
   const { profile, baseUrl } = ctx
   const widthMm = profile.widthMm + 2 * profile.bleedMm
@@ -81,7 +83,7 @@ export function buildInteriorPages(
       for (const face of [fold.left, fold.right]) {
         const warnings = collectFaceWarnings(face)
         const html = wrapPrintPageHtml(
-          <PrintFace face={face} photosById={photosById} profile={profile} />,
+          <PrintFace face={face} photosById={photosById} profile={profile} style={ctx.style} />,
           { widthMm, heightMm, baseUrl, needsFonts: face.kind === 'dedication' },
         )
         pages.push({ html, widthMm, heightMm, warnings })
@@ -110,7 +112,7 @@ export function buildInteriorPages(
 export function buildInteriorPageElements(
   structure: AlbumStructure,
   photosById: Map<string, PhotoAsset>,
-  ctx: { profile: PrintProfile },
+  ctx: { profile: PrintProfile; style?: AlbumStyle },
 ): { pages: PageElement[]; widthMm: number; heightMm: number } {
   const { profile } = ctx
   const widthMm = profile.widthMm + 2 * profile.bleedMm
@@ -142,7 +144,7 @@ export function buildInteriorPageElements(
     if (fold.kind === 'paired') {
       for (const face of [fold.left, fold.right]) {
         pages.push({
-          element: <PrintFace face={face} photosById={photosById} profile={profile} />,
+          element: <PrintFace face={face} photosById={photosById} profile={profile} style={ctx.style} />,
           needsFonts: face.kind === 'dedication',
           warnings: collectFaceWarnings(face),
         })
@@ -225,7 +227,7 @@ export async function generateInteriorPdf(
       for (const face of [fold.left, fold.right]) {
         collectFaceWarnings(face)
         const html = wrapPrintPageHtml(
-          <PrintFace face={face} photosById={photosById} profile={profile} />,
+          <PrintFace face={face} photosById={photosById} profile={profile} style={ctx.style} />,
           { widthMm, heightMm, baseUrl, needsFonts: face.kind === 'dedication' },
         )
         pagePdfs.push(await renderer.renderPageToPdf(html, widthMm, heightMm))
