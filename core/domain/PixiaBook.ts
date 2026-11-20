@@ -10,6 +10,8 @@ export interface PixiaBook {
   occasion?: string
   /** Formato físico como lo guarda el blueprint: '30x30' | '20x20' | 'a4' (vertical). Sin valor = 30x30. normalizeBook lo lee como raw.format. */
   format?: string
+  /** Páginas interiores: 'sin-margen' (fotos hasta el borde) o 'con-margen'. normalizeBook lo lee como raw.style. */
+  style?: string
   /** Lo que el cliente escribió en el paso "Tu portada". normalizeBook lo lee como raw.cover. */
   cover?: {
     title: string; subtitle?: string; date?: string; photoId?: string

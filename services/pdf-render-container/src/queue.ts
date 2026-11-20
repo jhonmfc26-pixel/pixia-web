@@ -142,9 +142,9 @@ async function processJob(
     // Fotos que no quedaron subidas: no se arregla reintentando — directo a 'fallo' y alerta.
     const unprintable = findUnprintablePhotos(built.input)
     if (unprintable.length > 0) throw new PermanentError(describeUnprintable(unprintable))
-    const { structure, photos, cover, coverPhoto, format } = built.input
+    const { structure, photos, cover, coverPhoto, format, style } = built.input
 
-    const interior = await engine.renderInterior(structure, new Map(Object.entries(photos)), format, baseUrl)
+    const interior = await engine.renderInterior(structure, new Map(Object.entries(photos)), format, baseUrl, style)
     for (const w of interior.warnings) {
       console.warn(`[queue] ${albumId} interior: foto ${w.photoId} a ${w.effectiveDpi} DPI (objetivo ${w.targetDpi})`)
     }

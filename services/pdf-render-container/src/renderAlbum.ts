@@ -3,7 +3,7 @@ import { buildInteriorPageElements, buildCoverPage } from '@/core/modules/print/
 import { wrapPrintAlbumHtml } from '@/core/modules/print/renderPrintAlbumHtml'
 import { getBookPrintProfile } from '@/core/modules/print/printProfiles'
 import type { AlbumStructure } from '@/core/modules/foldModel/types'
-import type { CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { AlbumStyle, CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 import type { DpiWarning } from '@/core/modules/print/dpiCheck'
 import { allowedPrintHosts, isAllowedPrintUrl, isPixiaAsset } from './printHosts'
 import { imageInfo, placeholderSvg, requiredScale, downscaleForPrint, limiter, type ImageInfo } from './printImages'
@@ -23,9 +23,11 @@ export interface RenderResult {
  * (2GB+ configurados en Cloud Run) y Chromium hace SU trabajo normal de
  * paginar un documento largo, algo para lo que está diseñado.
  */
-export async function renderInteriorPdf(structure: AlbumStructure, photosById: Map<string, PhotoAsset>, format: string, baseUrl: string): Promise<RenderResult> {
+export async function renderInteriorPdf(
+  structure: AlbumStructure, photosById: Map<string, PhotoAsset>, format: string, baseUrl: string, style: AlbumStyle = 'sin-margen',
+): Promise<RenderResult> {
   const profile = getBookPrintProfile(format)
-  const { pages, widthMm, heightMm } = buildInteriorPageElements(structure, photosById, { profile })
+  const { pages, widthMm, heightMm } = buildInteriorPageElements(structure, photosById, { profile, style })
   const warnings = pages.flatMap((p) => p.warnings)
 
   const html = wrapPrintAlbumHtml(

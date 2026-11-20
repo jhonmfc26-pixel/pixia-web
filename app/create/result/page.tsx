@@ -155,6 +155,7 @@ export default function ResultPage() {
           photos,
           story: state.storyType ?? 'general',
           format: getFormat(state.format).blueprintFormat,
+          style: state.pageStyle,
           title: state.cover?.title?.trim() || undefined,
           subtitle: state.cover?.subtitle,
           date: state.cover?.date,

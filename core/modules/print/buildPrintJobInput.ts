@@ -2,7 +2,7 @@ import { normalizeBook } from '@/core/modules/album/normalizeBook'
 import { foldsFromBlueprint } from '@/core/modules/foldModel/fromBlueprint'
 import { validateAlbumStructure } from '@/core/modules/foldModel/validateStructure'
 import type { AlbumStructure } from '@/core/modules/foldModel/types'
-import type { CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { AlbumStyle, CoverConfig, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
 
 /**
  * Todo lo que el motor de PDF necesita para generar interior + cubierta de
@@ -19,6 +19,8 @@ export interface PrintJobInput {
   cover: CoverConfig
   coverPhoto?: PhotoAsset
   format: string
+  /** Márgenes de página: lo que el cliente vio en el visor es lo que se imprime. */
+  style: AlbumStyle
 }
 
 export type BuildPrintJobInputResult =
@@ -65,6 +67,7 @@ export function buildPrintJobInput(rawBlueprint: any, albumId: string): BuildPri
       cover: book.cover,
       coverPhoto,
       format: book.format,
+      style: book.style === 'sin-margen' ? 'sin-margen' : 'con-margen',
     },
     warnings,
   }

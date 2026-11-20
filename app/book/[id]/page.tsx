@@ -173,8 +173,8 @@ function BookPageInner() {
           key: `${s.left.id}-${s.right.id}`, label: `${i + 1}`, aspectRatio: 2 * pageAspect,
           render: (
             <div style={{ display: 'flex', width: '100%', height: '100%', gap: '1px' }}>
-              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={s.left} photosById={photosById} /></div>
-              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={s.right} photosById={photosById} /></div>
+              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={s.left} photosById={photosById} style={book.style} /></div>
+              <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}><FaceThumbnail face={s.right} photosById={photosById} style={book.style} /></div>
             </div>
           ),
         }
@@ -423,8 +423,8 @@ function BookPageInner() {
       case 'paired':
         return (
           <>
-            <div style={panelStyle}><FacePageView face={s.left} photosById={photosById} /></div>
-            <div style={panelStyle}><FacePageView face={s.right} photosById={photosById} /></div>
+            <div style={panelStyle}><FacePageView face={s.left} photosById={photosById} style={book.style} /></div>
+            <div style={panelStyle}><FacePageView face={s.right} photosById={photosById} style={book.style} /></div>
           </>
         )
       case 'composition':

@@ -1,6 +1,7 @@
 'use client'
 
-import type { PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import type { AlbumStyle, PhotoAsset } from '@/core/contracts/AlbumBlueprint'
+import { PageMargin, faceHasPageMargin } from './SpreadFaces'
 import type { Face } from '@/core/modules/foldModel/types'
 import { getLayoutById } from '@/core/modules/album/layouts/helpers'
 import { DedicationCard } from '@/core/modules/dedication/DedicationCard'
@@ -16,10 +17,20 @@ import PixiaImage from '@/components/ui/PixiaImage'
  * Dedicatoria: reusa DedicationCard directo (ya es liviana — poco texto, sin
  * grid de fotos, y su propia foto opcional ya pasa por PixiaImage).
  */
-export function FaceThumbnail({ face, photosById }: {
+export function FaceThumbnail({ face, photosById, style }: {
   face: Face
   photosById: Map<string, PhotoAsset>
+  /** Márgenes de página del álbum (mismo marco que el visor y el PDF). */
+  style?: AlbumStyle
 }) {
+  return (
+    <PageMargin show={faceHasPageMargin(face, style)}>
+      <ThumbContent face={face} photosById={photosById} />
+    </PageMargin>
+  )
+}
+
+function ThumbContent({ face, photosById }: { face: Face; photosById: Map<string, PhotoAsset> }) {
   if (face.kind === 'dedication' && face.dedication) {
     const photo = face.dedication.photoId ? photosById.get(face.dedication.photoId) : undefined
     return <DedicationCard dedication={face.dedication} photo={photo} />
