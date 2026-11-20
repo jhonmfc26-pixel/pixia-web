@@ -18,7 +18,8 @@
     "pdf-lib": "^1.17.1",
     "playwright": "1.62.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

@@ -30,3 +30,13 @@ export function isAllowedPrintUrl(url: string, hosts: Set<string>): boolean {
   if (parsed.protocol === 'data:' || parsed.protocol === 'blob:' || parsed.protocol === 'about:') return true
   return parsed.protocol === 'https:' && hosts.has(parsed.hostname.toLowerCase())
 }
+
+/** ¿Es del almacenamiento de Pixia (fotos, arte, logo)? Esas son las que se reducen para imprimir. */
+export function isPixiaAsset(url: string, extra: string | undefined = process.env.PRINT_EXTRA_HOSTS): boolean {
+  let parsed: URL
+  try { parsed = new URL(url) } catch { return false }
+  if (parsed.protocol !== 'https:') return false
+  const host = parsed.hostname.toLowerCase()
+  if (PIXIA_ASSET_HOSTS.includes(host)) return true
+  return (extra ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean).includes(host)
+}

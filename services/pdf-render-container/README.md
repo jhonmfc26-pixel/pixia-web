@@ -203,9 +203,12 @@ gcloud run deploy pixia-pdf-render \
 ```
 
 Notas sobre las flags:
-- `--memory 2Gi --cpu 2`: pedido explícito del ticket — sobra para 36-40
-  páginas (el interior completo mide ~114MB en el caso probado, bien lejos
-  de 2GB).
+- `--memory 2Gi --cpu 2`: se mantiene. Con fotos reales de iPhone (24 MP) a
+  resolución completa, un álbum de 40 fotos daba un PDF de 234 MB y Chromium
+  pasaba los 2 GB («Page.printToPDF: Printing failed»). Desde v16 el
+  contenedor reduce cada foto a lo que ocupa en la página a 300 ppp
+  (`src/printImages.ts`): 40 fotos → 67 MB y 0,8 GB; 100 fotos → 115 MB y
+  0,85 GB. Cabe en 2 GB sin subir la memoria (ni el costo).
 - `--timeout 300`: 5 min — un álbum grande puede tardar más que una request
   HTTP típica; Cloud Run soporta hasta 60 min si hiciera falta más.
 - `--no-allow-unauthenticated`: el servicio NO queda público — solo se
