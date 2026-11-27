@@ -47,3 +47,9 @@ node_modules
 .DS_Store
 Millos10@/
 google-cloud-sdk/
+
+# OpenNext / Cloudflare Workers
+.open-next
+.wrangler
+.dev.vars
+cloudflare-env.d.ts

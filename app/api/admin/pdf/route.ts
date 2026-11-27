@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isAdminRequest } from '@/lib/admin/auth'
 import { getOrder, signPdfDownloadUrl } from '@/lib/admin/data'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -27,7 +26,7 @@ export async function GET(req: NextRequest) {
   const url = await signPdfDownloadUrl(key)
   if (!url) {
     console.error('[admin/pdf] Falta PDF_CONTAINER_URL o PDF_CONTAINER_SECRET')
-    return new NextResponse('Descargas no configuradas: faltan PDF_CONTAINER_URL y/o PDF_CONTAINER_SECRET en las variables de Cloudflare Pages (y redesplegar).', { status: 500 })
+    return new NextResponse('Descargas no configuradas: faltan PDF_CONTAINER_URL y/o PDF_CONTAINER_SECRET en las variables del Worker de Cloudflare (y redesplegar).', { status: 500 })
   }
   return NextResponse.redirect(url, 302)
 }

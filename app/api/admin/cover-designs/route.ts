@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isAdminRequest } from '@/lib/admin/auth'
 import { createDesign, setDesignActive } from '@/lib/admin/coverDesigns'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 /** Formularios de /admin/portadas: crear un diseño (con su imagen) y mostrar/ocultar. */

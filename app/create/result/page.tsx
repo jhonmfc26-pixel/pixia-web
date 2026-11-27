@@ -1,6 +1,5 @@
 'use client'
 
-export const runtime = 'edge'
 
 import { getFormat } from '@/lib/formats'
 import { useEffect, useRef, useState } from 'react'

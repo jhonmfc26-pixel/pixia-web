@@ -4,7 +4,6 @@ import { formatOfBook } from '@/lib/formats'
 import { syncOrderWithWompi } from '@/lib/paymentSync'
 import { rateLimit } from '@/core/middleware/rateLimiter'
 
-export const runtime = 'edge'
 
 function maskEmail(email: string): string {
   const at = email.indexOf('@')
