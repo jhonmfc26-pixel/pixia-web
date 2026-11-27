@@ -65,5 +65,5 @@ jobs:
         working-directory: services/pdf-render-container
         run: npm run build
 
-      - name: Compilación de la web
-        run: pnpm exec next build
+      - name: Compilación de la web (Worker de Cloudflare con OpenNext)
+        run: pnpm exec opennextjs-cloudflare build
