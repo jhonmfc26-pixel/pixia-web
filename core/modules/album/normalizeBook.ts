@@ -1,4 +1,5 @@
 import type { AlbumBlueprint } from '@/core/contracts/AlbumBlueprint'
+import { canonicalAssetUrl } from './assetUrl'
 import type { LayoutId } from '@/core/modules/album/layouts/registry'
 import { getDefaultTemplate } from '@/core/modules/cover/coverTemplates'
 
@@ -76,8 +77,8 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ídem
         ? spread.photos.map((photo: any) => ({
             ...photo,
-            url: photo.url ?? photo.src ?? photo.thumbnailUrl ?? '',
-            thumbnailUrl: photo.thumbnailUrl ?? photo.url ?? photo.src ?? '',
+            url: canonicalAssetUrl(photo.url ?? photo.src ?? photo.thumbnailUrl ?? ''),
+            thumbnailUrl: canonicalAssetUrl(photo.thumbnailUrl ?? photo.url ?? photo.src ?? ''),
             r2Key: photo.r2Key || '',
             width: photo.width || 0,
             height: photo.height || 0,
@@ -132,8 +133,8 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     photos: (s.photos ?? []).map((p: any) => ({
       id: p.id,
-      url: p.url ?? p.src ?? p.thumbnailUrl ?? '',
-      thumbnailUrl: p.thumbnailUrl ?? p.url ?? p.src ?? '',
+      url: canonicalAssetUrl(p.url ?? p.src ?? p.thumbnailUrl ?? ''),
+      thumbnailUrl: canonicalAssetUrl(p.thumbnailUrl ?? p.url ?? p.src ?? ''),
       r2Key: p.r2Key || '',
       width: p.width || 0,
       height: p.height || 0,
