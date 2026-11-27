@@ -89,7 +89,60 @@ docker run --rm -p 8080:8080 \
 curl http://localhost:8080/health
 ```
 
-## Redesplegar después de cambios en el código (lo más común)
+## Despliegue automático (desde la v18)
+
+Cada fusión a `main` que toque `services/pdf-render-container/`, `core/`,
+`components/` o `lib/` (lo que copia el `Dockerfile`) compila y despliega el
+contenedor sola, con `cloudbuild-deploy.yaml`:
+
+- La imagen queda etiquetada con el commit (`:abc1234`), y la versión de
+  Cloud Run lleva la etiqueta `commit=abc1234`.
+- Variables, secretos y memoria se conservan.
+- Si la versión nueva no arranca, Cloud Run sigue atendiendo con la anterior
+  y la compilación queda en rojo en Cloud Build → History.
+- **Volver atrás:** Cloud Run → pixia-pdf-render → Revisions → la versión
+  anterior → «Manage traffic» → 100 %.
+
+### Puesta en marcha (una sola vez, unos 15 minutos)
+
+```bash
+gcloud config set project project-d750839b-5664-4e5c-87b
+
+# 1. Conectar el repo (en la consola, no tiene comando):
+#    Cloud Build → Repositories → pestaña «2nd gen» → «Create host connection»
+#    → GitHub, región us-central1, nombre «github» → instalar la app de Cloud
+#    Build en jhonmfc26-pixel/pixia-web → «Link repository» → pixia-web.
+#    Ver el nombre que quedó:
+gcloud builds repositories list --connection=github --region=us-central1
+
+# 2. Cuenta de servicio solo para desplegar (permisos mínimos)
+gcloud iam service-accounts create pixia-deployer --display-name "Despliegue del contenedor del PDF"
+SA=pixia-deployer@project-d750839b-5664-4e5c-87b.iam.gserviceaccount.com
+for ROLE in roles/run.admin roles/artifactregistry.writer roles/logging.logWriter; do
+  gcloud projects add-iam-policy-binding project-d750839b-5664-4e5c-87b \
+    --member serviceAccount:$SA --role $ROLE --condition None
+done
+#    Puede desplegar con la cuenta con la que corre el servicio:
+RUNTIME=$(gcloud run services describe pixia-pdf-render --region us-central1 \
+  --format 'value(spec.template.spec.serviceAccountName)')
+RUNTIME=${RUNTIME:-316585315237-compute@developer.gserviceaccount.com}
+gcloud iam service-accounts add-iam-policy-binding $RUNTIME \
+  --member serviceAccount:$SA --role roles/iam.serviceAccountUser
+
+# 3. El activador (cambiar REPO por el nombre que dio el paso 1)
+gcloud builds triggers create github \
+  --name pixia-pdf-deploy --region us-central1 \
+  --repository projects/project-d750839b-5664-4e5c-87b/locations/us-central1/connections/github/repositories/REPO \
+  --branch-pattern '^main$' \
+  --build-config services/pdf-render-container/cloudbuild-deploy.yaml \
+  --included-files 'services/pdf-render-container/**,core/**,components/**,lib/**' \
+  --service-account projects/project-d750839b-5664-4e5c-87b/serviceAccounts/$SA
+
+# 4. Primera corrida a mano, para confirmar que todo funciona:
+gcloud builds triggers run pixia-pdf-deploy --region us-central1 --branch main
+```
+
+## Redesplegar a mano (solo si el despliegue automático no está activo)
 
 Cualquier cambio en `services/pdf-render-container/` o en el `core/` que
 importa (layouts, portada, impresión) solo llega a Cloud Run con un build y
