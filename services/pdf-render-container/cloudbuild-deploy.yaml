@@ -1,0 +1,51 @@
+# Despliegue AUTOMÁTICO del contenedor del PDF.
+#
+# Lo dispara el activador de Cloud Build «pixia-pdf-deploy» cada vez que se
+# fusiona a main un cambio en el contenedor o en el código que comparte con
+# la web (core/, lib/). Así la web y el PDF nunca quedan en versiones
+# distintas (antes, el despliegue a mano dejaba la web adelantada: los
+# márgenes del #62 se veían en el visor pero el PDF no los imprimía hasta
+# desplegar el v17).
+#
+# Pasos: compila la imagen, la sube etiquetada con el commit y la despliega
+# en Cloud Run. Las variables, los secretos y la memoria del servicio se
+# conservan. Si la nueva versión no arranca, Cloud Run no le pasa tráfico y
+# el despliegue queda en rojo: sigue atendiendo la versión anterior.
+#
+# Puesta en marcha (una sola vez): ver «Despliegue automático» en el README.
+steps:
+  - id: compilar
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'services/pdf-render-container/Dockerfile'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/pdf-render-container:$SHORT_SHA'
+      - '.'
+
+  - id: subir
+    name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/pdf-render-container:$SHORT_SHA']
+
+  - id: desplegar
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pixia-pdf-render'
+      - '--region=us-central1'
+      - '--image=gcr.io/$PROJECT_ID/pdf-render-container:$SHORT_SHA'
+      # Etiqueta visible en Cloud Run para saber de qué commit es cada versión.
+      - '--update-labels=commit=$SHORT_SHA'
+
+images:
+  - 'gcr.io/$PROJECT_ID/pdf-render-container:$SHORT_SHA'
+
+options:
+  # La imagen de Playwright es grande: más CPU acelera la compilación.
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s
