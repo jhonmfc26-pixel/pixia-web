@@ -24,6 +24,11 @@
   "kv_namespaces": [
     { "binding": "RATE_LIMIT_KV", "id": "8196b73f4749453cb5e6188fd80b1097" }
   ],
-  // Registros del Worker en el panel de Cloudflare (Workers → pixia-web → Logs).
+  // La base de datos (Supabase) está en São Paulo (aws:sa-east-1). Las rutas
+  // del servidor hacen varias consultas seguidas por petición; ejecutarlas al
+  // lado de la base ahorra un viaje Colombia–Brasil por consulta. Los archivos
+  // estáticos se siguen sirviendo desde el punto más cercano al cliente.
+  "placement": { "region": "aws:sa-east-1" },
+  // Registros del Worker en el panel de Cloudflare (Workers → pixia → Logs).
   "observability": { "enabled": true }
 }
