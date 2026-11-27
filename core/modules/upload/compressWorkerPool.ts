@@ -20,7 +20,7 @@ interface PendingJob {
 }
 
 // Pool-level state: inicializado lazily, una sola vez por sesión de página
-let pool: Worker[] = []
+const pool: Worker[] = []
 let jobCounter = 0
 const pendingJobs = new Map<string, PendingJob>()
 

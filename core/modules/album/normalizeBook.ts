@@ -69,9 +69,11 @@ export function normalizeBook(raw: any, idOverride?: string): AlbumBlueprint {
     const occasion = raw.occasion || 'boda'
     const defaultTemplate = getDefaultTemplate(occasion)
     const cover = raw.cover
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- álbum crudo de cualquier versión (ver arriba)
     const spreads = raw.spreads.map((spread: any) => ({
       ...spread,
       photos: Array.isArray(spread.photos)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ídem
         ? spread.photos.map((photo: any) => ({
             ...photo,
             url: photo.url ?? photo.src ?? photo.thumbnailUrl ?? '',

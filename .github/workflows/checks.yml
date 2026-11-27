@@ -1,0 +1,69 @@
+# Revisión automática de cada PR (y de cada fusión a main).
+# Si algo falla, el PR queda en rojo. Con la regla de protección de la rama
+# main (Settings → Branches), GitHub no deja fusionarlo hasta arreglarlo.
+name: Revisión
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Un PR que recibe otro commit cancela la revisión anterior.
+concurrency:
+  group: revision-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  revision:
+    name: Tipos, lint, pruebas y compilación
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Valores de mentira: la compilación y las pruebas no hablan con servicios reales.
+      RESEND_API_KEY: re_dummy
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: x
+      SUPABASE_SERVICE_ROLE_KEY: x
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Dependencias de la web
+        run: pnpm install --frozen-lockfile
+
+      - name: Dependencias del contenedor del PDF
+        working-directory: services/pdf-render-container
+        run: npm ci
+
+      - name: Tipos (web)
+        run: pnpm typecheck
+
+      - name: Tipos (contenedor)
+        working-directory: services/pdf-render-container
+        run: npm run typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Pruebas
+        run: pnpm test
+
+      - name: Compilación del contenedor
+        working-directory: services/pdf-render-container
+        run: npm run build
+
+      - name: Compilación de la web
+        run: pnpm exec next build

@@ -560,6 +560,7 @@ export default function Step2Upload() {
       </div>
 
       <motion.div
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-dropzone y framer-motion tipan onDrag/onAnimationStart distinto
         {...(getRootProps() as any)}
         whileHover={{ scale: 1.01 }}
         className={`relative border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all
